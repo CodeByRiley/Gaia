@@ -37,6 +37,22 @@ ESP_START = 2048
 ROOT_START = ESP_START + ESP_SECTORS
 
 
+def final_root(text: str) -> str | None:
+    """The volume named by the last root mount, or None if nothing mounted.
+
+    Not the first: mounting a volume is how the kernel discovers it has no
+    system hierarchy, so an ESP the type byte did not give away is mounted,
+    rejected and unmounted before the real root goes on. Only the mount
+    left standing at the end says which volume became the root.
+    """
+    volume = None
+    for line in text.splitlines():
+        marker = " mounted from "
+        if marker in line and line.rstrip().endswith(" at /"):
+            volume = line.split(marker)[1][:-len(" at /")].strip()
+    return volume
+
+
 def boot(qemu: str, iso: Path, disk: Path, log: Path, timeout: float,
          expected: list[tuple[str, str]], forbidden: list[tuple[str, str]]) -> None:
     log.write_bytes(b"")
@@ -64,6 +80,11 @@ def boot(qemu: str, iso: Path, disk: Path, log: Path, timeout: float,
         for needle, why in forbidden:
             if needle in text:
                 raise RuntimeError(f"{why}: saw {needle!r}\n{text}")
+        mounted = final_root(text)
+        if mounted != "ahci0p2":
+            raise RuntimeError(
+                f"the root ended up on {mounted!r}, not the system volume\n"
+                f"{text}")
     finally:
         proc.terminate()
         try:
@@ -108,8 +129,11 @@ def main() -> int:
         ("rootfs: fat mounted from ahci0p2 at /", "root did not come from p2"),
         ("winman: ready", "desktop did not come up"),
     ]
+    # Not "the ESP was never mounted": in the 0c case mounting it is how
+    # the kernel finds out what it is. What must not happen is a spawn
+    # failing, which is the symptom this whole search exists to prevent.
+    # Which volume the boot settles on is checked in boot() instead.
     forbidden = [
-        ("mounted from ahci0p1 at /", "the ESP was mounted as the root"),
         ("process_spawn: cannot open executable", "a spawn found no binary"),
     ]
 
