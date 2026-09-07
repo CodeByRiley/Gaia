@@ -55,10 +55,16 @@ struct mem_stats {
 /* A disk carrying a partition table is PARTITIONED and holds no filesystem of
  * its own: mount its slices instead. It is still listed, because formatting or
  * repartitioning it means addressing the whole disk. */
+/* An ESP is a FAT volume like any other and mounts perfectly, so it is
+ * flagged from its partition type rather than discovered by mounting it: on a
+ * normally installed machine it is the first partition, and a root search that
+ * takes the first thing to mount lands on it instead of on the system volume.
+ * It stays published, because updating a bootloader means writing to it. */
 #define BLOCKDEV_WRITABLE    0x1u
 #define BLOCKDEV_REMOVABLE   0x2u
 #define BLOCKDEV_PARTITION   0x4u
 #define BLOCKDEV_PARTITIONED 0x8u
+#define BLOCKDEV_ESP         0x10u
 
 struct blockdev_info {
   uint64_t sectors;

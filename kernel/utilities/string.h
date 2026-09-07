@@ -11,6 +11,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define NONEMPTY_OR(value, fallback) \
+    ((value) != NULL && (value)[0] != '\0' ? (value) : (fallback))
+
 void   *memcpy(void *dst, const void *src, usize n);
 void   *memmove(void *dst, const void *src, usize n);
 void   *memset(void *dst, int c, usize n);

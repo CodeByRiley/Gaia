@@ -18,6 +18,15 @@ struct MB2_TAG *mb2_find_tag(u64 mb2_addr, u32 type) {
     }
 }
 
+/* The boot info block stays mapped for the life of the machine, so the string
+ * is returned by pointer rather than copied. */
+const char *mb2_boot_cmdline(u64 mb2_addr) {
+    struct MB2_TAG *tag = mb2_find_tag(mb2_addr, MULTIBOOT_TAG_CMDLINE);
+    if (!tag) return 0;
+    const char *string = ((struct MB2_TAG_STRING*)tag)->string;
+    return *string ? string : 0;
+}
+
 /* Walk module tags. If `cmdline` is NULL, returns the first module;
  * otherwise returns the first module whose cmdline matches exactly. */
 struct MB2_TAG_MODULE *mb2_find_module(u64 mb2_addr, const char *cmdline) {

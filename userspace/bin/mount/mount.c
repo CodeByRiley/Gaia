@@ -51,6 +51,7 @@ static int list_volumes(void) {
      * at sector 0 where a filesystem would be. Say so, rather than leave
      * someone to work out why mounting it always fails. */
     const char *kind = volume->flags & BLOCKDEV_PARTITIONED ? "table"
+                       : volume->flags & BLOCKDEV_ESP       ? "esp"
                        : volume->flags & BLOCKDEV_PARTITION ? "partition"
                                                             : "disk";
     printf("%-10s %-8llu MiB %-14llu %-10s %s\n", volume->name, mib,

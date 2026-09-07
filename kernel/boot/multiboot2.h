@@ -16,6 +16,7 @@
 
 /* Tag type IDs we care about. */
 #define MULTIBOOT_TAG_END           0
+#define MULTIBOOT_TAG_CMDLINE       1
 #define MULTIBOOT_TAG_MODULE        3
 #define MULTIBOOT_TAG_MMAP          6
 #define MULTIBOOT_TAG_FRAMEBUFFER   8
@@ -62,6 +63,13 @@ struct MB2_TAG_MODULE {
     u32 mod_start;     /* physical addr of module first byte         */
     u32 mod_end;       /* physical addr one past last byte           */
     char     cmdline[];     /* null-terminated string                     */
+} PACKED;
+
+/* Kernel command line (tag 1) and bootloader name (tag 2) share this shape. */
+struct MB2_TAG_STRING {
+    u32 type;
+    u32 size;
+    char string[];     /* null-terminated                            */
 } PACKED;
 
 /* Framebuffer description. */
@@ -127,5 +135,9 @@ struct MB2_TAG        *mb2_find_tag(u64 mb2_addr, u32 type);
 
 /* Walk module tags looking for one whose cmdline matches `cmdline`. */
 struct MB2_TAG_MODULE *mb2_find_module(u64 mb2_addr, const char *cmdline);
+
+/* The kernel's own command line, or NULL when the bootloader passed none and
+ * when it passed an empty one , neither carries an option to read. */
+const char *mb2_boot_cmdline(u64 mb2_addr);
 
 #endif

@@ -27,6 +27,7 @@
 #define MBR_TYPE_EXTENDED_LBA 0x0Fu
 #define MBR_TYPE_EXTENDED_LINUX 0x85u
 #define MBR_TYPE_GPT_PROTECTIVE 0xEEu
+#define MBR_TYPE_EFI_SYSTEM 0xEFu
 
 /* A malformed or hostile EBR chain must not spin forever. Real disks use a
  * handful of links; DOS itself stopped well before this. */
@@ -105,9 +106,13 @@ static int has_signature(const u8 *sector) {
 
 /* Publish one slice. Returns 1 when it was published, 0 when it was rejected
  * or could not be named -- a bad entry skips its slot, it does not abort the
- * disk, because the other entries may still be sound. */
+ * disk, because the other entries may still be sound.
+ *
+ * `type` is the entry's system-ID byte. Only 0xEF is acted on, and only to
+ * mark the volume: what a partition holds is decided by mounting it, not by a
+ * byte an installer may well have got wrong. */
 static int publish(const struct block_device *parent, const char *parent_name,
-                   u32 number, u64 first, u64 sectors, u32 inherit) {
+                   u32 number, u64 first, u64 sectors, u32 inherit, u8 type) {
     if (!sectors || first >= parent->sectors ||
         sectors > parent->sectors - first)
         return 0;
@@ -132,13 +137,17 @@ static int publish(const struct block_device *parent, const char *parent_name,
         .flush = parent->flush ? slice_flush : 0,
     };
 
+    u32 role = type == MBR_TYPE_EFI_SYSTEM ? BLOCKDEV_ESP : 0u;
     if (blockdev_register(name, &slice->device, first,
-                          inherit | BLOCKDEV_PARTITION) != 0)
+                          inherit | BLOCKDEV_PARTITION | role) != 0)
         return 0;
     slice_count++;
     log_write_fmt(KERNEL, LOG_INFO,
                   "partition: %s at LBA %llu, %llu sectors", name,
                   (unsigned long long)first, (unsigned long long)sectors);
+    if (role)
+        log_write_string("partition: EFI system partition", name, KERNEL,
+                         LOG_INFO);
     return 1;
 }
 
@@ -164,7 +173,7 @@ static int scan_logical(const struct block_device *parent,
         u64 sectors = read_le32(entry + 12);
         if (entry[4] != MBR_TYPE_EMPTY && sectors)
             published += publish(parent, parent_name, number, here + first,
-                                 sectors, inherit);
+                                 sectors, inherit, entry[4]);
         number++;
 
         const u8 *next = entry + MBR_ENTRY_BYTES;
@@ -229,7 +238,7 @@ int partition_scan(const struct block_device *parent, const char *parent_name,
             continue;
         }
         published += publish(parent, parent_name, i + 1, first, sectors,
-                             inherit);
+                             inherit, entry[4]);
     }
     return published;
 }

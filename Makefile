@@ -280,6 +280,18 @@ $(HOST_TEST_DIR)/mbr-base.img: tools/create_partitioned_test_image.sh \
 		| $(HOST_TEST_DIR)
 	$(call run_linux,bash tools/create_partitioned_test_image.sh $@)
 
+# An installed machine's layout: ESP first, system volume second. Both
+# carry the real root image, so both depend on it; the two differ only in
+# the ESP's type byte, which is what decides whether the kernel can skip
+# it on sight rather than having to mount it and look.
+$(HOST_TEST_DIR)/esp-root-ef.img: tools/create_esp_root_image.sh $(disk_img) \
+		| $(HOST_TEST_DIR)
+	$(call run_linux,bash tools/create_esp_root_image.sh $@ $(disk_img) ef)
+
+$(HOST_TEST_DIR)/esp-root-0c.img: tools/create_esp_root_image.sh $(disk_img) \
+		| $(HOST_TEST_DIR)
+	$(call run_linux,bash tools/create_esp_root_image.sh $@ $(disk_img) 0c)
+
 EXT2_HOST_SRCS := kernel/fs/ext2/ext2_mount.c kernel/fs/ext2/ext2_inode.c \
 		kernel/fs/ext2/ext2_io.c \
 		kernel/fs/ext2/ext2_dir.c kernel/fs/ext2/ext2_file.c \
@@ -424,14 +436,17 @@ holyd-win:
 	@echo "  ./holyd.exe samples/gui.hd"
 
 .PHONY: test-qemu-heavy test-heavy
-# Both images are real prerequisites, not just host-test artefacts: the mount
+# These images are real prerequisites, not just host-test artefacts: the mount
 # test needs a second volume in a format the FAT root is not, and the MBR test
-# needs a disk whose sector 0 is a partition table.
-test-qemu-heavy: build-x86_64 $(HOST_TEST_DIR)/ext2-base.img $(HOST_TEST_DIR)/mbr-base.img
+# needs a disk whose sector 0 is a partition table, and the ESP test needs
+# one whose first partition is a bootloader's.
+test-qemu-heavy: build-x86_64 $(HOST_TEST_DIR)/ext2-base.img $(HOST_TEST_DIR)/mbr-base.img \
+		$(HOST_TEST_DIR)/esp-root-ef.img $(HOST_TEST_DIR)/esp-root-0c.img
 	wsl bash -lc "cd \$$(wslpath '$(CURDIR)') && \
 		python3 tests/smp_async_spawn_test.py --cpus 4 --timeout 90 && \
 		python3 tests/mount_syscall_test.py --timeout 180 && \
 		python3 tests/mbr_partition_test.py --timeout 200 && \
+		python3 tests/esp_root_test.py --timeout 220 && \
 		python3 tests/system_stress_test.py --cpus 4 --timeout 240 && \
 		python3 tests/window_lifecycle_test.py --timeout 120 && \
 		python3 tests/muse_liveness_test.py --timeout 90 && \

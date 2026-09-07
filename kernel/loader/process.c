@@ -466,7 +466,9 @@ static long spawn_async_on_tty(const char *path, char *const argv[], int tty) {
   else
     load_head = req;
   load_tail = req;
-  log_write_hex("process_spawn: queued pid =", (u64)req->reserved->pid, USER,
+  log_write_string("process_spawn: enqueued", NONEMPTY_OR(req->reserved->name, req->path),
+                   USER, LOG_INFO);
+  log_write_hex("process_spawn: process pid =", (u64)req->reserved->pid, USER,
                 LOG_INFO);
   return req->reserved->pid;
 }

@@ -185,7 +185,7 @@ static void init_task_entry(void) {
   if (winman_pid < 0)
     log_write("winman: launch failed , TTY-only mode", USER, LOG_INFO);
   else
-    log_write_hex("winman: spawn returned pid =", (u64)winman_pid, USER,
+    log_write_hex("winman: launched pid: ", (u64)winman_pid, USER,
                   LOG_INFO);
 
   for (int i = 0; i < WM_REGISTER_GRACE_TICKS && msg_input_owner() == 0; i++)
