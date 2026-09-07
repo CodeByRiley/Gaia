@@ -35,7 +35,7 @@ PE_CFLAGS := -ffreestanding -nostdlib -fno-pie -mno-red-zone -static \
 # source the ELF build uses.
 PE_LIB_OBJS := lib/crt0_pe.pe.o lib/syscall_pe.pe.o lib/syscall.pe.o \
                lib/syscall_posix.pe.o \
-               lib/printf.pe.o lib/string.pe.o lib/string_extra.pe.o \
+               lib/printf.pe.o lib/string.pe.o lib/string_extra.pe.o lib/errno.pe.o \
                lib/malloc.pe.o lib/pthread.pe.o
 
 # C-source PE lib objects (crt0_pe is assembly and has its own rule).
@@ -66,7 +66,7 @@ PE_VARIANT_EXES := $(foreach b,$(PE_VARIANTS),bin/$(b)/$(b).exe)
 # DOOM-only, which meant any other binary calling time() failed to link.
 LIB_OBJS := lib/crt0.o lib/syscall_asm.o lib/syscall.o lib/syscall_posix.o lib/event.o lib/wm.o lib/app.o lib/process.o \
             lib/printf.o lib/malloc.o lib/stdio.o lib/stdio_extra.o lib/string.o lib/keymap.o lib/console.o \
-            lib/stdlib_extra.o lib/string_extra.o lib/stat.o lib/bmp.o lib/gfx.o lib/ui.o \
+            lib/stdlib_extra.o lib/string_extra.o lib/errno.o lib/stat.o lib/bmp.o lib/gfx.o lib/ui.o \
             lib/damage.o lib/page_alloc.o lib/pthread.o lib/time_stub.o
 
 TTF_OBJS := lib/ttf.o
@@ -205,7 +205,7 @@ DOOM_PLATFORM_SRC := games/doom/doomgeneric_kernel.c games/doom/joystick_stub.c
 DOOM_PLATFORM_OBJS := $(DOOM_PLATFORM_SRC:.c=.o)
 
 DOOM_EXTRA_OBJS := lib/string_extra.o lib/stdio_extra.o \
-                   lib/math_stub.o lib/setjmp_stub.o lib/errno.o \
+                   lib/math_stub.o lib/setjmp_stub.o \
                    lib/unistd_stub.o
 
 DOOM_CFLAGS  := -ffreestanding -nostdlib -fno-pie -mno-red-zone -static \

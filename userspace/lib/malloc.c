@@ -15,6 +15,7 @@
 #ifdef TOS_USE_MUSL
 #include <string.h>
 #else
+#include <include/errno.h>
 #include <include/string.h>
 #endif
 #include <stdint.h>
@@ -65,7 +66,12 @@ static struct block *request_block(size_t n) {
 
     void *mem = mmap(0, bytes, PROT_READ | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANONYMOUS);
-    if (mem == MAP_FAILED) return 0;
+    if (mem == MAP_FAILED) {
+        /* malloc(3) exposes allocation failure as ENOMEM even when the
+         * underlying mapping mechanism had a more specific reason. */
+        errno = ENOMEM;
+        return 0;
+    }
 
     struct block *b = (struct block*)mem;
     b->size = bytes - sizeof(*b);
@@ -137,7 +143,10 @@ void free(void *p) {
 /* Standard calloc(3). Detects multiplication overflow before alloc. */
 void *calloc(size_t n, size_t sz) {
     size_t total = n * sz;
-    if (sz && total / sz != n) return 0;
+    if (sz && total / sz != n) {
+        errno = ENOMEM;
+        return 0;
+    }
 
     void *p = malloc(total);
     if (p) memset(p, 0, total);

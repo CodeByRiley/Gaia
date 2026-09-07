@@ -4,6 +4,13 @@
 
 #include "utilities/types.h"
 
+/* MinGW's host headers define errno as a DLL-backed function-like macro.
+ * TOS's freestanding legacy libc owns a simple process-global integer instead.
+ * Undefine it before declaring the ABI symbol so PE and ELF agree. */
+#ifdef errno
+#undef errno
+#endif
+
 extern int errno;
 
 /*
@@ -55,13 +62,35 @@ enum errornum {
     ENOSYS       = 38,
     ENOTEMPTY    = 39,
     ELOOP        = 40,
-    /* Socket codes. Not contiguous with the block above because these are
-     * the Linux numbers, which is what the kernel returns and what musl's
-     * headers use; see kernel/utilities/errno.h. */
-    ENOTSOCK        = 88,
+
+    /* Extended file and data errors */
+    EOVERFLOW    = 75,
+
+    /*
+     * Socket and network errors.
+     * These retain their Linux values; they are intentionally non-contiguous.
+     */
+    ENOTSOCK     = 88,
+    EDESTADDRREQ = 89,
+    EMSGSIZE      = 90,
+    EPROTOTYPE    = 91,
+
     EPROTONOSUPPORT = 93,
     EAFNOSUPPORT    = 97,
-    EADDRINUSE      = 98,
+    EADDRINUSE     = 98,
+    EADDRNOTAVAIL  = 99,
+    ENETDOWN       = 100,
+    ENETUNREACH    = 101,
+    ECONNABORTED   = 103,
+    ECONNRESET     = 104,
+    ENOBUFS        = 105,
+    EISCONN        = 106,
+    ENOTCONN       = 107,
+    ESHUTDOWN      = 108,
+    ETIMEDOUT      = 110,
+    ECONNREFUSED   = 111,
+    EHOSTUNREACH   = 113,
 };
+
 
 #endif

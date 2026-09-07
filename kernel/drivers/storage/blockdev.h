@@ -30,8 +30,8 @@
 /* `start_lba` is where this volume begins inside its parent disk, and is 0 for
  * a whole disk. `flags` carries the BLOCKDEV_* bits the caller knows about;
  * BLOCKDEV_WRITABLE is derived from the device itself and need not be passed.
- * Returns 0, or -1 on a duplicate or over-long name, a device with no read
- * callback or no sectors, or a full table. */
+ * Returns 0 or a negative errno: EINVAL for an invalid descriptor, EEXIST
+ * for a duplicate name, or ENOSPC when the fixed registry is full. */
 int blockdev_register(const char *name, const struct block_device *device,
                       uint64_t start_lba, uint32_t flags);
 
@@ -41,13 +41,13 @@ int blockdev_set_flags(const char *name, uint32_t flags);
 
 size_t blockdev_count(void);
 
-/* Describe entry `index` for enumeration. 0 on success, -1 past the end.
+/* Describe entry `index` for enumeration. 0 on success, -ENOENT past the end.
  * Entries keep their index for the life of the machine, so a walk that stops
  * at the first -1 sees every volume. */
 int blockdev_describe(size_t index, struct blockdev_info *out);
 
-/* Resolve a published name to a usable transport. 0 on success, -1 if no
- * volume goes by that name. */
+/* Resolve a published name to a usable transport. 0 on success, -ENOENT if no
+ * volume goes by that name, or -EINVAL for invalid arguments. */
 int blockdev_lookup(const char *name, struct block_device *out);
 
 #endif

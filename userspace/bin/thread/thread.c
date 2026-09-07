@@ -55,25 +55,35 @@ int main() {
 
     void *t1_stack = malloc(16384);
     void *t2_stack = malloc(16384);
-    if (!t1_stack || !t2_stack) return 1;
+    if (!t1_stack || !t2_stack) {
+        perror("thread: allocate worker stacks");
+        free(t1_stack);
+        free(t2_stack);
+        return 1;
+    }
 
     // void *t1_stack_top = (char*)t1_stack + 16384 - 8;
     // void *t2_stack_top = (char*)t2_stack + 16384 - 8;
 
     pthread_t tid1, tid2;
-    pthread_create(&tid1, NULL, thread_func, NULL);
-    pthread_create(&tid2, NULL, thread_func1, NULL);
+    if (pthread_create(&tid1, NULL, thread_func, NULL) != 0 ||
+        pthread_create(&tid2, NULL, thread_func1, NULL) != 0) {
+        perror("thread: create worker");
+        return 1;
+    }
 
     printf("Main created threads %lu %lu\n", tid1, tid2);
 
     // Safely wait for both threads to completely finish!
-    pthread_join(tid1, NULL);
-    pthread_join(tid2, NULL);
+    if (pthread_join(tid1, NULL) != 0 || pthread_join(tid2, NULL) != 0) {
+        perror("thread: join worker");
+        return 1;
+    }
 
     printf("Main exiting. Final counter: %d %d\n", t1_counter, t2_counter);
 
     // Now it is 100% safe to free the stacks!
     free(t1_stack);
     free(t2_stack);
-    return 1;
+    return 0;
 }

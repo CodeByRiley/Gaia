@@ -23,15 +23,16 @@ static const struct vfs_filesystem *find_type(const char *name) {
 
 int vfs_register(const struct vfs_filesystem *type) {
     VFS_GUARD();
-    if (!type || !type->name || !*type->name || !type->mount || find_type(type->name))
-        return -1;
+    if (!type || !type->name || !*type->name || !type->mount)
+        return -EINVAL;
+    if (find_type(type->name)) return -EEXIST;
     for (size_t i = 0; i < VFS_MAX_FILESYSTEMS; i++) {
         if (!filesystems[i]) {
             filesystems[i] = type;
             return 0;
         }
     }
-    return -1;
+    return -ENOSPC;
 }
 
 struct vfs_mount *vfs_find_mount(const char *path) {
@@ -112,7 +113,7 @@ int vfs_mount_child_named(const char *parent, const char *name) {
 /* Normalize slashes but reject dot components in mount names. */
 static int mount_name(const char *path, char out[VFS_PATH_MAX]) {
     size_t length;
-    if (vfs_path_length(path, &length)) return -1;
+    if (vfs_path_length(path, &length)) return -EINVAL;
     size_t at = 0;
     out[at++] = '/';
     for (size_t i = 1; i < length;) {
@@ -270,7 +271,7 @@ int vfs_sync_all(void) {
     for (size_t i = 0; i < VFS_MAX_MOUNTS; i++) {
         struct vfs_superblock *super = &mounts[i].super;
         if (super->filesystem && super->filesystem->sync && super->filesystem->sync(super))
-            result = -1;
+            result = -EIO;
     }
     return result;
 }
@@ -286,9 +287,9 @@ int vfs_device_mounted(const void *context) {
 
 int vfs_file_sync(struct vfs_file *file) {
     VFS_GUARD();
-    if (!file || !file->node) return -1;
+    if (!file || !file->node) return -EINVAL;
     struct vfs_superblock *super = file->node->super;
-    return super->filesystem->sync ? super->filesystem->sync(super) : 0;
+    return super->filesystem->sync && super->filesystem->sync(super) ? -EIO : 0;
 }
 
 struct vfs_inode *vfs_inode_get(struct vfs_superblock *super, uint64_t number,

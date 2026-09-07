@@ -281,9 +281,13 @@ static int load_request_image(struct spawn_request *req,
   }
 
   u8 magic[16] = {0};
-  FILE *sniff = fopen(req->path, "r");
+  int open_error = 0;
+  FILE *sniff = fopen_ex(req->path, "r", &open_error);
   if (!sniff) {
-    log_write("process_spawn: fopen failed", KERNEL, LOG_ERROR);
+    log_write_string("process_spawn: cannot open executable", req->path, KERNEL,
+                     LOG_ERROR);
+    log_write_string("process_spawn: fopen failed:",
+                     fopen_error_string(open_error), KERNEL, LOG_ERROR);
     goto fail;
   }
   usize read = fread(magic, 1, sizeof(magic), sniff);

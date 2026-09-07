@@ -1243,7 +1243,7 @@ static long sys_open(const char *path, int flags) {
   if (rc != 0) {
     vfs_close(f);
     kfree(f);
-    return -ENOENT;
+    return rc < 0 ? rc : -EIO;
   }
 
   int fd = fd_alloc_for(t, f);
@@ -1334,8 +1334,9 @@ static long sys_stat_raw(const char *path, struct stat_user *out) {
     return -ENAMETOOLONG;
 
   struct vfs_stat fs;
-  if (vfs_stat(resolved, &fs) != 0)
-    return -ENOENT;
+  int rc = vfs_stat(resolved, &fs);
+  if (rc != 0)
+    return rc < 0 ? rc : -EIO;
 
   stat_from_vfs(&fs, out);
   return 0;
@@ -1350,8 +1351,9 @@ static long sys_stat(const char *path, struct linux_kstat *out) {
     return -ENAMETOOLONG;
 
   struct vfs_stat fs;
-  if (vfs_stat(resolved, &fs) != 0)
-    return -ENOENT;
+  int rc = vfs_stat(resolved, &fs);
+  if (rc != 0)
+    return rc < 0 ? rc : -EIO;
 
   if (!user_buffer_ok(out, sizeof(*out), 1))
     return -EFAULT;
@@ -1371,13 +1373,15 @@ static long sys_fstat_raw(int fd, struct stat_user *out) {
 
   if (task_fd_is_dir(t, fd)) {
     struct vfs_stat fs;
-    if (vfs_stat(task_fd_slot(t, fd)->dir_path, &fs) != 0)
-      return -ENOENT;
+    int rc = vfs_stat(task_fd_slot(t, fd)->dir_path, &fs);
+    if (rc != 0)
+      return rc < 0 ? rc : -EIO;
     stat_from_vfs(&fs, out);
   } else {
     struct vfs_stat fs;
-    if (vfs_file_stat(task_fd_file(t, fd), &fs) != 0)
-      return -EIO;
+    int rc = vfs_file_stat(task_fd_file(t, fd), &fs);
+    if (rc != 0)
+      return rc < 0 ? rc : -EIO;
     stat_from_vfs(&fs, out);
   }
   return 0;
@@ -1394,11 +1398,13 @@ static long sys_fstat(int fd, struct linux_kstat *out) {
 
   struct vfs_stat fs;
   if (task_fd_is_dir(t, fd)) {
-    if (vfs_stat(task_fd_slot(t, fd)->dir_path, &fs) != 0)
-      return -ENOENT;
+    int rc = vfs_stat(task_fd_slot(t, fd)->dir_path, &fs);
+    if (rc != 0)
+      return rc < 0 ? rc : -EIO;
   } else {
-    if (vfs_file_stat(task_fd_file(t, fd), &fs) != 0)
-      return -EIO;
+    int rc = vfs_file_stat(task_fd_file(t, fd), &fs);
+    if (rc != 0)
+      return rc < 0 ? rc : -EIO;
   }
   linux_stat_from_vfs(&fs, out);
   return 0;
@@ -1430,8 +1436,9 @@ static long sys_lseek(int fd, long off, int whence) {
       return -EINVAL;
     target = base + (u64)off;
   }
-  if (vfs_seek(f, target) != 0)
-    return -EINVAL;
+  int rc = vfs_seek(f, target);
+  if (rc != 0)
+    return rc < 0 ? rc : -EIO;
   return (long)target;
 }
 
@@ -1891,8 +1898,9 @@ static long sys_mount(const char *source, const char *target,
    * is the same thing Linux reports for a /dev entry that is not there.
    * ENODEV stays reserved for a filesystem type we do not have. */
   struct block_device transport;
-  if (blockdev_lookup(name, &transport) != 0)
-    return -ENOENT;
+  int lookup_result = blockdev_lookup(name, &transport);
+  if (lookup_result != 0)
+    return lookup_result < 0 ? lookup_result : -EIO;
 
   /* transport is a copy on this stack, which is fine only because every
    * backend copies the descriptor during attach rather than retaining the
@@ -1965,8 +1973,11 @@ static long sys_blockdev_list(struct blockdev_info *out, long max) {
 #define RAW_BLOCK_MAX_SECTORS 64u
 static int raw_block_device(const char *source, struct block_device *out) {
   char device[BLOCKDEV_NAME_MAX + sizeof(DEV_PREFIX)];
-  if (!source || copy_user_string(source, device, sizeof(device)) != 0)
-    return -1;
+  if (!source)
+    return -EFAULT;
+  long result = copy_user_string(source, device, sizeof(device));
+  if (result)
+    return result < 0 ? (int)result : -EIO;
   const char *name = !strncmp(device, DEV_PREFIX, sizeof(DEV_PREFIX) - 1)
       ? device + sizeof(DEV_PREFIX) - 1 : device;
   return blockdev_lookup(name, out);
@@ -1979,8 +1990,9 @@ static long sys_blockdev_read(const char *source, u64 lba, u64 count, void *out)
     return -EINVAL;
   if (!user_buffer_ok(out, count * BLOCK_SECTOR_SIZE, 1))
     return -EFAULT;
-  if (raw_block_device(source, &device))
-    return -ENOENT;
+  int lookup_result = raw_block_device(source, &device);
+  if (lookup_result)
+    return lookup_result < 0 ? lookup_result : -EIO;
   return block_read(&device, lba, (u32)count, out) ? -EIO : (long)count;
 }
 static long sys_blockdev_write(const char *source, u64 lba, u64 count, const void *in) {
@@ -1991,8 +2003,9 @@ static long sys_blockdev_write(const char *source, u64 lba, u64 count, const voi
     return -EINVAL;
   if (!user_buffer_ok(in, count * BLOCK_SECTOR_SIZE, 0))
     return -EFAULT;
-  if (raw_block_device(source, &device))
-    return -ENOENT;
+  int lookup_result = raw_block_device(source, &device);
+  if (lookup_result)
+    return lookup_result < 0 ? lookup_result : -EIO;
   /* Writing under a live filesystem would corrupt whatever its cache still
    * intends to flush, so a mounted volume is busy, not invalid. */
   if (vfs_device_mounted(device.context))
@@ -2001,8 +2014,9 @@ static long sys_blockdev_write(const char *source, u64 lba, u64 count, const voi
 }
 static long sys_blockdev_flush(const char *source) {
   struct block_device device;
-  if (raw_block_device(source, &device))
-    return -ENOENT;
+  int lookup_result = raw_block_device(source, &device);
+  if (lookup_result)
+    return lookup_result < 0 ? lookup_result : -EIO;
   return block_flush(&device) ? -EIO : 0;
 }
 
@@ -2019,8 +2033,9 @@ static long sys_chdir(const char *path) {
    * whose first name is long would not fit in a probe buffer, and an
    * empty directory has no entry to read at all. */
   struct vfs_stat st;
-  if (vfs_stat(resolved, &st) != 0)
-    return -ENOENT;
+  int rc = vfs_stat(resolved, &st);
+  if (rc != 0)
+    return rc < 0 ? rc : -EIO;
   if (st.type != VFS_NODE_DIRECTORY)
     return -ENOTDIR;
 

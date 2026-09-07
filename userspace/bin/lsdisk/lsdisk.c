@@ -6,7 +6,9 @@
  * column for people at the console.
  */
 #include <lib/syscall.h>
+#include <errno.h>
 #include <stdio.h>
+#include <string.h>
 
 #define MAX_VOLUMES 64
 #define MIB (1024ULL * 1024ULL)
@@ -24,7 +26,7 @@ int main(int argc, char **argv) {
 
   long count = blockdev_list(volumes, MAX_VOLUMES);
   if (count < 0) {
-    printf("lsdisk: could not read the disk list\n");
+    printf("lsdisk: could not read the disk list: %s\n", strerror(errno));
     return 1;
   }
   if (count == 0) {

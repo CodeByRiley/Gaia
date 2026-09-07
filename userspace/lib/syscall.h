@@ -116,6 +116,15 @@ sysarg_t syscall5(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d,
 sysarg_t syscall6(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d,
                   sysarg_t e, sysarg_t f);
 
+/* Convert the kernel's negative errno result into the conventional
+ * userspace pair: errno is set and the caller receives -1. Musl performs
+ * this internally, so libtos keeps its raw results when built with musl. */
+#ifndef TOS_USE_MUSL
+long syscall_result(sysarg_t result);
+#else
+static inline long syscall_result(sysarg_t result) { return (long)result; }
+#endif
+
 /* Pointer -> syscall argument, at full width under both data models. */
 #define SYSPTR(p) ((sysarg_t)(uintptr_t)(p))
 
@@ -168,10 +177,8 @@ long yield(void);
  * have, EBUSY for a mountpoint already in use (and for unmounting "/", or a
  * volume with a file still open), EINVAL for a source no backend recognises,
  * EIO when the final sync of an unmount failed and the volume therefore
- * stays mounted. A musl-linked caller sees the usual errno and -1, because
- * musl's __syscall_ret does that translation; the hand-rolled wrappers in
- * syscall_posix.c hand the negative value back unchanged, as everything else
- * in that file does.
+ * stays mounted. Both libc variants expose the usual errno and -1: musl via
+ * __syscall_ret and the hand-rolled wrappers via syscall_result().
  *
  * The one worth recognising is EINVAL on a whole disk: every backend read it
  * and refused, which usually means it holds a partition table rather than a

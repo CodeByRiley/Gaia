@@ -38,9 +38,12 @@
  * @return The virtual address of the image's entry point, or 0 on failure.
  */
 u64 pe_load(const char *path, u64 *pml4) {
-  FILE *fp = fopen(path, "rb");
+  int open_error = 0;
+  FILE *fp = fopen_ex(path, "rb", &open_error);
   if (!fp) {
-    log_write("pe: fopen failed", KERNEL, LOG_ERROR);
+    log_write_string("pe: cannot open executable", path, KERNEL, LOG_ERROR);
+    log_write_string("pe: fopen reason", fopen_error_string(open_error),
+                     KERNEL, LOG_ERROR);
     return 0;
   }
 

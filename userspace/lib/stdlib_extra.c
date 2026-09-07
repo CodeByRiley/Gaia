@@ -5,6 +5,7 @@
  * is fast or robust , just enough to bring DOOM and the shell up.
  */
 #include <lib/syscall.h>
+#include <include/stdio.h>
 #include <include/stdlib.h>
 
 /* Integer absolute value. */
@@ -52,6 +53,13 @@ long strtol(const char *s, char **end, int base) {
 
 /* Abnormal termination , calls exit(1). No signal raised. */
 void abort(void) { exit(1); }
+
+/* Keep assertion failures actionable even in the small, non-musl runtime.
+ * printf() reaches the task's TTY before abort() terminates the process. */
+void __assert_fail(const char *expression, const char *file, int line) {
+    printf("assertion failed: %s, file %s, line %d\n", expression, file, line);
+    abort();
+}
 
 /* No environment yet , always NULL. */
 char *getenv(const char *n) { (void)n; return 0; }

@@ -6,6 +6,7 @@
  * no-op. Stream FILE structs are static so fileno-equivalent code works.
  */
 #include <lib/syscall.h>
+#include <include/errno.h>
 #include <include/stdio.h>
 #include <include/string.h>
 #include <include/stdlib.h>
@@ -99,12 +100,20 @@ int vfprintf(FILE *fp, const char *fmt, va_list ap) {
     return r;
 }
 
-/* Filesystem ops not supported yet. */
-int remove(const char *p) { (void)p; return -1; }
-int rename(const char *a, const char *b) { (void)a; (void)b; return -1; }
+/* Filesystem ops not supported yet. Report that truthfully to callers. */
+int remove(const char *p) { (void)p; errno = ENOSYS; return -1; }
+int rename(const char *a, const char *b) {
+    (void)a;
+    (void)b;
+    errno = ENOSYS;
+    return -1;
+}
 
-/* perror(3) without errno strings , caller's `s`, then literal " error". */
-void perror(const char *s) { fprintf(stderr, "%s: error\n", s); }
+/* perror(3): program-supplied context followed by the current errno text. */
+void perror(const char *s) {
+    fprintf(stderr, "%s%s%s\n", s && *s ? s : "",
+            s && *s ? ": " : "", strerror(errno));
+}
 
 /* No buffering, so nothing to flush. */
 int fflush(FILE *fp) { (void)fp; return 0; }

@@ -2,11 +2,32 @@
  *
  * Each function loads the syscall number plus the right argument
  * combination, casts pointers through uintptr_t so calling conventions
- * stay clean, and returns the kernel's long result unchanged. Anything
+ * stay clean, preserves the kernel's raw result, and records a negative
+ * Linux errno in errno. Anything
  * that isn't a syscall (winman IPC helpers, etc.) lives elsewhere , see
  * lib/wm.c.
  */
 #include <lib/syscall.h>
+#include <errno.h>
+
+/* TOS-specific wrappers intentionally preserve their raw return values: some
+ * APIs have their own documented negative results. They still record a Linux
+ * syscall failure in errno, so programs can report strerror(errno) without
+ * losing compatibility with callers that inspect the original result. */
+static sysarg_t syscall_record_error(sysarg_t result) {
+    if (result < 0 && result >= -4095)
+        errno = (int)-result;
+    return result;
+}
+
+/* This source is the sole C caller of syscallN() for TOS-specific APIs.
+ * Decorating each invocation here keeps errno reporting consistent without
+ * changing the raw ABI exported by those APIs. */
+#define syscall0(n) syscall_record_error(syscall0(n))
+#define syscall1(n, a) syscall_record_error(syscall1(n, a))
+#define syscall2(n, a, b) syscall_record_error(syscall2(n, a, b))
+#define syscall3(n, a, b, c) syscall_record_error(syscall3(n, a, b, c))
+#define syscall4(n, a, b, c, d) syscall_record_error(syscall4(n, a, b, c, d))
 
 long stat_raw(const char *path, struct stat_user *out) {
     return syscall2(SYS_STAT_RAW, (sysarg_t)(uintptr_t)path, (sysarg_t)(uintptr_t)out);

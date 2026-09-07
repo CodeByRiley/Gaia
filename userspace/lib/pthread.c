@@ -1,7 +1,9 @@
 #include <include/sys/pthread.h>
 #ifdef TOS_USE_MUSL
 #include <stdlib.h>
+#include <errno.h>
 #else
+#include <include/errno.h>
 #include <include/stdlib.h>
 #endif
 #include <stdint.h>
@@ -52,6 +54,7 @@ int pthread_create(pthread_t *thread,
         /* TODO: Terminate the new thread if its join record cannot be stored. */
         free(stack);
         free(parg);
+        errno = ENOMEM;
         return -1;
     }
     node->tid = tid;

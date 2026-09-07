@@ -42,13 +42,19 @@
 #include <fs/rootfs.h>
 #include <fs/vfs/vfs.h>
 #include <memory/hhdm.h>
+#include <utilities/errno.h>
 #include <utilities/log.h>
 
 static int mount_any_fs(const char *path, const struct block_device *device,
                         const char *source) {
     const char *fstype = 0;
-    if (vfs_attach_auto(path, (void *)device, &fstype) != 0)
-        return -1;
+    int result = vfs_attach_auto(path, (void *)device, &fstype);
+    if (result != 0) {
+        log_write_string("rootfs: cannot mount", source, FILESYS, LOG_WARN);
+        log_write_string("rootfs: mount reason", kernel_errno_string(result),
+                         FILESYS, LOG_WARN);
+        return result;
+    }
     log_write_fmt(FILESYS, LOG_INFO, "rootfs: %s mounted from %s at %s",
                   fstype, source, path);
     return 0;
@@ -77,8 +83,11 @@ static void name_with_unit(char *out, const char *prefix, unsigned unit) {
  * afterwards because whether it holds a table is only known once it is read. */
 static void publish_disk(const struct block_device *device, const char *name,
                          u32 flags) {
-    if (blockdev_register(name, device, 0, flags) != 0) {
+    int result = blockdev_register(name, device, 0, flags);
+    if (result != 0) {
         log_write_string("rootfs: could not publish", name, FILESYS, LOG_WARN);
+        log_write_string("rootfs: publish reason", kernel_errno_string(result),
+                         FILESYS, LOG_WARN);
         return;
     }
     if (partition_scan(device, name, flags) > 0)
@@ -134,11 +143,13 @@ static int mount_from_ramdisk(const char *path, u64 mb2_addr) {
         return -1;
     }
     const char *fstype = 0;
-    if (vfs_mount_auto(path, phys_to_virt(module->mod_start),
-                       module->mod_end - module->mod_start, &fstype) != 0) {
-        log_write("rootfs: ramdisk module holds no filesystem we recognise",
-                  FILESYS, LOG_ERROR);
-        return -1;
+    int result = vfs_mount_auto(path, phys_to_virt(module->mod_start),
+                                module->mod_end - module->mod_start, &fstype);
+    if (result != 0) {
+        log_write("rootfs: could not mount ramdisk module", FILESYS, LOG_ERROR);
+        log_write_string("rootfs: ramdisk mount reason",
+                         kernel_errno_string(result), FILESYS, LOG_ERROR);
+        return result;
     }
     log_write_string("rootfs: mounted from Multiboot2 ramdisk module",
                      fstype ? fstype : "unknown", FILESYS, LOG_INFO);

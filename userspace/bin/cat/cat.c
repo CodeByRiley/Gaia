@@ -14,15 +14,17 @@ APP_INFO(APP_TYPE_CLI, "cat");
 static int cat_one(const char *path) {
     FILE *fp = fopen(path, "rb");
     if (!fp) {
-        printf("cat: %s: open failed\n", path);
+        perror(path);
         return 1;
     }
 
     char buf[256];
     size_t n;
     while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) {
-        if (write(1, buf, n) < 0)
+        if (write(1, buf, n) < 0) {
+            perror("cat: write");
             break;
+        }
     }
     fclose(fp);
     return 0;

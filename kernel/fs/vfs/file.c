@@ -4,7 +4,8 @@
 static void close_locked(struct vfs_file *file);
 
 static int file_stat_locked(struct vfs_file *file, struct vfs_stat *out) {
-    if (!file || vfs_getattr(file->node, out)) return -1;
+    if (!file || !file->node || !out) return -EINVAL;
+    if (vfs_getattr(file->node, out)) return -EIO;
     file->size = out->size;
     file->inode = out->inode;
     file->type = out->type;
@@ -32,33 +33,35 @@ static int open_inode(struct vfs_inode *inode, const struct vfs_mount *mount,
     struct vfs_stat metadata;
     if ((ops && ops->open && ops->open(file)) || file_stat_locked(file, &metadata)) {
         close_locked(file);
-        return -1;
+        return -EIO;
     }
     return 0;
 }
 
 int vfs_open(const char *path, struct vfs_file *file) {
     VFS_GUARD();
-    if (!file) return -1;
+    if (!file) return -EINVAL;
     memset(file, 0, sizeof(*file));
     struct vfs_path found;
-    if (vfs_lookup(path, &found)) return -1;
-    int result = open_inode(vfs_inode_ref(found.entry->inode), found.entry->mount, file);
+    int result = vfs_lookup(path, &found);
+    if (result) return result;
+    result = open_inode(vfs_inode_ref(found.entry->inode), found.entry->mount, file);
     vfs_path_put(&found);
     return result;
 }
 
 int vfs_create(const char *path, struct vfs_file *file) {
     VFS_GUARD();
-    if (!file) return -1;
+    if (!file) return -EINVAL;
     memset(file, 0, sizeof(*file));
     struct vfs_path parent;
     char name[VFS_NAME_MAX + 1];
     int trailing;
-    if (vfs_lookup_parent(path, &parent, name, &trailing)) return -1;
+    int result = vfs_lookup_parent(path, &parent, name, &trailing);
+    if (result) return result;
     struct vfs_inode *dir = parent.entry->inode;
     struct vfs_inode *inode = 0;
-    int result = -1;
+    result = trailing ? -ENOTDIR : -EROFS;
     if (!trailing && dir->operations->create &&
         !dir->operations->create(dir, name, &inode)) {
         result = open_inode(inode, parent.entry->mount, file);
@@ -124,26 +127,29 @@ size_t vfs_append(struct vfs_file *file, const void *buffer, size_t length) {
 int vfs_seek(struct vfs_file *file, uint64_t position) {
     VFS_GUARD();
     const struct vfs_file_operations *ops = regular_ops(file);
-    if (!ops || !ops->seek) return -1;
+    if (!ops || !ops->seek) return -ESPIPE;
     int result = ops->seek(file, position);
     refresh_file(file);
-    return result;
+    return result ? -EIO : 0;
 }
 
 int vfs_truncate(struct vfs_file *file) {
     VFS_GUARD();
-    if (!regular_ops(file) || !file->node->operations->truncate) return -1;
+    if (!regular_ops(file)) return -EISDIR;
+    if (!file->node->operations || !file->node->operations->truncate) return -EROFS;
     int result = file->node->operations->truncate(file->node);
     if (!result) file->position = 0;
     refresh_file(file);
-    return result;
+    return result ? -EIO : 0;
 }
 
 static long iterate(struct vfs_inode *dir, uint32_t *index, struct vfs_dirent *out) {
     const struct vfs_file_operations *ops = dir->file_operations;
-    if (dir->type != VFS_NODE_DIRECTORY || !ops || !ops->iterate) return -1;
+    if (dir->type != VFS_NODE_DIRECTORY) return -ENOTDIR;
+    if (!ops || !ops->iterate) return -EIO;
     memset(out, 0, sizeof(*out));
-    return ops->iterate(dir, index, out);
+    long result = ops->iterate(dir, index, out);
+    return result < 0 ? -EIO : result;
 }
 
 /* The backend owns the normal directory cookie. Once it reaches EOF, reserve
@@ -206,7 +212,9 @@ static long read_dir_one_locked(const struct vfs_path *path, uint32_t *index,
 long vfs_read_dir_one(const char *path, uint32_t *index, struct vfs_dirent *out) {
     VFS_GUARD();
     struct vfs_path found;
-    if (!index || !out || vfs_lookup(path, &found)) return -1;
+    if (!index || !out) return -EINVAL;
+    int lookup_result = vfs_lookup(path, &found);
+    if (lookup_result) return lookup_result;
     uint32_t before = *index;
     long result = read_dir_one_locked(&found, index, out);
     if (result < 0) *index = before;
@@ -217,7 +225,9 @@ long vfs_read_dir_one(const char *path, uint32_t *index, struct vfs_dirent *out)
 long vfs_read_dir(const char *path, uint32_t *index, char *buffer, size_t length) {
     VFS_GUARD();
     struct vfs_path found;
-    if (!index || !buffer || !length || vfs_lookup(path, &found)) return -1;
+    if (!index || !buffer || !length) return -EINVAL;
+    int lookup_result = vfs_lookup(path, &found);
+    if (lookup_result) return lookup_result;
     size_t written = 0;
     long result;
     for (;;) {
@@ -226,14 +236,14 @@ long vfs_read_dir(const char *path, uint32_t *index, char *buffer, size_t length
         long status = read_dir_one_locked(&found, index, &entry);
         if (status <= 0) {
             if (status < 0) *index = before;
-            result = status < 0 && !written ? -1 : (long)written;
+            result = status < 0 && !written ? status : (long)written;
             break;
         }
         size_t count = strlen(entry.name);
         size_t required = count + 1 + (entry.type == VFS_NODE_DIRECTORY);
         if (required > length - written) {
             *index = before;
-            result = written ? (long)written : -1;
+            result = written ? (long)written : -EINVAL;
             break;
         }
         memcpy(buffer + written, entry.name, count);

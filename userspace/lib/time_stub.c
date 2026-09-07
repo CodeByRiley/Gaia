@@ -5,6 +5,7 @@
  * a thin wrapper over it rather than a stand-in.
  */
 #include <include/time.h>
+#include <include/errno.h>
 #include <lib/syscall.h>
 
 /* musl implements both of these against the same kernel calls. Only
@@ -13,9 +14,11 @@
 #ifndef TOS_USE_MUSL
 
 int clock_gettime(int clock_id, struct timespec *ts) {
-    if (!ts)
+    if (!ts) {
+        errno = EINVAL;
         return -1;
-    return (int)sys_clock_gettime(clock_id, ts);
+    }
+    return (int)syscall_result(sys_clock_gettime(clock_id, ts));
 }
 
 time_t time(time_t *t) {

@@ -16,6 +16,7 @@
  *               wrong time is worse than an obvious zero.
  */
 #include <include/sys/stat.h>
+#include <include/errno.h>
 #include <syscall.h>
 
 #define FAT_ATTR_READ_ONLY 0x01
@@ -47,20 +48,26 @@ static void fill_stat(const struct stat_user *k, struct stat *buf) {
 }
 
 int stat(const char *path, struct stat *buf) {
-    if (!path || !buf) return -1;
+    if (!path || !buf) {
+        errno = EINVAL;
+        return -1;
+    }
 
     struct stat_user k;
-    if (stat_raw(path, &k) != 0) return -1;
+    if (syscall_result(stat_raw(path, &k)) != 0) return -1;
 
     fill_stat(&k, buf);
     return 0;
 }
 
 int fstat(int fd, struct stat *buf) {
-    if (!buf) return -1;
+    if (!buf) {
+        errno = EINVAL;
+        return -1;
+    }
 
     struct stat_user k;
-    if (fstat_raw(fd, &k) != 0) return -1;
+    if (syscall_result(fstat_raw(fd, &k)) != 0) return -1;
 
     fill_stat(&k, buf);
     return 0;
@@ -68,5 +75,5 @@ int fstat(int fd, struct stat *buf) {
 
 int mkdir(const char *path, mode_t mode) {
     (void)mode;   /* FAT has no permission bits to apply */
-    return (int)mkdir_path(path);
+    return (int)syscall_result(mkdir_path(path));
 }

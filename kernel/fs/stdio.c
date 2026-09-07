@@ -14,10 +14,30 @@
 #include <fs/stdio.h>
 #include <fs/vfs/vfs.h>
 #include <memory/heap.h>
+#include <utilities/errno.h>
 #include <utilities/log.h>
 
-FILE *fopen(const char *name, const char *mode) {
-    if (!name || !mode) return 0;
+static void set_open_error(int *error_out, int error) {
+    if (error_out)
+        *error_out = error;
+}
+
+const char *fopen_error_string(int error) {
+    switch (error) {
+    case ENOENT: return "No such file or directory";
+    case ENOMEM: return "Out of memory";
+    case EINVAL: return "Invalid path or mode";
+    case EIO: return "Filesystem I/O error";
+    default: return "Unable to open file";
+    }
+}
+
+FILE *fopen_ex(const char *name, const char *mode, int *error_out) {
+    set_open_error(error_out, 0);
+    if (!name || !mode) {
+        set_open_error(error_out, EINVAL);
+        return 0;
+    }
 
     int read = 0, write = 0, append = 0, truncate = 0, create = 0;
 
@@ -31,19 +51,26 @@ FILE *fopen(const char *name, const char *mode) {
         case 'r': read = 1; break;
         case 'w': write = 1; truncate = 1; create = 1; break;
         case 'a': write = 1; append = 1; create = 1; break;
-        default: return 0;
+        default:
+            set_open_error(error_out, EINVAL);
+            return 0;
     }
 
     for (int i = 1; mode[i] != '\0'; i++) {
         switch (mode[i]) {
             case '+': read = 1; write = 1; break;
             case 'b': break;                  /* Text and binary are equal. */
-            default: return 0;
+            default:
+                set_open_error(error_out, EINVAL);
+                return 0;
         }
     }
 
     FILE *fp = (FILE*)kmalloc(sizeof(FILE));
-    if (!fp) return 0;
+    if (!fp) {
+        set_open_error(error_out, ENOMEM);
+        return 0;
+    }
 
     int status = vfs_open(name, &fp->f);
 
@@ -56,13 +83,14 @@ FILE *fopen(const char *name, const char *mode) {
             status = vfs_truncate(&fp->f);
         else if (append)
             status = vfs_seek(&fp->f, fp->f.size);
-    } else if (create) {
+    } else if (status == -ENOENT && create) {
         status = vfs_create(name, &fp->f);
     }
 
     if (status != 0) {
         vfs_close(&fp->f);
         kfree(fp);
+        set_open_error(error_out, status < 0 ? -status : EIO);
         return 0;
     }
 
@@ -72,6 +100,10 @@ FILE *fopen(const char *name, const char *mode) {
     fp->valid = 1;
 
     return fp;
+}
+
+FILE *fopen(const char *name, const char *mode) {
+    return fopen_ex(name, mode, 0);
 }
 
 int fclose(FILE *fp) {

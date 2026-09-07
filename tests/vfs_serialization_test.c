@@ -9,6 +9,8 @@
 #include "vfs_lock_host.h"
 #include <string.h>
 
+enum { KERR_EBUSY = 16 };
+
 enum { WORKERS = 8, ROUNDS = 40 };
 static struct vfs_file shared;
 static atomic_uint winners;
@@ -37,7 +39,7 @@ static void *mutate(void *context) {
         uint32_t index = 0;
         struct vfs_dirent entry;
         assert(vfs_read_dir_one(dir, &index, &entry) > 0);
-        assert(vfs_unlink(path) == -1); /* A live handle still pins the inode. */
+        assert(vfs_unlink(path) == -KERR_EBUSY); /* A live handle still pins the inode. */
         assert(!vfs_truncate(&file));
         vfs_close(&file);
         assert(!vfs_unlink(path));
@@ -120,7 +122,7 @@ int main(int argc, char **argv) {
     verify_packets(&shared);
     verify_packets(&append);
     vfs_close(&append);
-    assert(vfs_unmount("/") == -1); /* Error paths release the gate. */
+    assert(vfs_unmount("/") == -KERR_EBUSY); /* Error paths release the gate. */
     assert(!vfs_seek(&shared, 0));
 
     vfs_lock();

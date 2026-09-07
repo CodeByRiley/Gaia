@@ -1,6 +1,7 @@
 /* Create the FAT32 layout supported by TOS on an unmounted whole volume. */
 #include <lib/syscall.h>
 #include <stdint.h>
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #define SECTOR 512u
@@ -59,7 +60,7 @@ int main(int argc, char **argv) {
   for (uint64_t lba = 0; lba < total;) {
     uint32_t n = total - lba > CHUNK ? CHUNK : (uint32_t)(total - lba);
     if (blockdev_write(argv[1], lba, n, zero) != n) {
-      printf("mkfs: write refused or failed\n");
+      printf("mkfs: write failed: %s\n", strerror(errno));
       return 1;
     }
     lba += n;
@@ -98,7 +99,7 @@ int main(int argc, char **argv) {
       write_one(argv[1], 1, fsinfo) || write_one(argv[1], 7, fsinfo) ||
       write_one(argv[1], RESERVED, table) ||
       write_one(argv[1], RESERVED + fat, table) || blockdev_flush(argv[1])) {
-    printf("mkfs: metadata write failed\n");
+    printf("mkfs: metadata write failed: %s\n", strerror(errno));
     return 1;
   }
   printf("mkfs: created FAT32 on %s (%llu sectors)\n", argv[1],

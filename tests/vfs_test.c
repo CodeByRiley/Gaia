@@ -5,6 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Linux errno values form the kernel ABI.  Do not include the host's errno.h:
+ * MinGW assigns several of these names different values. */
+enum { KERR_ENOENT = 2, KERR_ENODEV = 19, KERR_ENOTDIR = 20, KERR_EINVAL = 22,
+       KERR_ESPIPE = 29, KERR_EROFS = 30, KERR_ENAMETOOLONG = 36,
+       KERR_EISDIR = 21 };
+
 static int failed, allocations, fail_after = -1, fail_open;
 static int mounts, unmounts, reads, releases;
 static const struct vfs_inode_operations inode_ops;
@@ -100,7 +106,8 @@ int main(void) {
     struct vfs_file file, other;
     struct vfs_stat st;
     char data[16] = {0};
-    expect(vfs_open("/file", &file) < 0, "lookup without root mount fails");
+    expect(vfs_open("/file", &file) == -KERR_ENODEV,
+           "lookup without root mount reports no mounted root");
     expect(vfs_mount_image("/", "test", "root", 4) == 0, "mount root");
     expect(vfs_mount_image("/", "test", "oops", 4) < 0 && mounts == 1,
            "duplicate rejected before backend mutation");
@@ -115,6 +122,8 @@ int main(void) {
     vfs_close(&file);
     expect(vfs_stat("/../../file", &st) == 0, "dot-dot cannot escape root");
     expect(vfs_stat("/mntish/file", &st) < 0, "mount names match complete components");
+    expect(vfs_stat("/missing", &st) == -KERR_ENOENT,
+           "missing component reports ENOENT");
     expect(vfs_stat("/missing/../file", &st) < 0, "dot-dot cannot skip a missing component");
     expect(vfs_stat("/file/..", &st) < 0 && vfs_stat("/file/.", &st) < 0 &&
            vfs_stat("/file/", &st) < 0, "non-directories cannot be traversed");
@@ -135,8 +144,8 @@ int main(void) {
     int before_reads = reads;
     expect(vfs_open("/dir", &file) == 0 && vfs_file_stat(&file, &st) == 0 &&
            st.type == VFS_NODE_DIRECTORY && vfs_read(&file, data, 1) == 0 &&
-           vfs_write(&file, data, 1) == 0 && vfs_seek(&file, 0) < 0 &&
-           vfs_truncate(&file) < 0 && reads == before_reads,
+           vfs_write(&file, data, 1) == 0 && vfs_seek(&file, 0) == -KERR_ESPIPE &&
+           vfs_truncate(&file) == -KERR_EISDIR && reads == before_reads,
            "directory metadata works; byte operations never reach backend");
     vfs_close(&file);
     int before_releases = releases;
@@ -150,14 +159,15 @@ int main(void) {
            "packed directories retain trailing slash");
     expect(vfs_read_dir("/", &index, data, sizeof(data)) == 5 && index == 2 &&
            !strcmp(data, "file"), "enumeration resumes at unconsumed entry");
-    expect(vfs_stat(0, &st) < 0 && vfs_stat("/", 0) < 0 &&
-           vfs_open(0, &file) < 0 && vfs_open("relative", &file) < 0 &&
+    expect(vfs_stat(0, &st) == -KERR_EINVAL && vfs_stat("/", 0) == -KERR_EINVAL &&
+           vfs_open(0, &file) == -KERR_EINVAL && vfs_open("relative", &file) == -KERR_EINVAL &&
            vfs_read(0, data, 1) == 0 && vfs_read_dir_one("/", 0, 0) < 0,
            "null and relative inputs fail safely");
     char long_path[VFS_PATH_MAX + 1];
     memset(long_path, 'a', sizeof(long_path));
     long_path[0] = '/'; long_path[sizeof(long_path) - 1] = 0;
-    expect(vfs_stat(long_path, &st) < 0, "overlong paths rejected");
+    expect(vfs_stat(long_path, &st) == -KERR_ENAMETOOLONG,
+           "overlong paths report ENAMETOOLONG");
 
     int baseline = allocations;
     for (int limit = 0; limit < 10; limit++) {
@@ -171,8 +181,12 @@ int main(void) {
     expect(vfs_open("/file", &file) < 0 && !file.node && allocations == baseline,
            "failed backend open releases partial private state");
     fail_open = 0;
-    expect(vfs_create("/new", &file) < 0 && vfs_mkdir("/new") < 0 &&
-           vfs_unlink("/file") < 0, "missing operation hooks fail safely");
+    expect(vfs_unlink("/dir") == -KERR_EISDIR &&
+           vfs_rmdir("/file") == -KERR_ENOTDIR,
+           "type mismatches describe the requested namespace operation");
+    expect(vfs_create("/new", &file) == -KERR_EROFS && vfs_mkdir("/new") == -KERR_EROFS &&
+           vfs_unlink("/file") == -KERR_EROFS,
+           "missing mutation hooks report a read-only filesystem");
     for (int i = 1; i < VFS_MAX_MOUNTS; i++) {
         char path[16]; snprintf(path, sizeof(path), "/mount%d", i);
         expect(vfs_mount_image(path, "test", "more", 4) == 0, "fill mount table");

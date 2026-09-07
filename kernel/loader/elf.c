@@ -26,9 +26,12 @@
  * doubles as the bound that keeps p_vaddr + p_memsz from wrapping. */
 
 u64 elf_load(const char *path, u64 *pml4) {
-  FILE *fp = fopen(path, "rb");
+  int open_error = 0;
+  FILE *fp = fopen_ex(path, "rb", &open_error);
   if (!fp) {
-    log_write("elf: fopen failed", KERNEL, LOG_ERROR);
+    log_write_string("elf: cannot open executable", path, KERNEL, LOG_ERROR);
+    log_write_string("elf: fopen reason", fopen_error_string(open_error),
+                     KERNEL, LOG_ERROR);
     return 0;
   }
 

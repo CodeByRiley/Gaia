@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <stdio.h>
 #include <sys/mman.h>
 
 // 512 Megabytes!
@@ -12,6 +13,7 @@ int main() {
                           MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
     if (huge_mem == MAP_FAILED) {
+        perror("mmaptest: mmap");
         return 1; // Failed to get virtual address space
     }
 

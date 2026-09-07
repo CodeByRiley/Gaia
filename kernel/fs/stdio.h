@@ -28,6 +28,11 @@ typedef struct {
 } FILE;
 
 FILE  *fopen(const char *name, const char *mode);
+/* Extended kernel-internal open. On failure, `error_out` receives a positive
+ * errno-style reason; plain fopen() remains available to callers that only
+ * need a FILE pointer. */
+FILE  *fopen_ex(const char *name, const char *mode, int *error_out);
+const char *fopen_error_string(int error);
 int    fclose(FILE *fp);
 size_t fread(void *buf, size_t sz, size_t nmemb, FILE *fp);
 size_t fwrite(const void *buf, size_t size, size_t count, FILE *fp);

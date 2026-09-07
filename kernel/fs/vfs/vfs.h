@@ -104,7 +104,9 @@ void vfs_inode_put(struct vfs_inode *inode);
  * failed: ENODEV for no such filesystem, EBUSY for a taken mountpoint or a
  * volume still in use, EINVAL for a source nothing recognises, ENOMEM for a
  * full mount table, EIO when a final sync failed and the volume is therefore
- * still mounted. Everything else here still returns a bare 0/-1. */
+ * still mounted. Path and handle operations below also return 0 or a
+ * negative errno. Backends which have not yet adopted errno are translated at
+ * this boundary, so syscall callers never mistake a bare -1 for -EPERM. */
 void vfs_init(void);
 int vfs_register(const struct vfs_filesystem *filesystem);
 int vfs_mount_image(const char *mountpoint, const char *filesystem,

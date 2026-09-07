@@ -1,5 +1,6 @@
 /* Inspect an on-disk boot record without modifying the volume. */
 #include <stdio.h>
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 #include <lib/syscall.h>
@@ -10,7 +11,8 @@ int main(int argc, char **argv) {
     unsigned char boot[512];
     if (argc != 2) { printf("usage: diskinfo DEVICE\n"); return 2; }
     if (blockdev_read(argv[1], 0, 1, boot) != 1) {
-        printf("diskinfo: cannot read %s\n", argv[1]); return 1;
+        printf("diskinfo: cannot read %s: %s\n", argv[1], strerror(errno));
+        return 1;
     }
     printf("device: %s\n", argv[1]);
     printf("signature: %s\n",

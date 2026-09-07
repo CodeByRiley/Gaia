@@ -1,6 +1,7 @@
 /* Publication and name lookup for block volumes. See blockdev.h. */
 #include <drivers/storage/blockdev.h>
 #include <sync/spinlock.h>
+#include <utilities/errno.h>
 #include <utilities/string.h>
 
 struct blockdev_entry {
@@ -26,11 +27,13 @@ int blockdev_register(const char *name, const struct block_device *device,
                       uint64_t start_lba, uint32_t flags) {
     if (!name || !*name || strlen(name) >= BLOCKDEV_NAME_MAX || !device ||
         !device->read || !device->sectors)
-        return -1;
+        return -EINVAL;
 
-    int result = -1;
+    int result = -ENOSPC;
     spin_lock(&lock);
-    if (entry_count < BLOCKDEV_MAX && !find(name)) {
+    if (find(name)) {
+        result = -EEXIST;
+    } else if (entry_count < BLOCKDEV_MAX) {
         struct blockdev_entry *entry = &entries[entry_count];
         strcpy(entry->name, name);
         entry->device = *device;
@@ -45,9 +48,9 @@ int blockdev_register(const char *name, const struct block_device *device,
 
 int blockdev_set_flags(const char *name, uint32_t flags) {
     if (!name)
-        return -1;
+        return -EINVAL;
 
-    int result = -1;
+    int result = -ENOENT;
     spin_lock(&lock);
     struct blockdev_entry *entry = find(name);
     if (entry) {
@@ -67,9 +70,9 @@ size_t blockdev_count(void) {
 
 int blockdev_describe(size_t index, struct blockdev_info *out) {
     if (!out)
-        return -1;
+        return -EINVAL;
 
-    int result = -1;
+    int result = -ENOENT;
     spin_lock(&lock);
     if (index < entry_count) {
         const struct blockdev_entry *entry = &entries[index];
@@ -87,9 +90,9 @@ int blockdev_describe(size_t index, struct blockdev_info *out) {
 
 int blockdev_lookup(const char *name, struct block_device *out) {
     if (!name || !out)
-        return -1;
+        return -EINVAL;
 
-    int result = -1;
+    int result = -ENOENT;
     spin_lock(&lock);
     const struct blockdev_entry *entry = find(name);
     if (entry) {

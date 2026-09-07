@@ -13,6 +13,7 @@
 #include "fs/fat/fat.h"
 #include "fs/fat/fat_vfs.h"
 #include "fs/vfs/vfs.h"
+#include "utilities/errno.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -92,10 +93,18 @@ int main(void) {
            "mount synthetic FAT image through VFS");
 
     /* mode strings */
-    expect(fopen("/MISSING.TXT", "r") == 0, "\"r\" on a missing file fails");
+    int open_error = 0;
+    expect(fopen_ex("/MISSING.TXT", "r", &open_error) == 0,
+           "\"r\" on a missing file fails");
+    expect(open_error == ENOENT,
+           "missing file reports ENOENT through fopen_ex");
     expect(fopen("/MISSING.TXT", "r+") == 0,
            "\"r+\" does not create a missing file");
-    expect(fopen("/ANY.TXT", "q") == 0, "unknown base mode rejected");
+    open_error = 0;
+    expect(fopen_ex("/ANY.TXT", "q", &open_error) == 0,
+           "unknown base mode rejected");
+    expect(open_error == EINVAL,
+           "invalid mode reports EINVAL through fopen_ex");
     expect(fopen("/ANY.TXT", "rq") == 0, "unknown modifier rejected");
 
     write_file("/KEEP.TXT", "original contents");
