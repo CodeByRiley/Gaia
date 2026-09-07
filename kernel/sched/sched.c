@@ -101,7 +101,7 @@ void task_inherit_tty(struct task *child, struct task *parent) {
 extern void context_switch(u64 *old_rsp_ptr, u64 new_rsp, u64 new_cr3,
                            void *old_fxstate, void *new_fxstate);
 extern void context_enter(u64 new_rsp, u64 new_cr3, void *new_fxstate)
-    __attribute__((noreturn));
+    NORETURN;
 
 /* Capture the CPU's current x87/SSE state into `buf`. Match the FXSAVE64
  * layout restored by context_switch, including the full x87 pointers.

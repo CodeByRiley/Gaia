@@ -36,12 +36,12 @@ struct riff_header {
     char riff[4];
     uint32_t size;
     char wave[4];
-} __attribute__((packed));
+} PACKED;
 
 struct chunk_header {
     char id[4];
     uint32_t size;
-} __attribute__((packed));
+} PACKED;
 
 struct wav_format {
     uint16_t encoding;
@@ -50,7 +50,7 @@ struct wav_format {
     uint32_t byte_rate;
     uint16_t block_align;
     uint16_t bits_per_sample;
-} __attribute__((packed));
+} PACKED;
 
 struct wav_info {
     uint32_t sample_rate;

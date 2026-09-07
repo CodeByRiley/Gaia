@@ -6,6 +6,7 @@
 #ifndef STDLIB_H
 #define STDLIB_H
 
+#include "./sys/types.h"
 #include <stddef.h>
 
 /* --- Allocation -------------------------------------------------------- */
@@ -20,8 +21,8 @@ double atof(const char *s);
 long   strtol(const char *s, char **endp, int base);
 
 /* --- Process termination ---------------------------------------------- */
-void   exit(int code) __attribute__((noreturn));
-void   abort(void) __attribute__((noreturn));
+void   exit(int code) NORETURN;
+void   abort(void) NORETURN;
 
 /* --- Environment (currently always returns NULL / -1) ----------------- */
 char  *getenv(const char *name);

@@ -17,6 +17,7 @@
 
 /* --- Compiler Attributes & Macros --------------------------------- */
 #define PACKED __attribute__((packed))
+#define CLEANUP(x) __attribute__((cleanup(x)))
 #define ALIGNED(x) __attribute__((aligned(x)))
 #define NORETURN __attribute__((noreturn))
 #define UNUSED __attribute__((unused))

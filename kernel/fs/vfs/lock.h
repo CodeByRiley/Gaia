@@ -13,6 +13,6 @@ static inline void vfs_guard_release(int *guard) {
     vfs_unlock();
 }
 #define VFS_GUARD() \
-    int vfs_guard __attribute__((cleanup(vfs_guard_release), unused)) = (vfs_lock(), 0)
+    int vfs_guard CLEANUP(vfs_guard_release) UNUSED = (vfs_lock(), 0)
 
 #endif

@@ -5,11 +5,11 @@
 struct bot_cbw {
     uint32_t signature, tag, length;
     uint8_t flags, lun, cdb_size, cdb[16];
-} __attribute__((packed));
+} PACKED;
 struct bot_csw {
     uint32_t signature, tag, residue;
     uint8_t status;
-} __attribute__((packed));
+} PACKED;
 _Static_assert(sizeof(struct bot_cbw) == 31, "BOT command wire size");
 _Static_assert(sizeof(struct bot_csw) == 13, "BOT status wire size");
 
