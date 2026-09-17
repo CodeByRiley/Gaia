@@ -26,19 +26,6 @@ u32 lapic_id(void) { return lapic_read(LAPIC_REG_ID) >> 24; }
 
 void lapic_eoi(void) { lapic_write(LAPIC_REG_EOI, 0); }
 
-void lapic_init(u64 mmio_phys) {
-  if (lapic_mmio)
-    return;
-  /* Map a single 4 KiB page. Mark uncacheable via PCD/PWT so MMIO loads
-   * and stores don't get reordered or coalesced by the cache. */
-  vmm_map(LAPIC_VIRT_BASE, mmio_phys,
-          VMM_PRESENT | VMM_WRITE | VMM_PCD | VMM_PWT);
-  lapic_mmio = (volatile u8 *)LAPIC_VIRT_BASE;
-  lapic_enable_this_cpu();
-  log_write_hex("LAPIC: mapped phys =", mmio_phys, KERNEL, LOG_INFO);
-  log_write_hex("LAPIC: id          =", lapic_id(), KERNEL, LOG_INFO);
-}
-
 void lapic_enable_this_cpu(void) {
   /* Software-enable the LAPIC: set bit 8 of the SVR and route spurious
    * interrupts to vector 0xFF (a no-op IDT slot we mask in the handler). */
@@ -54,6 +41,19 @@ void lapic_timer_prepare_this_cpu(void) {
   lapic_write(LAPIC_REG_TIMER_DIV, LAPIC_TIMER_DIVIDE_16);
   lapic_write(LAPIC_REG_LVT_TIMER, LAPIC_LVT_TIMER_MASKED | LAPIC_TIMER_VECTOR);
   lapic_write(LAPIC_REG_TIMER_INIT, 0);
+}
+
+void lapic_init(u64 mmio_phys) {
+  if (lapic_mmio)
+    return;
+  /* Map a single 4 KiB page. Mark uncacheable via PCD/PWT so MMIO loads
+   * and stores don't get reordered or coalesced by the cache. */
+  vmm_map(LAPIC_VIRT_BASE, mmio_phys,
+          VMM_PRESENT | VMM_WRITE | VMM_PCD | VMM_PWT);
+  lapic_mmio = (volatile u8 *)LAPIC_VIRT_BASE;
+  lapic_enable_this_cpu();
+  log_write_hex("LAPIC: mapped phys =", mmio_phys, KERNEL, LOG_INFO);
+  log_write_hex("LAPIC: id          =", lapic_id(), KERNEL, LOG_INFO);
 }
 
 static void icr_wait(void) {
