@@ -23,6 +23,8 @@
 #define PANIC_ACCENT 0x00E06C75u
 #define PANIC_DIM 0x007A7F87u
 
+#define PANIC_MESSAGE_SIZE 512
+
 static_assert(offsetof(struct interrupt_frame, rsp) ==
                   offsetof(struct interrupt_frame, rflags) + 8,
               "interrupt_frame rsp must immediately follow rflags");
@@ -51,11 +53,13 @@ static char serial_line[512];
 static char screen_line[384];
 static struct panic_record panic_records[MAX_CPUS];
 static char exception_messages[MAX_CPUS][128];
+static char panic_messages[MAX_CPUS][PANIC_MESSAGE_SIZE];
 
 extern char _kernel_start[];
 extern char _kernel_end[];
 
-static NORETURN void panic_halt(void) {
+NORETURN
+static void panic_halt(void) {
   for (;;)
     __asm__ volatile("cli; hlt");
 }
@@ -615,24 +619,55 @@ panic_finish(struct panic_record *record) {
   panic_halt();
 }
 
-void panic_at(const char *msg, const char *file, int line, const char *func) {
-  u64 rsp;
-  __asm__ volatile("mov %%rsp, %0" : "=r"(rsp));
-  int cpu_id = percpu_current_id();
-  if (cpu_id < 0 || cpu_id >= MAX_CPUS)
-    cpu_id = 0;
-  struct panic_record *record = &panic_records[cpu_id];
-  *record = (struct panic_record){
-      .message = msg,
-      .file = file,
-      .func = func,
-      .line = line,
-      .cpu_id = cpu_id,
-      .caller = (u64)(uintptr_t)__builtin_return_address(0),
-      .rbp = (u64)(uintptr_t)__builtin_frame_address(0),
-      .rsp = rsp,
-  };
-  panic_finish(record);
+NORETURN
+void panic_at(const char *msg,
+              const char *file,
+              int line,
+              const char *func)
+{
+    u64 rsp;
+
+    __asm__ volatile ("mov %%rsp, %0" : "=r"(rsp));
+
+    int cpu_id = percpu_current_id();
+
+    if (cpu_id < 0 || cpu_id >= MAX_CPUS)
+        cpu_id = 0;
+
+    struct panic_record *record = &panic_records[cpu_id];
+
+    *record = (struct panic_record){
+        .message = msg,
+        .file = file,
+        .func = func,
+        .line = line,
+        .cpu_id = cpu_id,
+        .caller = (u64)(uintptr_t)__builtin_return_address(0),
+        .rbp = (u64)(uintptr_t)__builtin_frame_address(0),
+        .rsp = rsp,
+    };
+
+    panic_finish(record);
+}
+
+void panicf_at(const char *file,
+               int line,
+               const char *func,
+               const char *fmt, ...)
+{
+    int cpu_id = percpu_current_id();
+
+    if (cpu_id < 0 || cpu_id >= MAX_CPUS)
+        cpu_id = 0;
+
+    char *message = panic_messages[cpu_id];
+
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(message, PANIC_MESSAGE_SIZE, fmt, ap);
+    va_end(ap);
+
+    panic_at(message, file, line, func);
 }
 
 void panic_from_exception(const char *name, const struct interrupt_frame *frame,

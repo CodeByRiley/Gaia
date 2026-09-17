@@ -12,7 +12,7 @@
 #include <utilities/log.h>
 #include <display/print.h>
 
-/* Validate raw type byte → enum log_type. Returns 1 on hit. */
+/* Validate raw type byte to enum log_type. Returns 1 on hit. */
 static int log_type_from_u8(u8 value, enum log_type *out) {
     switch (value) {
         case KERNEL:
@@ -27,7 +27,7 @@ static int log_type_from_u8(u8 value, enum log_type *out) {
     }
 }
 
-/* Validate raw level byte → enum log_level. Returns 1 on hit. */
+/* Validate raw level byte to enum log_level. Returns 1 on hit. */
 static int log_level_from_u8(u8 value, enum log_level *out) {
     switch (value) {
         case LOG_DEBUG:
@@ -69,7 +69,7 @@ static void log_copy_message(char *dst, u64 dst_cap, const char *src) {
 }
 
 /* Initialise an entry with safe defaults and copy `message` into it.
- * Bad raw_type/raw_level fall back to SYSTEM / LOG_INFO. */
+ * Bad raw_type/raw_level fall back to SYSTEM | LOG_INFO. */
 static void log_init_entry(struct log_entry *entry, const char *message,
                            u8 raw_type, u8 raw_level) {
     entry->message[0] = '\0';
@@ -94,7 +94,7 @@ static void log_init_entry(struct log_entry *entry, const char *message,
     log_copy_message(entry->message, sizeof(entry->message), message);
 }
 
-/* Render a populated entry to both serial + VGA text-mode print. */
+/* Render a populated entry to both serial & VGA text-mode print. */
 void log_write_entry(struct log_entry *entry) {
     serial_write_str("[");
     serial_write_str(log_type_name(entry->type));
@@ -137,14 +137,14 @@ void log_write_entry(struct log_entry *entry) {
     print_write_str("\n");
 }
 
-/* Plain message , no payload. */
+/* Plain message, no payload. */
 void log_write(const char *message, u8 raw_type, u8 raw_level) {
     struct log_entry entry;
     log_init_entry(&entry, message, raw_type, raw_level);
     log_write_entry(&entry);
 }
 
-/* Message + hex payload. */
+/* Message & hex payload. */
 void log_write_hex(const char *message, u64 value,
                    u8 raw_type, u8 raw_level) {
     struct log_entry entry;
@@ -164,7 +164,7 @@ void log_write_int(const char *message, int64_t value,
     log_write_entry(&entry);
 }
 
-/* Message + string payload. */
+/* Message & string payload. */
 void log_write_string(const char *message, const char *val,
                       u8 raw_type, u8 raw_level) {
     struct log_entry entry;
@@ -174,7 +174,7 @@ void log_write_string(const char *message, const char *val,
     log_write_entry(&entry);
 }
 
-/* Pretty-print a CPU exception. Routed to both serial + VGA so the cause
+/* Pretty-print a CPU exception. Routed to both serial & VGA so the cause
  * is captured even if the framebuffer pipeline is the thing that broke. */
 void log_write_exception(u64 int_num, const char *name,
                          u64 err_code, u64 rip) {
@@ -205,7 +205,7 @@ void log_write_exception(u64 int_num, const char *name,
     print_write_str("\n");
 }
 
-/* printf-style logging */
+/* formatted logging */
 
 /* Buffer for assembling the formatted message before it is copied into
  * the entry.  Kept on the stack; log_init_entry's log_copy_message will

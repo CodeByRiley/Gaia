@@ -1,12 +1,20 @@
 #ifndef ASSERT_H
 #define ASSERT_H
 
-/* TODO: Route assertion failures through panic(). */
-#define assert(x) \
-    do { \
-        if (!(x)) { \
-            while (1) { } \
-        } \
-    } while (0)
+#include <utilities/panic.h>
+
+#ifdef NDEBUG
+
+#define assert(expr) ((void)0)
+
+#else
+
+#define assert(expr)                                                           \
+  do {                                                                         \
+    if (!(expr))                                                               \
+      panicf("Assertion failed: %s", #expr);                                   \
+  } while (0)
+
+#endif /* NDEBUG */
 
 #endif /* ASSERT_H */

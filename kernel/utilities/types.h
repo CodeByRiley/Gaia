@@ -19,6 +19,7 @@
 #define PACKED __attribute__((packed))
 #define CLEANUP(x) __attribute__((cleanup(x)))
 #define ALIGNED(x) __attribute__((aligned(x)))
+#define NOINLINE __attribute__((noinline))
 #define NORETURN __attribute__((noreturn))
 #define UNUSED __attribute__((unused))
 #define WEAK __attribute__((weak))
@@ -34,6 +35,9 @@
 
 /* For declaring aliases or preventing strict aliasing optimisations */
 #define MAY_ALIAS __attribute__((may_alias))
+
+#define PRINTF_FORMAT(format_index, first_arg_index) \
+    __attribute__((format(printf, format_index, first_arg_index)))
 
 /* --- Linux-style short names --------------------------------------- */
 typedef unsigned char uchar;
