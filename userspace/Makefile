@@ -209,7 +209,7 @@ DOOM_EXTRA_OBJS := lib/string_extra.o lib/stdio_extra.o \
                    lib/unistd_stub.o
 
 DOOM_CFLAGS  := -ffreestanding -nostdlib -fno-pie -mno-red-zone -static \
-                  -I . -I include -I lib \
+                  -I . -I include -I lib -I ../kernel \
                   -I $(DOOM_SRC_DIR) \
                   -std=gnu17 -O2 -Wno-error \
                   -DNORMALUNIX -DLINUX

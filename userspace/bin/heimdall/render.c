@@ -1,7 +1,7 @@
 #define HEIMDALL_DECLARE_STATE
+#include "heimdall.h"
 #include "key_codes.h"
 #include "syscall.h"
-#include "heimdall.h"
 #include <display/print.h>
 #include <stdbool.h>
 #include <string.h>
@@ -770,6 +770,7 @@ void compose(void) {
 /* Hand normal backbuffer copies to the kernel so large regions can use its AP
  * work queue. Keep the direct path as a fallback for an older kernel or a
  * rejected request. */
+//struct fb_rect strips[4] = { top, left, right, bottom }
 void present_backbuffer_rects(const struct fb_rect *rects,
                               uint32_t rect_count) {
   if (rect_count == 0)
