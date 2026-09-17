@@ -15,8 +15,11 @@
 #define FRAMEBUFFER_H
 
 #include <stdint.h>
+#include <utilities/math.h>
 #include <utilities/types.h>
 #include <arch/syscall_abi.h>
+
+#define FB_TARGET_HZ 120
 
 /* Probe MB2 tag 8 and prep the contiguous-page backend. */
 int framebuffer_init(u64 mb2_addr);
