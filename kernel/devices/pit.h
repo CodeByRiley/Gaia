@@ -9,19 +9,21 @@
 #ifndef PIT_H
 #define PIT_H
 
-#include <utilities/types.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 /* Program the PIT to fire IRQ0 at `freq_hz`. */
-void     pit_init(u32 freq_hz);
+void pit_init(u32 freq_hz);
 
 /* Read the current tick counter. */
 u64 pit_ticks(void);
+
+/* Ticks per second requested from channel 0 by its divisor. */
 u32 pit_get_freq(void);
 
 /* Busy-wait on PIT channel 2. Independent of IRQ0 and of the tick counter,
  * so these are the only delays that work before interrupts are enabled. */
-void     pit_delay_us(u64 us);
-void     pit_delay_ms(u32 ms);
+void pit_delay_us(u64 us);
+void pit_delay_ms(u32 ms);
 
 #endif

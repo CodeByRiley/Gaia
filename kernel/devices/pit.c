@@ -5,16 +5,16 @@
  * sleepers. The common IRQ dispatcher considers ring-3 preemption only
  * after this handler returns and IRQ0 has been acknowledged.
  */
-#include <devices/pit.h>
 #include <devices/io.h>
-#include <devices/serial.h>
+#include <devices/pit.h>
 #include <interrupts/idt.h>
 #include <sched/sched.h>
 
 #define PIT_CH0 0x40
 #define PIT_CH2 0x42
 #define PIT_CMD 0x43
-#define PIT_GATE2 0x61   /* NMI/keyboard ctrl port: bit0 = ch2 gate, bit5 = OUT2 */
+#define PIT_GATE2                                                              \
+  0x61 /* NMI/keyboard ctrl port: bit0 = ch2 gate, bit5 = OUT2 */
 #define PIT_FREQ 1193182 /* 8254 input clock , divides down */
 
 static volatile u64 ticks = 0;
@@ -31,15 +31,31 @@ static void pit_handler(void) {
 
 /* Program PIT channel 0 to fire at `freq_hz`. */
 void pit_init(u32 freq_hz) {
-  current_freq_hz = freq_hz;
+  if (freq_hz == 0)
+    freq_hz = 100;
+
   u32 div = PIT_FREQ / freq_hz;
-  outb(PIT_CMD, 0x36); /* channel 0, lo/hi byte, mode 3, binary */
-  outb(PIT_CH0, div & 0xFF);
-  outb(PIT_CH0, (div >> 8) & 0xFF);
+
+  if (div < 1)
+    div = 1;
+  if (div > 0xFFFF)
+    div = 0xFFFF;
+
+  current_freq_hz = PIT_FREQ / div;
+
+  outb(PIT_CMD, 0x36);
+  outb(PIT_CH0, (u8)(div & 0xff));
+  outb(PIT_CH0, (u8)(div >> 8));
+
   irq_install(0, pit_handler);
 }
 
 u64 pit_ticks(void) { return ticks; }
+
+/* This is the frequency requested of channel 0 by its divisor, not a sample
+ * of handler entries. A legacy PIC can merge timer edges while one is pending,
+ * and QEMU TCG makes that amount vary with host scheduling. Turning one such
+ * sample into the kernel's time scale makes time depend on the boot. */
 u32 pit_get_freq(void) { return current_freq_hz; }
 
 /* Polled one-shot delay on channel 2.

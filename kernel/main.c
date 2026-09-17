@@ -37,6 +37,10 @@
 extern u64 *kernel_pml4;
 static u8 bsp_syscall_kstack[16384] ALIGNED(16);
 
+/* Keep the legacy PIC timer below the rate at which QEMU TCG commonly
+ * coalesces IRQ0 edges. Time conversion always uses this programmed rate. */
+#define PIT_SCHED_HZ 250U
+
 static void early_console_init(void) {
   print_clear();
   print_set_color(PRINT_COLOR_WHITE, PRINT_COLOR_BLACK);
@@ -50,7 +54,7 @@ static void arch_init(void) {
   idt_init();
   log_write("idt initialised", KERNEL, LOG_INFO);
   pic_remap();
-  pit_init(1000);
+  pit_init(PIT_SCHED_HZ);
   log_write("pit initialised", KERNEL, LOG_INFO);
 }
 

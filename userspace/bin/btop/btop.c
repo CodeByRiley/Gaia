@@ -28,7 +28,7 @@ extern void  *memset(void *, int, size_t);
 // #region CONSTANTS
 #define MAX_PROCS    16
 #define BAR_WIDTH    40
-#define REFRESH_TICK 50          /* 100 Hz PIT * 50 = 500 ms */
+#define REFRESH_TICK 125         /* 250 Hz PIT * 125 = 500 ms */
 // #endregion CONSTANTS
 
 APP_INFO(APP_TYPE_CLI, "btop");

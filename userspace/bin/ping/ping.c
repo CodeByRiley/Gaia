@@ -23,7 +23,7 @@
 
 #define PING_DEFAULT_COUNT 4
 #define PING_TIMEOUT_MS 1000
-/* usleep rather than sleep_ticks: the PIT runs at 500 Hz today and
+/* usleep rather than sleep_ticks: the PIT runs at 250 Hz today and
  * hardcoding that here would break silently the day it changes. */
 #define PING_INTERVAL_MS 1000
 

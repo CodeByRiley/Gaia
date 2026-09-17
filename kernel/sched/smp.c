@@ -41,6 +41,22 @@ extern void ap_long_mode_handoff(void);
 
 #define AP_TRAMPOLINE_PHYS  0x8000
 #define AP_KSTACK_BYTES     16384
+
+/* How long to wait for an AP to set cpu_local.online, and how often to look.
+ *
+ * A duration, because that is what a timeout is. The bound used to be
+ * pit_get_freq() , a frequency in hertz standing in for a count of 10 ms
+ * slices , so the budget was whatever the tick rate happened to be: ~10 s at
+ * the programmed 1000 Hz despite a comment claiming one second. A timeout
+ * must not drift with the clock it is timing.
+ *
+ * An AP that is coming up at all reaches ap_main in single-digit
+ * milliseconds, so a second is generous by two orders of magnitude, and
+ * deliberately: erring long costs a slower boot on a CPU that was never going
+ * to arrive, erring short declares a working CPU dead. */
+#define AP_ONLINE_TIMEOUT_MS 1000
+#define AP_ONLINE_POLL_MS    10
+
 #define SMP_WORK_VECTOR     240
 #define SMP_WORK_CAPACITY   64
 
@@ -131,19 +147,10 @@ static void smp_probe_job(void *arg) {
 #define AP_PATCH_HANDOFF_OFF 16
 #define AP_PATCH_TARGET_OFF   8
 
-/* Spin for roughly `us` microseconds using the configured PIT frequency.
- * We round up to at least one tick. Good enough for
- * the Intel-spec 10 ms inter-INIT delay and the 200 µs inter-SIPI delay
- * (which is necessarily rounded up to one PIT tick). */
+/* Use PIT channel 2 for the Intel-specified INIT/SIPI delays. Channel 0 is a
+ * scheduler interrupt and, at 250 Hz, cannot express the 200 us interval. */
 static void smp_delay_us(u64 us) {
-    u64 hz = pit_get_freq();
-    if (hz == 0) hz = 100;
-    u64 ticks = (us * hz + 999999) / 1000000;
-    if (ticks == 0) ticks = 1;
-    u64 start = pit_ticks();
-    while (pit_ticks() - start < ticks) {
-        __asm__ volatile ("pause");
-    }
+    pit_delay_us(us);
 }
 
 static int boot_one_ap(int cpu_id, u8 apic_id, u32 bootstrap_cr3,
@@ -178,12 +185,22 @@ static int boot_one_ap(int cpu_id, u8 apic_id, u32 bootstrap_cr3,
     smp_delay_us(200);
     lapic_send_startup(apic_id, AP_TRAMPOLINE_PHYS >> 12);
 
-    /* Spin for up to ~1 s waiting for the AP to flag itself online. */
+    /* Wait for the AP to flag itself online.
+     *
+     * The acquire load pairs with the AP's release store in ap_main, matching
+     * how smp_work_pending reads the same flag. cpu_local.online is volatile,
+     * so a plain read would reload correctly on every pass; what it would not
+     * do is order this CPU's view of the per-CPU state the AP set up before
+     * publishing the flag. x86's store ordering makes that academic here, but
+     * the flag has one publication protocol and this is it. */
     struct cpu_local *c = percpu_get(cpu_id);
-    for (int i = 0; i < pit_get_freq() && !c->online; i++) {
-        smp_delay_us(10000);
+    int waited_ms = 0;
+    while (!__atomic_load_n(&c->online, __ATOMIC_ACQUIRE) &&
+           waited_ms < AP_ONLINE_TIMEOUT_MS) {
+        smp_delay_us(AP_ONLINE_POLL_MS * 1000);
+        waited_ms += AP_ONLINE_POLL_MS;
     }
-    if (!c->online) {
+    if (!__atomic_load_n(&c->online, __ATOMIC_ACQUIRE)) {
         log_write_hex("SMP: AP failed to come online cpu_id=", cpu_id, KERNEL, LOG_ERROR);
         return -1;
     }

@@ -26,8 +26,8 @@ static int last_title_click_y = 0;
  * The window is bounded in time as well as cleared on destroy: handles are
  * slot indices and get reused, so without a deadline a stale pending request
  * could force-destroy an unrelated window that later inherited the handle.
- * Ticks come from the PIT at 500 Hz, so this is roughly three seconds. */
-#define CLOSE_ESCALATE_TICKS 1500u
+ * Ticks come from the PIT at 250 Hz, so this is roughly three seconds. */
+#define CLOSE_ESCALATE_TICKS 750u
 int close_pending_handle = -1;
 u32 close_pending_tick = 0;
 

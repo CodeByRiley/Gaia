@@ -68,7 +68,7 @@ HEIMDALL_STATE int wallpaper_loaded HEIMDALL_STATE_INIT(0);
 #define START_MENU_ITEM_H 24
 #define START_MENU_PAD 4
 
-#define DOUBLE_CLICK_TICKS 370u
+#define DOUBLE_CLICK_TICKS 185u
 #define DOUBLE_CLICK_SLOP 4
 #define CLIENT_DIM_HARD_LIMIT 2048
 
@@ -246,7 +246,7 @@ extern const uint8_t fallback_cursor_mask[CURSOR_H][CURSOR_W];
 /* Poll interval. The taskbar only shows minutes, so once a second is already
  * far more often than the display can change , it just keeps the rollover
  * from lagging by up to a minute. */
-#define CLOCK_POLL_TICKS 100u
+#define CLOCK_POLL_TICKS 50u
 
 /* Drag affordances. RESIZE_GRIP = size of the bottom-right square that acts
  * as the resize handle. MIN_CLIENT_* = floor below which we refuse to shrink
@@ -300,7 +300,7 @@ extern const uint8_t fallback_cursor_mask[CURSOR_H][CURSOR_W];
 #define TB_NETWORK_CONNECTED_FG 0x00FFFFFFu
 #define TB_NETWORK_DISCONNECTED_FG 0x00D0D0D0u
 /* Match the clock's polling cadence in event-loop iterations. */
-#define NETWORK_POLL_TICKS 100u
+#define NETWORK_POLL_TICKS 50u
 #define TB_INTERNET_ICON_MAX_DIM 256
 #define TB_INTERNET_ICON_PAD 2
 
