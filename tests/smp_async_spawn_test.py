@@ -65,9 +65,9 @@ def main() -> int:
     proc = subprocess.Popen(command, stdin=subprocess.DEVNULL)
     try:
         deadline = time.monotonic() + args.timeout
-        if not wait_for_text(log_path, "winman: ready", deadline):
+        if not wait_for_text(log_path, "heimdall: ready", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("winman did not become ready", file=sys.stderr)
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
 
         log = log_path.read_text(encoding="utf-8", errors="replace")
@@ -78,7 +78,7 @@ def main() -> int:
             "SMP: bootstrap CR3    =",
             "SMP: AP target CR3    =",
             "process_spawn: queued pid =",
-            "winman: spawn returned pid =",
+            "heimdall: spawn returned pid =",
             "process_spawn: ready pid =",
         ]
         missing = [marker for marker in required if marker not in log]
@@ -133,7 +133,7 @@ def main() -> int:
             return 1
 
         queued = log.index("process_spawn: queued pid =")
-        returned = log.index("winman: spawn returned pid =")
+        returned = log.index("heimdall: spawn returned pid =")
         ready = log.index("process_spawn: ready pid =")
         if not queued < returned < ready:
             print(log)
@@ -143,7 +143,7 @@ def main() -> int:
 
         pid_patterns = [
             r"process_spawn: queued pid =\s+(0x[0-9A-Fa-f]+)",
-            r"winman: spawn returned pid =\s+(0x[0-9A-Fa-f]+)",
+            r"heimdall: spawn returned pid =\s+(0x[0-9A-Fa-f]+)",
             r"process_spawn: ready pid =\s+(0x[0-9A-Fa-f]+)",
         ]
         pids = [re.search(pattern, log) for pattern in pid_patterns]

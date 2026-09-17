@@ -9,7 +9,7 @@
  *   - syscallN()              , raw register-passing trampolines.
  *   - libc-style wrappers     , typed helpers around the syscalls above.
  *
- * Higher-level winman client API lives in lib/wm.h, not here.
+ * Higher-level heimdall client API lives in lib/wm.h, not here.
  */
 #ifndef USER_SYSCALL_H
 #define USER_SYSCALL_H
@@ -259,12 +259,12 @@ long get_pid(void);
  * `ts` points at a struct timespec. Prefer clock_gettime() from
  * <include/time.h>, which types the argument properly. */
 long sys_clock_gettime(int clock_id, void *ts);
-/* Push one ASCII character into TTY channel `tty`'s input ring. Winman
+/* Push one ASCII character into TTY channel `tty`'s input ring. Heimdall
  * calls this for the console window that has focus; the channel is named
- * explicitly because winman itself is on a different one. */
+ * explicitly because heimdall itself is on a different one. */
 void tty_inject(int tty, char c);
 
-/* Drain characters winman injected for this process's console. Non-blocking;
+/* Drain characters heimdall injected for this process's console. Non-blocking;
  * returns the count read, 0 when nothing is queued. The channel is implicit:
  * it is always the caller's own (task->tty, inherited at spawn).
  *
@@ -293,11 +293,11 @@ long shmem_share(int target_pid, uint64_t in_va, long npages,
                  uint64_t *out_target_va);
 long shmem_unshare(int target_pid, uint64_t in_va, long npages);
 
-/* Winman registration / discovery. The pid of the WM is not cached because
- * winman is allowed to crash and respawn. */
+/* Heimdall registration / discovery. The pid of the WM is not cached because
+ * heimdall is allowed to crash and respawn. */
 long wm_register(void);
 long wm_pid(void);
-/* Read TTY channel `tty`'s pending output. Winman calls this once per live
+/* Read TTY channel `tty`'s pending output. Heimdall calls this once per live
  * console window per frame and renders what comes back. */
 long tty_drain(int tty, char *buf, long max);
 
@@ -307,7 +307,7 @@ long tty_drain(int tty, char *buf, long max);
  * -1 when they are all taken. tty_free gives one back and discards whatever
  * was still buffered on it. tty_spawn is spawn() with the child pinned to a
  * channel rather than inheriting the caller's , without it a shell launched
- * by winman would land on winman's own console. */
+ * by heimdall would land on heimdall's own console. */
 long tty_alloc(void);
 long tty_free(int tty);
 long tty_spawn(const char *path, char *const argv[], int tty);

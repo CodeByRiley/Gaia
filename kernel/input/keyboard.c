@@ -4,7 +4,7 @@
  * 0xE0 extended-prefix state, maps them to Linux KEY_* codes, and posts
  * (KEY_*, press/release) events to two places:
  *   - the legacy `kbd_ring` polled by keyboard_poll() (kernel apps)
- *   - the per-task msg ring of the input owner (userspace winman or
+ *   - the per-task msg ring of the input owner (userspace heimdall or
  *     whoever else grabbed input via msg_input_owner_register)
  *
  * Press/release state is explicit so consumers can track modifier

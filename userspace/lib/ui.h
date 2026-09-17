@@ -22,7 +22,7 @@
  * shifts every later id by one; keep conditional widgets at the end, or draw
  * them disabled instead of skipping them.
  *
- * Dynamic callers such as winman can use the *_id variants instead. Those
+ * Dynamic callers such as heimdall can use the *_id variants instead. Those
  * take caller-owned, non-zero ids, so a taskbar button can use a window
  * handle and keep its hover/press state even when other windows reorder.
  *
@@ -50,7 +50,7 @@ struct ui_theme {
     int      scale;         /* text magnification                         */
 };
 
-/* Grey bevels and navy accents , the palette winman's chrome already
+/* Grey bevels and navy accents , the palette heimdall's chrome already
  * uses, so widgets sit next to it without clashing. */
 extern const struct ui_theme ui_theme_default;
 

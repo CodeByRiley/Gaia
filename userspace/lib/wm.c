@@ -1,11 +1,11 @@
 /* userspace/lib/wm.c , libwm: client-side IPC for windows.
  *
  * Thin synchronous wrappers around ipc_send + ipc_recv. The server lives
- * in userspace/bin/winman/winman.c and speaks the same wire protocol
+ * in userspace/bin/heimdall/heimdall.c and speaks the same wire protocol
  * declared in wm.h.
  *
- * The "winman pid" is looked up via wm_pid() on every call , never
- * cached, because winman is allowed to crash and respawn.
+ * The "heimdall pid" is looked up via wm_pid() on every call , never
+ * cached, because heimdall is allowed to crash and respawn.
  */
 #include "wm.h"
 #include "event.h"
@@ -76,7 +76,7 @@ int wm_window_destroy(int handle) {
     return (int)ipc_send((int)wpid, &req);
 }
 
-/* Mark the window dirty so winman recomposites. */
+/* Mark the window dirty so heimdall recomposites. */
 int wm_window_invalidate(int handle) {
     long wpid = wm_pid();
     if (wpid <= 0) return -1;
@@ -101,7 +101,7 @@ int wm_window_set_title(int handle, const char *title) {
 }
 
 /* Update the status strip. Windows created without WM_CREATE_STATUSBAR
- * have nowhere to put this, and winman drops it. */
+ * have nowhere to put this, and heimdall drops it. */
 int wm_window_set_status(int handle, const char *text) {
     long wpid = wm_pid();
     if (wpid <= 0) return -1;
@@ -116,7 +116,7 @@ int wm_window_set_status(int handle, const char *text) {
 /* Blocking modal prompt. The wait is deliberately unbounded compared with
  * wait_for(): a dialog sits open until a human answers it, so the bounded
  * handshake spin used for create/destroy would time out mid-question. A
- * dead winman is detected by re-checking wm_pid() rather than by counting
+ * dead heimdall is detected by re-checking wm_pid() rather than by counting
  * spins. */
 int wm_prompt(int handle, int kind, const char *message, char *out,
               size_t cap) {
@@ -167,7 +167,7 @@ int wm_poll_event(struct wm_event *out) {
 
     switch (m.type) {
     case IPC_WM_INPUT:
-        /* winman packs (msg_type, param, x, y) into (a, b, c, d).
+        /* heimdall packs (msg_type, param, x, y) into (a, b, c, d).
          * MSG_* codes (1..5) are intentionally aligned with WM_EV_*. */
         memset(out, 0, sizeof(*out));
         out->type  = m.a;

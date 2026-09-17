@@ -1,7 +1,7 @@
-#define WINMAN_DECLARE_STATE
+#define HEIMDALL_DECLARE_STATE
 #include "key_codes.h"
 #include "syscall.h"
-#include "winman.h"
+#include "heimdall.h"
 #include <display/print.h>
 #include <stdbool.h>
 #include <string.h>
@@ -12,7 +12,7 @@ int outer_h(const struct window *w) {
   return w->client_h + TITLEBAR_PX + BORDER_PX + w->status_h;
 }
 
-/* Keep Winman call sites terse while the reusable library owns clipping and
+/* Keep Heimdall call sites terse while the reusable library owns clipping and
  * union semantics. */
 void mark_dirty(int x, int y, int w, int h) {
   gfx_damage_add(&desktop_damage, gfx_rect_make(x, y, w, h),
@@ -31,20 +31,20 @@ static int tb_network_connected = 0;
 static int tb_load_icon(const char *path, const char *name, int max_dim,
                         struct bmp_image *icon) {
   if (bmp_load(path, icon) != 0) {
-    printf("winman: %s unavailable, using built-in %s icon\n", path, name);
+    printf("heimdall: %s unavailable, using built-in %s icon\n", path, name);
     return 0;
   }
 
   if (icon->width <= 0 || icon->height <= 0 || icon->width > max_dim ||
       icon->height > max_dim) {
-    printf("winman: %s has invalid %s icon dimensions %dx%d, using "
+    printf("heimdall: %s has invalid %s icon dimensions %dx%d, using "
            "built-in %s icon\n",
            path, name, icon->width, icon->height, name);
     bmp_free(icon);
     return 0;
   }
 
-  printf("winman: %s icon %dx%d from %s\n", name, icon->width, icon->height,
+  printf("heimdall: %s icon %dx%d from %s\n", name, icon->width, icon->height,
          path);
   return 1;
 }
@@ -699,7 +699,7 @@ void compose_handle(int handle) {
   }
   struct window *w = find_handle(handle);
   if (!w) {
-    printf("winman: compose_handle: no window found for handle=%d\n", handle);
+    printf("heimdall: compose_handle: no window found for handle=%d\n", handle);
     return;
   }
   if (!clip_hits(w->x, w->y, outer_w(w), outer_h(w)))
@@ -816,7 +816,7 @@ void present_dirty(void) {
 
   // Composite only the region we are about to copy out. Everything else
   // would be discarded, and at 1280x800 redrawing the whole desktop for a
-  // small dirty box was costing ~6x winman's loop rate.
+  // small dirty box was costing ~6x heimdall's loop rate.
   clip_set(damage.x, damage.y, damage.w, damage.h);
   compose();
 

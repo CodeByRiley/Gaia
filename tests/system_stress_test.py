@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the heavy in-guest VM, FAT, IPC, Winman, and process stress test."""
+"""Run the heavy in-guest VM, FAT, IPC, Heimdall, and process stress test."""
 
 from __future__ import annotations
 
@@ -67,9 +67,9 @@ def main() -> int:
     started = time.monotonic()
     try:
         deadline = started + args.timeout
-        if not wait_for_marker(log_path, "winman: ready", proc, deadline):
+        if not wait_for_marker(log_path, "heimdall: ready", proc, deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("winman did not become ready", file=sys.stderr)
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
 
         qmp = Qmp(qmp_port, deadline)

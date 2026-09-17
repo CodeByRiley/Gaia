@@ -1,7 +1,7 @@
-#define WINMAN_DECLARE_STATE
+#define HEIMDALL_DECLARE_STATE
 #include "key_codes.h"
 #include "syscall.h"
-#include "winman.h"
+#include "heimdall.h"
 #include <display/print.h>
 #include <stdbool.h>
 #include <string.h>
@@ -283,7 +283,7 @@ void client_window_resize(int handle, int new_cw, int new_ch) {
     }
   }
   if (!w) {
-    printf("winman: client_window_resize: no window found for handle=%d\n",
+    printf("heimdall: client_window_resize: no window found for handle=%d\n",
            handle);
     return;
   }
@@ -411,7 +411,7 @@ int handle_create(int client_pid, int w, int h, const char *title,
     return -1;
   struct window *win = find_slot();
   if (!win) {
-    printf("winman: handle_create: no slot found\n");
+    printf("heimdall: handle_create: no slot found\n");
     return -1;
   }
 
@@ -424,7 +424,7 @@ int handle_create(int client_pid, int w, int h, const char *title,
     return -1;
 
   /* Map the same physical pages into the client's PML4 so the client
-   * can write pixels without going through winman. */
+   * can write pixels without going through heimdall. */
   uint64_t client_va = 0;
   if (shmem_share(client_pid, (uint64_t)surface, (long)pages, &client_va) !=
       0) {
@@ -473,7 +473,7 @@ int handle_create(int client_pid, int w, int h, const char *title,
   *out_client_va = client_va;
   *out_pitch = (uint32_t)(w * 4);
   *out_handle = win->handle;
-  printf("winman: create handle=%d owner=%d %dx%d pages=%d client_va=%lx "
+  printf("heimdall: create handle=%d owner=%d %dx%d pages=%d client_va=%lx "
          "active=%d\n",
          win->handle, client_pid, w, h, (int)pages, (unsigned long)client_va,
          window_count());
@@ -505,7 +505,7 @@ void handle_destroy_internal(int handle, int client_pid_check) {
 
   struct window *w = find_handle(handle);
   if (!w) {
-    printf("winman: handle_destroy_internal: no window found for handle=%d\n",
+    printf("heimdall: handle_destroy_internal: no window found for handle=%d\n",
            handle);
     return;
   }
@@ -559,7 +559,7 @@ void handle_destroy_internal(int handle, int client_pid_check) {
   }
 
   mark_dirty(old_x, old_y, old_ow, old_oh);
-  printf("winman: destroy handle=%d owner=%d active=%d\n", handle,
+  printf("heimdall: destroy handle=%d owner=%d active=%d\n", handle,
          old_owner_pid, window_count());
 }
 
@@ -574,7 +574,7 @@ void destroy_windows_for_owner(int owner_pid, const char *why) {
     if (!windows[i].in_use || windows[i].owner_pid != owner_pid)
       continue;
     int h = windows[i].handle;
-    printf("winman: reap window %d owner_pid=%d (%s)\n", h, owner_pid,
+    printf("heimdall: reap window %d owner_pid=%d (%s)\n", h, owner_pid,
            why ? why : "owner-exit");
     handle_destroy_internal(h, 0);
   }
@@ -597,7 +597,7 @@ void toggle_minimize(int handle) {
   //   return;
   struct window *w = find_handle(handle);
   if (!w) {
-    printf("winman: toggle_minimize: no window found for handle=%d\n", handle);
+    printf("heimdall: toggle_minimize: no window found for handle=%d\n", handle);
     return;
   }
   w->minimized = !w->minimized;
@@ -629,7 +629,7 @@ void toggle_maximize(int handle) {
   //   return;
   struct window *w = find_handle(handle);
   if (!w) {
-    printf("winman: toggle_maximize: no window found for handle=%d\n", handle);
+    printf("heimdall: toggle_maximize: no window found for handle=%d\n", handle);
     return;
   }
   if (w->maximized) {
@@ -677,14 +677,14 @@ void reap_dead_windows(void) {
     }
     if (terminal) {
       int h = windows[i].handle;
-      printf("winman: reap window %d owner_pid=%d (dead)\n", h, owner);
+      printf("heimdall: reap window %d owner_pid=%d (dead)\n", h, owner);
       handle_destroy_internal(h, 0);
     }
   }
 
   /* Same for consoles: a shell that ran off the end of `exit` leaves a window
    * nothing can type into. Unlike client windows, a missing row is treated as
-   * dead here , the shell is winman's own child, so if it is not in the table
+   * dead here , the shell is heimdall's own child, so if it is not in the table
    * it is gone, and there is no IPC_PEER_EXITED for a process that never
    * registered as a WM client. */
   for (int i = 0; i < CON_MAX; i++) {
@@ -700,7 +700,7 @@ void reap_dead_windows(void) {
       }
     }
     if (terminal) {
-      printf("winman: reap console slot=%d sh pid=%d (exited)\n", i, c->pid);
+      printf("heimdall: reap console slot=%d sh pid=%d (exited)\n", i, c->pid);
       c->pid = 0; /* already gone , console_close has nothing to kill */
       console_close(c);
     }

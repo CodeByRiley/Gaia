@@ -1,5 +1,5 @@
-#define WINMAN_DECLARE_STATE
-#include "winman.h"
+#define HEIMDALL_DECLARE_STATE
+#include "heimdall.h"
 #include "key_codes.h"
 #include "syscall.h"
 #include <display/print.h>
@@ -149,7 +149,7 @@ void pump_ipc(void) {
 /* Translate input event from screen coords to the focused window's
  * client-area coords before forwarding. Clients draw into a surface that
  * starts at (0,0) so they shouldn't have to know their own position on
- * the desktop , winman is the only thing that does. */
+ * the desktop , heimdall is the only thing that does. */
 void forward_input(int target_pid, int win_handle, const struct msg *m) {
   if (target_pid <= 0)
     return;
@@ -186,13 +186,13 @@ void forward_input(int target_pid, int win_handle, const struct msg *m) {
 }
 
 void request_window_close(int handle, u32 now) {
-  /* A console has no client to ask politely: winman owns the window and
+  /* A console has no client to ask politely: heimdall owns the window and
    * started the shell, so the close button acts immediately. Nothing here
    * needs the kernel to stay alive , the init task no longer waits on any
    * shell , so closing the last one is allowed. */
   struct console *c = con_for_handle(handle);
   if (c) {
-    printf("winman: close button -> console handle=%d tty=%d\n", handle,
+    printf("heimdall: close button -> console handle=%d tty=%d\n", handle,
            c->tty);
     console_close(c);
     return;
@@ -208,14 +208,14 @@ void request_window_close(int handle, u32 now) {
    * the owner is not the one asking. */
   if (close_pending_handle == handle &&
       now - close_pending_tick < CLOSE_ESCALATE_TICKS) {
-    printf("winman: close button -> force handle=%d owner=%d\n", handle,
+    printf("heimdall: close button -> force handle=%d owner=%d\n", handle,
            w->owner_pid);
     close_pending_handle = -1;
     handle_destroy_internal(handle, 0);
     return;
   }
 
-  printf("winman: close button -> request handle=%d\n", handle);
+  printf("heimdall: close button -> request handle=%d\n", handle);
   close_pending_handle = handle;
   close_pending_tick = now;
 
@@ -366,7 +366,7 @@ void pump_input(void) {
         start_menu_hover = -1;
 
         /* Rescan on open rather than per-frame: the directories can gain a
-         * binary while winman runs, but a scan per repaint would hit the
+         * binary while heimdall runs, but a scan per repaint would hit the
          * filesystem on every hover change. */
         // if (start_menu_open)
         //   build_start_menu_entries();
@@ -476,7 +476,7 @@ void pump_input(void) {
           mark_dirty(0, taskbar_y(), fb_w, TASKBAR_PX);
 
           if (titlebar_double_click) {
-            printf("winman: titlebar double-click handle=%d\n", hit_handle);
+            printf("heimdall: titlebar double-click handle=%d\n", hit_handle);
             toggle_maximize(hit_handle);
             forward = 0;
             continue;
@@ -568,9 +568,9 @@ void pump_input(void) {
         if (clicked_icon >= 0) {
           uint32_t current_tick = (uint32_t)m.when;
 
-          printf("winman: clicked icon %d\n", clicked_icon);
+          printf("heimdall: clicked icon %d\n", clicked_icon);
 
-          printf("winman: tick=%u, last_icon=%d, "
+          printf("heimdall: tick=%u, last_icon=%d, "
                  "last_tick=%u\n",
                  current_tick, last_icon_clicked, last_icon_click_tick);
 
@@ -672,7 +672,7 @@ void pump_input(void) {
 
         /* Console zoom lives here rather than in the shell. The shell now
          * receives ASCII from the TTY ring and never sees a raw keycode, so
-         * it cannot spot Ctrl+-/Ctrl+= any more , and winman owns the
+         * it cannot spot Ctrl+-/Ctrl+= any more , and heimdall owns the
          * console's scale anyway. Scale is per-console: zooming one leaves
          * the others alone. */
         if (ctrl_held && m.param == KEY_MINUS) {
@@ -714,14 +714,14 @@ int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
 
-  printf("winman: built " __DATE__ " " __TIME__ "\n");
+  printf("heimdall: built " __DATE__ " " __TIME__ "\n");
 
-  printf("winman: start\n");
+  printf("heimdall: start\n");
   if (wm_register() != 0) {
-    printf("winman: wm_register failed\n");
+    printf("heimdall: wm_register failed\n");
     return 1;
   }
-  printf("winman: registered\n");
+  printf("heimdall: registered\n");
 
   struct fb_info info;
   if (fb_info(&info) != 0)
@@ -736,16 +736,16 @@ int main(int argc, char **argv) {
   fb_bytes = info.pitch * info.height;
   fb_mapped_bytes = fb_bytes;
   update_client_size_limits();
-  printf("winman: fb %dx%d pitch=%d bytes=%d\n", fb_w, fb_h, fb_stride * 4,
+  printf("heimdall: fb %dx%d pitch=%d bytes=%d\n", fb_w, fb_h, fb_stride * 4,
          (int)fb_bytes);
 
   if (backbuffer_reserve(fb_bytes) != 0) {
-    printf("winman: back buffer alloc failed\n");
+    printf("heimdall: back buffer alloc failed\n");
     return 4;
   }
   if (backbuffer_register() != 0)
-    printf("winman: back buffer registration failed, using fallback\n");
-  printf("winman: back buffer @%p bytes=%d\n", (void *)fb, (int)fb_capacity);
+    printf("heimdall: back buffer registration failed, using fallback\n");
+  printf("heimdall: back buffer @%p bytes=%d\n", (void *)fb, (int)fb_capacity);
 
   cursor_load();
   tb_load_icons();
@@ -760,17 +760,17 @@ int main(int argc, char **argv) {
   memset(windows, 0, sizeof(windows));
   focused_handle = 0;
   /* The boot console. Its shell is started from here rather than by the
-   * kernel so winman owns the pid and the close button has something to
+   * kernel so heimdall owns the pid and the close button has something to
    * kill; the kernel only runs a shell of its own when no WM registers. */
   struct console *boot_con = console_open();
   if (boot_con)
-    printf("winman: console tty=%d surface=%p w=%d h=%d\n", boot_con->tty,
+    printf("heimdall: console tty=%d surface=%p w=%d h=%d\n", boot_con->tty,
            (void *)boot_con->win.surface, boot_con->win.client_w,
            boot_con->win.client_h);
   else
-    printf("winman: boot console failed to open\n");
+    printf("heimdall: boot console failed to open\n");
   present_full_desktop();
-  printf("winman: ready\n");
+  printf("heimdall: ready\n");
 
   int self_pid = (int)get_pid();
   int tick = 0;
@@ -822,10 +822,10 @@ int main(int argc, char **argv) {
             fb_bytes = new_bytes;
             update_client_size_limits();
             if (backbuffer_register() != 0)
-              printf("winman: resized back buffer registration failed\n");
+              printf("heimdall: resized back buffer registration failed\n");
             present_full_desktop();
             have_last = 0;
-            printf("winman: rebound fb to %dx%d\n", fb_w, fb_h);
+            printf("heimdall: rebound fb to %dx%d\n", fb_w, fb_h);
           }
         }
       }

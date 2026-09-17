@@ -1,11 +1,11 @@
 /* userspace/lib/wm.h , libwm: userspace window-manager client API.
  *
- * Apps include this header to talk to winman over IPC without knowing
+ * Apps include this header to talk to heimdall over IPC without knowing
  * the wire protocol. The functions wrap a synchronous request/reply
  * handshake built on ipc_send + ipc_recv (declared in syscall.h, which
  * this header pulls in).
  *
- * The server lives in userspace/bin/winman/winman.c and includes this
+ * The server lives in userspace/bin/heimdall/heimdall.c and includes this
  * same header so wire types and `struct ipc_msg` field layout stay
  * single-sourced. The kernel msg dispatcher (kernel/msg/msg.h) only
  * routes opaque ipc_msg payloads , IPC_WM_* codes are user-defined.
@@ -22,7 +22,7 @@
 #include <stdint.h>
 
 /* ---------------- Wire protocol ---------------------------------------- */
-/* IPC message type codes. Must stay in sync with winman.c's pump_ipc()
+/* IPC message type codes. Must stay in sync with heimdall.c's pump_ipc()
  * switch. Values are inside the IPC_USER_FIRST range. */
 #define IPC_WM_CREATE_REQ       0x100
 #define IPC_WM_CREATE_RESP      0x101
@@ -60,7 +60,7 @@ enum {
 /* ---------------- Window handle ---------------------------------------- */
 /* Returned by wm_window_create. `surface_va` is the page-aligned base of
  * the shared BGRA pixel buffer mapped into the client's address space ,
- * write pixels there directly, then call wm_window_invalidate so winman
+ * write pixels there directly, then call wm_window_invalidate so heimdall
  * recomposites. `pitch` is the row stride in bytes (== w*4 today). */
 struct wm_window {
     uint64_t surface_va;
@@ -73,7 +73,7 @@ struct wm_window {
 /* wm_poll_event() selects WM-flavored messages through lib/event. Non-WM
  * messages remain queued in libevent's userspace inbox, so windowed clients
  * can safely mix WM and custom IPC. Event codes mirror MSG_* from syscall.h
- * so apps see the same input vocabulary winman receives from the kernel. */
+ * so apps see the same input vocabulary heimdall receives from the kernel. */
 enum {
     WM_EV_NONE        = 0,
     WM_EV_KEY_DOWN    = 1,
@@ -95,10 +95,10 @@ struct wm_event {
 };
 
 /* ---------------- Client API ------------------------------------------- */
-/* All functions return 0 on success and -1 on failure (winman missing,
+/* All functions return 0 on success and -1 on failure (heimdall missing,
  * IPC failure, or server-side allocation failure). */
 
-/* Create a `w` x `h` BGRA window. Blocks until winman replies. On success
+/* Create a `w` x `h` BGRA window. Blocks until heimdall replies. On success
  * `out` is filled in and the surface is mapped RW at out->surface_va. */
 int  wm_window_create(int w, int h, const char *title, struct wm_window *out);
 
@@ -115,11 +115,11 @@ int  wm_window_set_status(int handle, const char *text);
  *
  * `kind` is WM_PROMPT_*. For WM_PROMPT_TEXT the reply is copied into `out`
  * (NUL-terminated, truncated to `cap`); pass NULL/0 for the other kinds.
- * Returns WM_PROMPT_OK, WM_PROMPT_NO, or WM_PROMPT_CANCEL , a dead winman
+ * Returns WM_PROMPT_OK, WM_PROMPT_NO, or WM_PROMPT_CANCEL , a dead heimdall
  * or a failed request reads as WM_PROMPT_CANCEL, so callers only have to
  * handle "the user did not say yes".
  *
- * Winman draws and drives the dialog; the calling app neither renders it
+ * Heimdall draws and drives the dialog; the calling app neither renders it
  * nor sees the keystrokes that go into it. */
 int  wm_prompt(int handle, int kind, const char *message, char *out,
                size_t cap);
@@ -127,7 +127,7 @@ int  wm_prompt(int handle, int kind, const char *message, char *out,
 /* Tear down a window. After this call surface_va becomes invalid. */
 int  wm_window_destroy(int handle);
 
-/* Tell winman the window's pixels changed and need recompositing. Today
+/* Tell heimdall the window's pixels changed and need recompositing. Today
  * this is whole-window damage; future versions will accept a rect. */
 int  wm_window_invalidate(int handle);
 

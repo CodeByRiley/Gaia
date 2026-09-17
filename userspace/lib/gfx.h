@@ -1,6 +1,6 @@
 /* userspace/lib/gfx.h , 2D drawing over a pixel buffer.
  *
- * The primitives winman and its clients both need: rectangles, fills,
+ * The primitives heimdall and its clients both need: rectangles, fills,
  * blits, font8x8 text, mask stamping and BMP drawing, all clipped so a
  * caller can pass coordinates that fall outside the target without
  * checking first. Nothing here allocates or makes syscalls except

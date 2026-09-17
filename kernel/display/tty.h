@@ -7,8 +7,8 @@
  *
  * Channel TTY_KERNEL (0) is special in one way only: it is the one the
  * kernel itself renders. It owns the character grid, the glyph scale and
- * the framebuffer blit, so the boot shell stays visible before winman
- * exists and again if winman dies. When winman registers it calls
+ * the framebuffer blit, so the boot shell stays visible before heimdall
+ * exists and again if heimdall dies. When heimdall registers it calls
  * tty_set_active(0), which stops the blitting; text still accumulates in
  * the grid so the kernel log does not blackhole.
  *
@@ -17,7 +17,7 @@
  * so they are only useful while something is draining them. tty_alloc()
  * hands one out and tty_release() gives it back.
  *
- * In-band control codes are emitted into the drain ring so winman can
+ * In-band control codes are emitted into the drain ring so heimdall can
  * mirror tty_clear_ch / tty_push_ch / tty_pop_ch on its surface. They sit in
  * unassigned low C0 ASCII so they don't collide with regular text or
  * handled control chars (\t \n \r \b are already in use).
@@ -37,8 +37,8 @@
 #define TTY_CTRL_ZOOM_IN  0x1E /* increase glyph scale by one step       */
 #define TTY_CTRL_ZOOM_OUT 0x1F /* decrease glyph scale by one step       */
 
-/* Channel count. Userspace winman mirrors one console window per channel,
- * so CON_MAX in userspace/bin/winman/winman.h must not exceed this. */
+/* Channel count. Userspace heimdall mirrors one console window per channel,
+ * so CON_MAX in userspace/bin/heimdall/heimdall.h must not exceed this. */
 #define TTY_MAX     4
 #define TTY_KERNEL  0
 
@@ -46,7 +46,7 @@ extern struct ttf_font *g_sys_font;
 
 void tty_init(void);
 
-/* Disable framebuffer drawing while winman owns the screen. Text still
+/* Disable framebuffer drawing while heimdall owns the screen. Text still
  * buffers into the grid so the kernel log doesn't blackhole. */
 void tty_set_active(int on);
 int  tty_is_active(void);

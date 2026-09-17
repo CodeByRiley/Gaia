@@ -116,8 +116,8 @@ int main(void) {
                 break;
 
             case WM_EV_RESIZE:
-                /* winman handed us a fresh shared surface; the previous va
-                 * becomes invalid the moment winman frees the old backing. */
+                /* heimdall handed us a fresh shared surface; the previous va
+                 * becomes invalid the moment heimdall frees the old backing. */
                 px    = (uint32_t *)(uintptr_t)ev.surface_va;
                 win.w = ev.w;
                 win.h = ev.h;

@@ -3,7 +3,7 @@
 
 An EFI System Partition is FAT, comes first, and mounts perfectly. A root
 search that stopped at the first volume some filesystem claimed therefore took
-the ESP, and the boot ended at "process_spawn: fopen failed" -- winman lives on
+the ESP, and the boot ended at "process_spawn: fopen failed" -- heimdall lives on
 the system volume, which never got mounted.
 
 Two boots, because the kernel has two defences and only one of them applies at
@@ -127,7 +127,7 @@ def main() -> int:
     # can be spawned from it.
     tail = [
         ("rootfs: fat mounted from ahci0p2 at /", "root did not come from p2"),
-        ("winman: ready", "desktop did not come up"),
+        ("heimdall: ready", "desktop did not come up"),
     ]
     # Not "the ESP was never mounted": in the 0c case mounting it is how
     # the kernel finds out what it is. What must not happen is a spawn

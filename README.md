@@ -12,12 +12,12 @@ TOS is mainly intended for QEMU and OS-development experiments. It is not a gene
 - **Memory:** physical and virtual memory managers, a kernel heap, per-process page tables, demand-paged virtual memory regions, and the `mmap`, `mprotect`, and `munmap` paths required by static musl programs. `brk` is intentionally rejected so musl uses `mmap` instead.
 - **Executables:** static ELF64 and PE32+ loaders. Builds produce ELF programs by default, along with PE versions of `hello` and `ls` to test both loaders.
 - **Storage:** a VFS with writable FAT16/FAT32 and ext2 backends. FAT supports VFAT long names and AHCI write-through; either FAT or ext2 can be used for the GRUB-loaded root image.
-- **Graphics and input:** Multiboot VBE/GOP framebuffer fallback with 24/32-bit pixel-format conversion, virtio-gpu and VirtualBox VMSVGA scanout/resize support, TTF text rendering, keyboard and mouse input, and the Winman desktop. Winman supports movable and resizable windows, launchers, and a taskbar clock. NVIDIA GSP display support is also included but still under development and has not yet been tested on physical hardware.
+- **Graphics and input:** Multiboot VBE/GOP framebuffer fallback with 24/32-bit pixel-format conversion, virtio-gpu and VirtualBox VMSVGA scanout/resize support, TTF text rendering, keyboard and mouse input, and the Heimdall desktop. Heimdall supports movable and resizable windows, launchers, and a taskbar clock. NVIDIA GSP display support is also included but still under development and has not yet been tested on physical hardware.
 - **Firmware:** dual BIOS/UEFI boot media, UEFI64 handoff detection, and capture of the EFI system-table and memory-map metadata supplied by GRUB.
 - **Drivers:** PCI discovery and driver registration, AHCI storage, Intel e1000 networking, Sound Blaster 16 audio, UHCI USB, virtio-gpu, and the developing NVIDIA driver.
 - **Networking:** Ethernet, ARP, IPv4, ICMP echo, UDP, packet capture and statistics, plus the Linux x86_64 syscall numbers for `socket`, `bind`, `sendto`, and `recvfrom`.
 - **Userspace:** a shell with `PATH` lookup, tab completion, working directories, built-ins, and background jobs; command-line utilities; graphical demos and tools; Netmon; ping; a UDP echo program; a DOOM port; and the HolyD bytecode language and runtime.
-- **Tests:** fast host-side tests and QEMU tests covering SMP, virtual memory, process lifetime, VFS/FAT/ext2, ELF/PE loading, musl, Winman, framebuffer ownership, networking, `PATH` lookup, and kernel panics.
+- **Tests:** fast host-side tests and QEMU tests covering SMP, virtual memory, process lifetime, VFS/FAT/ext2, ELF/PE loading, musl, Heimdall, framebuffer ownership, networking, `PATH` lookup, and kernel panics.
 
 ## Quick start
 
@@ -206,7 +206,7 @@ A normal build does not require DOOM WADs, music, NetSurf resources, or NVIDIA f
 
 ## Using TOS
 
-When it starts, TOS launches Winman and the Shelf shell.
+When it starts, TOS launches Heimdall and the Skald shell.
 
 Type `help` to see the shell's built-in commands. External programs can be run without their `.elf` suffix. Add `&` to the end of a command to run it in the background and keep using the shell.
 
@@ -228,7 +228,7 @@ holyd holyd/samples/gui.hd
 The root filesystem uses these executable directories:
 
 - `/usr/bin` — normal applications and development tools
-- `/system/bin` — the shell, Winman, core utilities, and HolyD
+- `/system/bin` — the Skald shell, Heimdall window manager, core utilities, and HolyD
 - `/bin` and `/usr/local/bin` — standard locations reserved for future or locally installed programs
 
 The default `PATH` is:
@@ -266,7 +266,7 @@ These programs are not included by default
 	
 - [NetSurf](https://www.netsurf-browser.org/)
 
-`libtos` handles the framebuffer, Winman IPC, console I/O, drawing, fonts, audio, input, and system inspection.
+`libtos` handles the framebuffer, Heimdall IPC, console I/O, drawing, fonts, audio, input, and system inspection.
 
 An older hand-written libc is still used by programs that cannot yet use musl, including the native TOS thread test and the DOOM port. PE builds use a separate MinGW-compatible startup and syscall layer.
 
@@ -353,8 +353,8 @@ It runs fifteen scripts covering:
 - ARP
 - ping
 - UDP
-- Winman partial repaint
-- Winman title-bar double-click handling
+- Heimdall partial repaint
+- Heimdall title-bar double-click handling
 - `PATH` lookup
 - the kernel panic screen
 

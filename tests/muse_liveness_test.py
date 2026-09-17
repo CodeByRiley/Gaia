@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Winman continues presenting while Muse streams audio."""
+"""Verify Heimdall continues presenting while Muse streams audio."""
 
 from __future__ import annotations
 
@@ -66,9 +66,9 @@ def main() -> int:
     qmp: Qmp | None = None
     try:
         deadline = time.monotonic() + args.timeout
-        if not wait_for_marker(log_path, "winman: ready", proc, deadline):
+        if not wait_for_marker(log_path, "heimdall: ready", proc, deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("winman did not become ready", file=sys.stderr)
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
 
         qmp = Qmp(qmp_port, deadline)
@@ -90,7 +90,7 @@ def main() -> int:
         time.sleep(0.4)
         mw, mh, moved = dump(qmp, moved_path)
         if (fw, fh) != (mw, mh) or changed_pixels(first, moved) == 0:
-            print("Winman did not repaint after cursor movement", file=sys.stderr)
+            print("Heimdall did not repaint after cursor movement", file=sys.stderr)
             return 1
 
         time.sleep(args.hold_seconds)

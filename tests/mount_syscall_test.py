@@ -5,7 +5,7 @@ The root comes from the FAT disk on ide.0, which leaves the ext2 disk on
 ide.1 published but unmounted -- exactly the case SYS_MOUNT exists for.
 
 Assertions read the *kernel* log on the serial port, not shell output:
-sh's stdout goes to the TTY once winman owns the display, so the mount and
+sh's stdout goes to the TTY once heimdall owns the display, so the mount and
 umount syscalls logging their own result is what makes this observable.
 
 Requires a built ISO, build/disk-fat.img and build/tests/ext2-base.img.
@@ -76,7 +76,7 @@ def main() -> int:
         # the ext2 disk. Assert it, or a swapped bus order would leave the
         # mount below testing an already-mounted volume.
         expect("rootfs: fat mounted from ahci0 at /", "root did not mount")
-        expect("winman: ready", "desktop did not come up")
+        expect("heimdall: ready", "desktop did not come up")
 
         qmp = Qmp(port, deadline)
         send_text(qmp, "mount ahci1 /mnt\n")

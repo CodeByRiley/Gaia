@@ -1,4 +1,4 @@
-/* Heavy in-guest regression test for VM, FAT, IPC, Winman and task churn. */
+/* Heavy in-guest regression test for VM, FAT, IPC, Heimdall and task churn. */
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -236,7 +236,7 @@ static int shmem_stress(void) {
 }
 
 static int window_stress(void) {
-    check(wm_pid() > 0, "Winman is registered");
+    check(wm_pid() > 0, "Heimdall is registered");
     for (int round = 0; round < WINDOW_ROUNDS; round++) {
         struct wm_window window;
         int width = 240 + (round & 3) * 16;

@@ -131,14 +131,14 @@ def main() -> int:
     proc = subprocess.Popen(command, stdin=subprocess.DEVNULL)
     try:
         boot_deadline = time.monotonic() + args.boot_timeout
-        if not wait_for_text(log_path, "winman: ready", boot_deadline):
+        if not wait_for_text(log_path, "heimdall: ready", boot_deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("winman did not become ready", file=sys.stderr)
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
 
         started = time.monotonic()
         request_vnc_resize(port, args.width, args.height)
-        marker = f"winman: rebound fb to {args.width}x{args.height}"
+        marker = f"heimdall: rebound fb to {args.width}x{args.height}"
         if not wait_for_text(log_path, marker, started + args.resize_timeout):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
             print(f"resize marker not seen within {args.resize_timeout:.1f}s",

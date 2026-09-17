@@ -1,5 +1,5 @@
-#define WINMAN_DECLARE_STATE
-#include "winman.h"
+#define HEIMDALL_DECLARE_STATE
+#include "heimdall.h"
 #include "key_codes.h"
 #include "syscall.h"
 #include <display/print.h>
@@ -10,7 +10,7 @@
 /* Pre-expanded glyph row for the console (CONSOLE_FG/CONSOLE_BG are
  * constants): byte -> 8 pixels. Built in con_alloc_buffers. 8 KiB BSS.
  * Per-row glyph render becomes a single memcpy(32 B) instead of 8 per-pixel
- * conditional writes , the dominant cost when winman drains the TTY ring. */
+ * conditional writes , the dominant cost when heimdall drains the TTY ring. */
 static uint32_t con_glyph_lut[256][FONT_GLYPH_W];
 
 void build_con_glyph_lut(void) {
@@ -168,7 +168,7 @@ void con_try_load_ttf(void) {
   }
 
   if (!loaded_path) {
-    printf("winman: TTF console unavailable rc=%d, using font8x8\n", rc);
+    printf("heimdall: TTF console unavailable rc=%d, using font8x8\n", rc);
     return;
   }
 
@@ -187,7 +187,7 @@ void con_try_load_ttf(void) {
     con_ttf_ascent = (CON_TTF_PX * 3) / 4;
 
   con_ttf_ready = 1;
-  printf("winman: TTF console %s cell=%dx%d px=%d asc=%d desc=%d\n",
+  printf("heimdall: TTF console %s cell=%dx%d px=%d asc=%d desc=%d\n",
          loaded_path, con_ttf_cell_w, con_ttf_cell_h, CON_TTF_PX,
          con_ttf_ascent, con_ttf_descent);
 }
@@ -722,7 +722,7 @@ void con_set_title(struct console *con, int slot) {
  * Slot 0 is the exception at the channel level only: it mirrors TTY_KERNEL,
  * which the kernel opened at boot and never closes, so there is nothing to
  * allocate or release for it. It still gets its own shell from here, which
- * is what makes closing it possible , winman knows the pid. */
+ * is what makes closing it possible , heimdall knows the pid. */
 struct console *console_open(void) {
   int slot = -1;
   for (int i = 0; i < CON_MAX; i++) {
@@ -732,7 +732,7 @@ struct console *console_open(void) {
     }
   }
   if (slot < 0) {
-    printf("winman: console open refused , all %d slots in use\n", CON_MAX);
+    printf("heimdall: console open refused , all %d slots in use\n", CON_MAX);
     return 0;
   }
 
@@ -743,14 +743,14 @@ struct console *console_open(void) {
   if (slot > 0) {
     long claimed = tty_alloc();
     if (claimed < 0) {
-      printf("winman: console open failed , no free TTY channel\n");
+      printf("heimdall: console open failed , no free TTY channel\n");
       return 0;
     }
     tty = (int)claimed;
   }
 
   if (con_alloc_buffers(con, slot) != 0) {
-    printf("winman: console open failed , surface alloc\n");
+    printf("heimdall: console open failed , surface alloc\n");
     if (slot > 0)
       tty_free(tty);
     memset(con, 0, sizeof(*con));
@@ -765,7 +765,7 @@ struct console *console_open(void) {
   char *argv[] = {(char *)"sh", 0};
   long pid = tty_spawn("/system/bin/sh.elf", argv, tty);
   if (pid <= 0) {
-    printf("winman: console open failed , sh spawn returned %ld\n", pid);
+    printf("heimdall: console open failed , sh spawn returned %ld\n", pid);
     con->win.in_use = 0;
     free(con->win.surface_raw);
     free(con->backing_raw);
@@ -782,7 +782,7 @@ struct console *console_open(void) {
   focused_handle = con->win.handle;
   mark_dirty(con->win.x, con->win.y, outer_w_dims(con->win.client_w),
              outer_h_dims(con->win.client_h, con->win.status_h));
-  printf("winman: console slot=%d tty=%d sh pid=%d\n", slot, tty, con->pid);
+  printf("heimdall: console slot=%d tty=%d sh pid=%d\n", slot, tty, con->pid);
   return con;
 }
 
@@ -826,7 +826,7 @@ void console_close(struct console *con) {
   }
 
   mark_dirty(old_x, old_y, old_ow, old_oh);
-  printf("winman: console slot=%d closed\n", slot);
+  printf("heimdall: console slot=%d closed\n", slot);
 }
 
 /* True for the shell binary, whatever directory it was found in. */
@@ -842,8 +842,8 @@ int path_is_shell(const char *path) {
 }
 
 /* Launch from the desktop or the start menu. A shell is not an ordinary
- * spawn: without a console of its own it inherits winman's TTY channel,
- * so its output lands in whichever console winman is attached to and it
+ * spawn: without a console of its own it inherits heimdall's TTY channel,
+ * so its output lands in whichever console heimdall is attached to and it
  * never receives a keystroke. Give it a window and a channel instead. */
 void launch_program(const char *path) {
   if (path_is_shell(path)) {
@@ -854,7 +854,7 @@ void launch_program(const char *path) {
   char *argv[] = {(char *)path, 0};
   long pid = spawn(path, argv);
   if (pid > 0)
-    printf("winman: spawned %s pid %ld\n", path, pid);
+    printf("heimdall: spawned %s pid %ld\n", path, pid);
   else
-    printf("winman: failed to spawn %s (code %ld)\n", path, pid);
+    printf("heimdall: failed to spawn %s (code %ld)\n", path, pid);
 }

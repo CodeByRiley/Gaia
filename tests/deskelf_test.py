@@ -64,9 +64,9 @@ def main() -> int:
     qmp: Qmp | None = None
     try:
         deadline = time.monotonic() + args.timeout
-        if not wait_for_text(log_path, "winman: ready", deadline):
+        if not wait_for_text(log_path, "heimdall: ready", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("winman did not become ready", file=sys.stderr)
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
 
         qmp = Qmp(qmp_port, deadline)
@@ -93,7 +93,7 @@ def main() -> int:
                   file=sys.stderr)
             return 1
 
-        # Winman must send WM_EV_QUIT and let the owner destroy the shared
+        # Heimdall must send WM_EV_QUIT and let the owner destroy the shared
         # surface instead of unmapping it while the process is still drawing.
         qmp.command("human-monitor-command",
                     {"command-line": "mouse_move 612 67"})
@@ -105,22 +105,22 @@ def main() -> int:
                     {"command-line": "mouse_button 0"})
         if not wait_for_text(log_path, "deskelf: exit", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("Winman close did not reach Deskelf", file=sys.stderr)
+            print("Heimdall close did not reach Deskelf", file=sys.stderr)
             return 1
-        if not wait_for_text(log_path, "winman: destroy handle=", deadline):
+        if not wait_for_text(log_path, "heimdall: destroy handle=", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("Winman did not finish Deskelf teardown", file=sys.stderr)
+            print("Heimdall did not finish Deskelf teardown", file=sys.stderr)
             return 1
 
         log = log_path.read_text(encoding="utf-8", errors="replace")
-        if ("winman: close button -> request handle=" not in log or
+        if ("heimdall: close button -> request handle=" not in log or
                 "PANIC" in log or
                 "deskelf: could not create window" in log):
             print(log)
             print("Deskelf smoke test detected a guest failure", file=sys.stderr)
             return 1
 
-        print("Deskelf rendered, handled input, and honored Winman's close")
+        print("Deskelf rendered, handled input, and honored Heimdall's close")
         return 0
     finally:
         if qmp is not None:

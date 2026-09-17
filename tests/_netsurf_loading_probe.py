@@ -28,13 +28,13 @@ process = subprocess.Popen(command, stdin=subprocess.DEVNULL)
 qmp = None
 try:
     deadline = time.monotonic() + 45
-    if not wait_for_text(log, "winman: ready", deadline):
-        raise RuntimeError("winman did not become ready")
+    if not wait_for_text(log, "heimdall: ready", deadline):
+        raise RuntimeError("heimdall did not become ready")
     qmp = Qmp(port, deadline)
     send_text(qmp, "netsurf ")
     qmp.command("human-monitor-command", {"command-line": "sendkey minus"})
     send_text(qmp, "v\n")
-    if not wait_for_text(log, "winman: create handle=", deadline):
+    if not wait_for_text(log, "heimdall: create handle=", deadline):
         raise RuntimeError("NetSurf window was not created")
     time.sleep(8)
     qmp.command("screendump", {"filename": shot.as_posix()})

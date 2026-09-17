@@ -55,9 +55,9 @@ def main() -> int:
     qmp: Qmp | None = None
     try:
         deadline = time.monotonic() + args.timeout
-        if not wait_for_text(log_path, "winman: ready", deadline):
+        if not wait_for_text(log_path, "heimdall: ready", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("winman did not become ready", file=sys.stderr)
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
 
         qmp = Qmp(qmp_port, deadline)
@@ -85,7 +85,7 @@ def main() -> int:
 
         for width, height in ((1446, 1082), (801, 669), (1280, 800)):
             request_vnc_resize(vnc_port, width, height)
-            marker = f"winman: rebound fb to {width}x{height}"
+            marker = f"heimdall: rebound fb to {width}x{height}"
             if not wait_for_text(log_path, marker, deadline):
                 print(log_path.read_text(encoding="utf-8", errors="replace"))
                 print(f"resize to {width}x{height} did not complete",

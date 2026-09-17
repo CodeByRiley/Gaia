@@ -74,9 +74,9 @@ def main() -> int:
     qmp: Qmp | None = None
     try:
         deadline = time.monotonic() + args.timeout
-        if not wait_for_text(log_path, "winman: ready", deadline):
+        if not wait_for_text(log_path, "heimdall: ready", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("winman did not become ready", file=sys.stderr)
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
         if not wait_for_text(log_path, "e1000: RX/TX ready", deadline):
             print("e1000 did not initialise", file=sys.stderr)

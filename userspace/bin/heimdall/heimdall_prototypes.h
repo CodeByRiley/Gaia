@@ -1,7 +1,7 @@
-/* Cross-module entry points for the Winman executable. This is a private
+/* Cross-module entry points for the Heimdall executable. This is a private
  * interface: applications use lib/wm.h and never include this file. */
-#ifndef WINMAN_PROTOTYPES_H
-#define WINMAN_PROTOTYPES_H
+#ifndef HEIMDALL_PROTOTYPES_H
+#define HEIMDALL_PROTOTYPES_H
 
 #include <stdint.h>
 #include <stddef.h>

@@ -87,7 +87,7 @@ join remains 1102.
 All eleven live in `kernel/arch/syscall_abi.h`, included by both sides; there
 are no kernel/userspace mirror structs whose field order can drift.
 
-**Winman** , the desktop compositor, `userspace/bin/winman/`. Clients talk to
+**Heimdall** , the desktop compositor, `userspace/bin/heimdall/`. Clients talk to
 it over IPC through **libwm** (`userspace/lib/wm.h`) and never see the wire
 protocol.
 

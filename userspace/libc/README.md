@@ -45,7 +45,7 @@ overlay writes the object list to `lib/libc.a.rsp` and invokes `ar` with
 `@lib/libc.a.rsp`.
 
 musl is the default libc for userspace. Every program under `bin/` links
-`crt1.o` + `libc.a` plus `lib/libtos.a` (the TOS-only half: winman IPC, the
+`crt1.o` + `libc.a` plus `lib/libtos.a` (the TOS-only half: heimdall IPC, the
 framebuffer, the console, audio, the drawing and font helpers), except:
 
 - `bin/thread` , drives TOS's own `SYS_THREAD_CREATE`/`EXIT`/`JOIN`, while
@@ -55,7 +55,7 @@ framebuffer, the console, audio, the drawing and font helpers), except:
 
 Those still link the hand-rolled `userspace/lib` objects. Everything else
 should use standard headers; reach for `<lib/syscall.h>` only for calls musl
-has no name for, such as `readdir_path()` or the winman surface.
+has no name for, such as `readdir_path()` or the heimdall surface.
 
 The kernel now provides enough of the Linux x86_64 syscall ABI for basic static
 musl programs to run unchanged:

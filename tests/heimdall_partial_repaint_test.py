@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Catch Winman writes outside a partial-composition clip.
+"""Catch Heimdall writes outside a partial-composition clip.
 
 Typing dirties individual console cells. If draw_chrome or another compositor
 primitive ignores that clip, it overwrites the persistent backbuffer with the
@@ -54,9 +54,9 @@ def main() -> int:
         print(f"missing ISO: {iso}", file=sys.stderr)
         return 2
 
-    log_path = Path("build/qemu-winman-partial-repaint.log").resolve()
-    before = Path("build/winman-partial-before.ppm").resolve()
-    after = Path("build/winman-partial-after.ppm").resolve()
+    log_path = Path("build/qemu-heimdall-partial-repaint.log").resolve()
+    before = Path("build/heimdall-partial-before.ppm").resolve()
+    after = Path("build/heimdall-partial-after.ppm").resolve()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_bytes(b"")
     before.unlink(missing_ok=True)
@@ -78,9 +78,9 @@ def main() -> int:
     qmp: Qmp | None = None
     try:
         deadline = time.monotonic() + args.timeout
-        if not wait_for_text(log_path, "winman: ready", deadline):
+        if not wait_for_text(log_path, "heimdall: ready", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("winman did not become ready", file=sys.stderr)
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
 
         qmp = Qmp(qmp_port, deadline)
@@ -121,7 +121,7 @@ def main() -> int:
             return 1
 
         print(
-            "Winman partial repaint preserved the backbuffer "
+            "Heimdall partial repaint preserved the backbuffer "
             f"(gray pixels {baseline} -> {damaged})"
         )
         return 0

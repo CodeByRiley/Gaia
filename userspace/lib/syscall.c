@@ -4,7 +4,7 @@
  * combination, casts pointers through uintptr_t so calling conventions
  * stay clean, preserves the kernel's raw result, and records a negative
  * Linux errno in errno. Anything
- * that isn't a syscall (winman IPC helpers, etc.) lives elsewhere , see
+ * that isn't a syscall (heimdall IPC helpers, etc.) lives elsewhere , see
  * lib/wm.c.
  */
 #include <lib/syscall.h>
@@ -205,7 +205,7 @@ long shmem_unshare(int target_pid, uint64_t in_va, long npages) {
     return syscall3(SYS_SHMEM_UNSHARE, target_pid, (sysarg_t)in_va, npages);
 }
 
-/* Winman registration */
+/* Heimdall registration */
 long wm_register(void) { return syscall0(SYS_WM_REGISTER); }
 long wm_pid(void)      { return syscall0(SYS_WM_PID); }
 

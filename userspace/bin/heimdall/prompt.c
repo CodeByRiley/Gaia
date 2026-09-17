@@ -1,5 +1,5 @@
-#define WINMAN_DECLARE_STATE
-#include "winman.h"
+#define HEIMDALL_DECLARE_STATE
+#include "heimdall.h"
 #include "key_codes.h"
 #include "syscall.h"
 #include <display/print.h>
@@ -9,7 +9,7 @@
 
 /* ---------------- Modal prompt ------------------------------------------
  *
- * Winman owns the dialog outright: it draws it, it consumes every keystroke
+ * Heimdall owns the dialog outright: it draws it, it consumes every keystroke
  * and click while it is up, and it sends the answer back. The requesting app
  * is parked inside wm_prompt() and never sees the input, which is what makes
  * the dialog genuinely modal rather than merely painted on top.
@@ -171,7 +171,7 @@ void handle_prompt_req(int owner_pid, int handle, int kind,
   int px, py, pw, ph;
   prompt_rect(&px, &py, &pw, &ph);
   mark_dirty(px, py, pw, ph);
-  printf("winman: prompt kind=%d owner=%d handle=%d at %d,%d\n", kind,
+  printf("heimdall: prompt kind=%d owner=%d handle=%d at %d,%d\n", kind,
          owner_pid, handle, px, py);
 }
 

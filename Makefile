@@ -457,8 +457,8 @@ test-qemu-heavy: build-x86_64 $(HOST_TEST_DIR)/ext2-base.img $(HOST_TEST_DIR)/mb
 		python3 tests/net_arp_test.py --timeout 120 && \
 		python3 tests/net_ping_test.py --timeout 180 && \
 		python3 tests/net_udp_test.py --timeout 120 && \
-		python3 tests/winman_partial_repaint_test.py --timeout 90 && \
-		python3 tests/winman_titlebar_double_click_test.py --timeout 90 && \
+		python3 tests/heimdall_partial_repaint_test.py --timeout 90 && \
+		python3 tests/heimdall_titlebar_double_click_test.py --timeout 90 && \
 		python3 tests/path_lookup_test.py --timeout 90 && \
 		python3 tests/ehci_test.py && \
 		python3 tests/uhci_test.py && \

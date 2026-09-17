@@ -1,7 +1,7 @@
-#define WINMAN_DECLARE_STATE
+#define HEIMDALL_DECLARE_STATE
 #include "key_codes.h"
 #include "syscall.h"
-#include "winman.h"
+#include "heimdall.h"
 #include <display/print.h>
 #include <stdbool.h>
 #include <string.h>
@@ -18,23 +18,23 @@ void cursor_load(void) {
     if (cursor_img.width > 0 && cursor_img.height > 0 &&
         cursor_img.width <= CURSOR_MAX_SOURCE_DIM &&
         cursor_img.height <= CURSOR_MAX_SOURCE_DIM) {
-      printf("winman: cursor %dx%d from %s\n", cursor_img.width,
+      printf("heimdall: cursor %dx%d from %s\n", cursor_img.width,
              cursor_img.height, CURSOR_BMP_PATH);
     } else {
       printf(
-          "winman: %s has invalid cursor dimensions, using built-in cursor\n",
+          "heimdall: %s has invalid cursor dimensions, using built-in cursor\n",
           CURSOR_BMP_PATH);
       bmp_free(&cursor_img);
     }
   } else {
-    printf("winman: %s unavailable, using built-in cursor\n", CURSOR_BMP_PATH);
+    printf("heimdall: %s unavailable, using built-in cursor\n", CURSOR_BMP_PATH);
   }
 }
 
 void desktop_load(void) {
   if (bmp_load("/system/wallpaper.bmp", &wallpaper_img) == 0) {
     wallpaper_loaded = 1;
-    printf("winman: wallpaper %dx%d loaded\n", wallpaper_img.width,
+    printf("heimdall: wallpaper %dx%d loaded\n", wallpaper_img.width,
            wallpaper_img.height);
   }
 
@@ -44,7 +44,7 @@ void desktop_load(void) {
    * the destination in tools/create_disk.sh. */
   static const struct program desktop_candidates[] = {
       {"DOOM", "usr/bin/doom.elf"},
-      {"shelf", "system/bin/sh.elf"},
+      {"skald", "system/bin/sh.elf"},
   };
   const int candidate_count =
       (int)(sizeof(desktop_candidates) / sizeof(desktop_candidates[0]));
@@ -56,7 +56,7 @@ void desktop_load(void) {
      * doing nothing but fail to spawn when clicked. */
     struct stat_user st;
     if (stat_raw(desktop_candidates[c].path, &st) != 0) {
-      printf("winman: desktop icon %s skipped, %s not present\n",
+      printf("heimdall: desktop icon %s skipped, %s not present\n",
              desktop_candidates[c].name, desktop_candidates[c].path);
       continue;
     }
@@ -77,7 +77,7 @@ void desktop_load(void) {
     if (bmp_load(path, &desktop_icons[i].icon) == 0) {
       desktop_icons[i].loaded = 1;
     } else {
-      printf("winman: icon %s not found, using fallback\n",
+      printf("heimdall: icon %s not found, using fallback\n",
              desktop_icons[i].program.name);
       desktop_icons[i].loaded = 0;
     }
@@ -121,7 +121,7 @@ int start_menu_has_path(const char *path) {
 static const char *const skipped_programs[] = {
     "pkill", "plist",  "mtest",       "pe_test", "audiotest", "btop",
     "cat",   "ls",     "holyd",       "fdchild", "faulter",   "thread",
-    "tree",  "stress", "stress_peer", "uidemo",  "vmtest",    "winman"};
+    "tree",  "stress", "stress_peer", "uidemo",  "vmtest",    "heimdall"};
 
 static int is_skipped_program(const char *label) {
   for (size_t k = 0; k < sizeof(skipped_programs) / sizeof(skipped_programs[0]);
@@ -149,15 +149,15 @@ void start_menu_add(const char *name, const char *path) {
   if (start_menu_count >= START_MENU_MAX)
     return;
   if (is_skipped_program(name)) {
-    printf("winman: skip %s (%s)\n", name, path);
+    printf("heimdall: skip %s (%s)\n", name, path);
     start_menu_remove(path);
     return;
   }
   if (start_menu_has_path(path)) {
-    printf("winman: dup %s (%s)\n", name, path);
+    printf("heimdall: dup %s (%s)\n", name, path);
     return;
   }
-  printf("winman: add %s (%s)\n", name, path);
+  printf("heimdall: add %s (%s)\n", name, path);
   struct start_entry *e = &start_menu_programs[start_menu_count++];
   copy_field(e->name, sizeof(e->name), name);
   copy_field(e->path, sizeof(e->path), path);
@@ -233,7 +233,7 @@ void build_start_menu_entries(void) {
   for (int d = 0; d < START_MENU_SCAN_DIR_COUNT; d++)
     start_menu_scan_dir(start_menu_scan_dirs[d], capacity);
 
-  printf("winman: start menu %d entries (%d pinned)\n", start_menu_count,
+  printf("heimdall: start menu %d entries (%d pinned)\n", start_menu_count,
          START_MENU_DEFAULT_COUNT);
 }
 

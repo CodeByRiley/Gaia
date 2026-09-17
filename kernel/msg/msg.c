@@ -52,7 +52,7 @@ void msg_post(const struct msg *m) {
         return;
     }
     /* Fallback: deliver to init (pid=1) so the shell-only boot path still
-     * sees keyboard events when no userspace winman is up. */
+     * sees keyboard events when no userspace heimdall is up. */
     msg_post_to(1, m);
 }
 

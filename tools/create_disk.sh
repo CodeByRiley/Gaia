@@ -43,14 +43,14 @@ payloads=(
 	"rootfs/system/icons/connected.bmp::system/icons/connected.bmp"
 	"rootfs/system/icons/disconnected.bmp::system/icons/disconnected.bmp"
 	"rootfs/system/icons/DOOM.bmp::system/icons/doom.bmp"
-	"rootfs/system/icons/shelf.bmp::system/icons/shelf.bmp"
+	"rootfs/system/icons/skald.bmp::system/icons/skald.bmp"
 	"rootfs/system/icons/cursor.bmp::system/icons/cursor.bmp"
 
 # System Apps
 	"userspace/bin/shutdown/shutdown.elf::system/bin/shutdown.elf"
 	"userspace/bin/reboot/reboot.elf::system/bin/reboot.elf"
 	"userspace/bin/pkill/pkill.elf::system/bin/pkill.elf"
-	"userspace/bin/winman/winman.elf::system/bin/winman.elf"
+	"userspace/bin/heimdall/heimdall.elf::system/bin/heimdall.elf"
 	"userspace/bin/plist/plist.elf::system/bin/plist.elf"
 	"userspace/bin/mount/mount.elf::system/bin/mount.elf"
 	"userspace/bin/umount/umount.elf::system/bin/umount.elf"

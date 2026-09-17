@@ -126,7 +126,7 @@ static void load_text_file(const char *path) {
     printf("notepad: loaded %d bytes from %s\n", count, path);
 }
 
-/* Ask winman for a path. Returns 1 if file_path now holds one. */
+/* Ask heimdall for a path. Returns 1 if file_path now holds one. */
 static int prompt_for_path(void) {
   char entered[PATH_MAX];
   int rc = wm_prompt(win_handle, WM_PROMPT_TEXT,

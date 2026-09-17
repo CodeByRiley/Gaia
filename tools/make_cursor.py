@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate rootfs/system/icons/cursor.bmp , the winman pointer sprite.
+"""Generate rootfs/system/icons/cursor.bmp , the heimdall pointer sprite.
 
 Emits a 32-bit BITMAPV4HEADER BMP with an explicit alpha mask, which is
 what an image editor produces when it exports RGBA. Run it to regenerate
@@ -9,8 +9,8 @@ and rebuild.
 
     python tools/make_cursor.py
 
-The mask below is the same shape winman carries as its built-in fallback
-(bin/winman/winman.c), so a fresh build looks identical whether or not
+The mask below is the same shape heimdall carries as its built-in fallback
+(bin/heimdall/heimdall.c), so a fresh build looks identical whether or not
 the file is present. 0 = transparent, 1 = black border, 2 = white fill.
 """
 import os

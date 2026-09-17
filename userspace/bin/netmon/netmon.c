@@ -580,7 +580,7 @@ int main(void) {
 //     struct ui_context ui;
 //     memset(&ui, 0, sizeof(ui));
 
-//     /* winman truncates the status strip at 47 bytes, so this is as much
+//     /* heimdall truncates the status strip at 47 bytes, so this is as much
 //      * as fits; the rest of the keys are in the header comment. */
 //     wm_window_set_status(win.handle,
 //                          "ESC quit  UP/DN PGUP/PGDN  P pause  C clear");

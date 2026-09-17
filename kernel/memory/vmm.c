@@ -211,7 +211,7 @@ u64 vmm_translate(u64 virt) {
  * whose top-level slot first appears *after* a process was spawned is
  * invisible to that process: its copy of the slot is still empty. That is
  * not hypothetical , large_alloc's arena at 0xFFFFA000_00000000 is a slot
- * of its own, and the first call to it after winman started left winman
+ * of its own, and the first call to it after heimdall started left heimdall
  * unable to read the result, which an interrupt handler then did.
  *
  * Populating all 256 slots here makes them immutable from this point on.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that double-clicking a Winman titlebar maximizes and restores it."""
+"""Verify that double-clicking a Heimdall titlebar maximizes and restores it."""
 
 from __future__ import annotations
 
@@ -56,10 +56,10 @@ def main() -> int:
 
     build = Path("build").resolve()
     build.mkdir(parents=True, exist_ok=True)
-    log_path = build / "qemu-winman-titlebar-double-click.log"
-    before = build / "winman-titlebar-before.ppm"
-    maximized = build / "winman-titlebar-maximized.ppm"
-    restored = build / "winman-titlebar-restored.ppm"
+    log_path = build / "qemu-heimdall-titlebar-double-click.log"
+    before = build / "heimdall-titlebar-before.ppm"
+    maximized = build / "heimdall-titlebar-maximized.ppm"
+    restored = build / "heimdall-titlebar-restored.ppm"
     log_path.write_bytes(b"")
     for screenshot in (before, maximized, restored):
         screenshot.unlink(missing_ok=True)
@@ -81,9 +81,9 @@ def main() -> int:
     qmp: Qmp | None = None
     try:
         deadline = time.monotonic() + args.timeout
-        if not wait_for_text(log_path, "winman: ready", deadline):
+        if not wait_for_text(log_path, "heimdall: ready", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("winman did not become ready", file=sys.stderr)
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
 
         qmp = Qmp(qmp_port, deadline)
@@ -137,7 +137,7 @@ def main() -> int:
             print("kernel panic detected", file=sys.stderr)
             return 1
 
-        print("Winman titlebar double-click maximized and restored the console")
+        print("Heimdall titlebar double-click maximized and restored the console")
         return 0
     finally:
         if qmp is not None:

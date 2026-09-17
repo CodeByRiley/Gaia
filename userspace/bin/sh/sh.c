@@ -7,11 +7,11 @@
  * spawn() so windowed apps don't pin the prompt.
  *
  * Input model:
- *   - ASCII drained from the TTY input ring, which winman fills only while
+ *   - ASCII drained from the TTY input ring, which heimdall fills only while
  *     the console window has focus. Not kbd_poll: that ring receives every
  *     keystroke regardless of focus, so a shell reading it also collects
  *     whatever is typed into other windows.
- *   - Modifiers and console zoom are winman's business, since the keymap is
+ *   - Modifiers and console zoom are heimdall's business, since the keymap is
  *     applied before the characters reach us.
  *   - TAB completes command names from PATH or files from the current dir.
  */
@@ -108,15 +108,15 @@ static int apply_path_assignment(const char *word) {
 // #region KEYBOARD INPUT
 /* Block until a character arrives for the console.
  *
- * Reads the TTY input ring, which winman fills only while the console has
+ * Reads the TTY input ring, which heimdall fills only while the console has
  * focus. Polling kbd_poll instead would be reading the raw keyboard ring ,
  * that is filled for every keystroke no matter which window is focused, so
  * the shell would silently collect everything typed into other windows and
  * find it queued at the prompt the moment they closed.
  *
- * Characters arrive already folded to ASCII (winman applies the keymap), so
+ * Characters arrive already folded to ASCII (heimdall applies the keymap), so
  * there is no modifier state to track here. Ctrl+-/Ctrl+= console zoom is
- * handled by winman for the same reason: raw keycodes never reach us. */
+ * handled by heimdall for the same reason: raw keycodes never reach us. */
 static char read_char(void) {
   static char buf[32];
   static int have = 0;
@@ -732,7 +732,7 @@ int main(int argc, char **argv) {
   (void)argv;
 
   console_init();
-  sh_printf("shelf v0.1 - type 'help'\n");
+  sh_printf("Skald v0.3 - type 'help'\n");
 
   char line[LINE_MAX];
   char *targs[16];
@@ -761,7 +761,7 @@ int main(int argc, char **argv) {
     if (builtin) {
       builtin->fn(ac, targs);
       if (shell_should_exit) {
-        printf("exiting SHELF\n");
+        printf("exiting Skald\n");
         return 0;
       }
     } else {

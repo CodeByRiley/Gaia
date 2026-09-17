@@ -821,7 +821,7 @@ static long sys_audio_resume(void) {
 
 // #endregion CONSOLE + SLEEP + PID
 
-// #region IPC + SHMEM + WINMAN
+// #region IPC + SHMEM + HEIMDALL
 
 static long sys_ipc_send(long target_pid, const struct ipc_msg *m) {
   if (!m)
@@ -1015,7 +1015,7 @@ static long sys_tty_spawn(const char *path, char *const argv[], long idx) {
   return process_spawn_async_tty(resolved, argv, (int)idx);
 }
 
-/* Drain the keystrokes winman has injected for whoever owns the console.
+/* Drain the keystrokes heimdall has injected for whoever owns the console.
  * Non-blocking: returns 0 when nothing is queued.
  *
  * This is the counterpart to SYS_TTY_INJECT, and the reason the console

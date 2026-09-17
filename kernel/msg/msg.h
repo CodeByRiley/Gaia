@@ -4,10 +4,10 @@
  *   - struct msg     : Win3-style input event ring. IRQ handlers + timers
  *                       post; the foreground process pops via SYS_MSG_GET.
  *                       The kernel routes input to a single "input owner"
- *                       (typically userspace winman) so other processes
+ *                       (typically userspace heimdall) so other processes
  *                       don't race on a global queue.
  *   - struct ipc_msg : Larger cross-process control messages. Used for
- *                       the winman <-> client protocol and for kernel-
+ *                       the heimdall <-> client protocol and for kernel-
  *                       originated notifications (peer-exited, etc.).
  *
  * Both layouts live in arch/syscall_abi.h because the kernel and userspace

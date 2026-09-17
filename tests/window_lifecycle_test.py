@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run 64 in-process Winman create/destroy cycles under QEMU."""
+"""Run 64 in-process Heimdall create/destroy cycles under QEMU."""
 
 from __future__ import annotations
 
@@ -63,8 +63,8 @@ def main() -> int:
     qmp: Qmp | None = None
     try:
         deadline = time.monotonic() + args.timeout
-        if not wait_for_marker(log_path, "winman: ready", proc, deadline):
-            print("winman did not become ready", file=sys.stderr)
+        if not wait_for_marker(log_path, "heimdall: ready", proc, deadline):
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
         qmp = Qmp(qmp_port, deadline)
         send_text(qmp, "stress windows\n")
@@ -72,23 +72,23 @@ def main() -> int:
             print(log_path.read_text(encoding="utf-8", errors="replace"))
             print("window lifecycle stress did not pass", file=sys.stderr)
             return 1
-        if not wait_for_count(log_path, "winman: destroy handle=", 64,
+        if not wait_for_count(log_path, "heimdall: destroy handle=", 64,
                               proc, deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("Winman did not consume all destroy requests",
+            print("Heimdall did not consume all destroy requests",
                   file=sys.stderr)
             return 1
 
         log = log_path.read_text(encoding="utf-8", errors="replace")
         if ("stress: windows PASS rounds=64" not in log or
-                log.count("winman: create handle=") < 64 or
-                log.count("winman: destroy handle=") < 64 or
+                log.count("heimdall: create handle=") < 64 or
+                log.count("heimdall: destroy handle=") < 64 or
                 "PANIC" in log or "stress: FAIL" in log):
             print(log)
             print("window lifecycle markers were incomplete", file=sys.stderr)
             return 1
 
-        print("completed 64 Winman surface create/destroy cycles")
+        print("completed 64 Heimdall surface create/destroy cycles")
         return 0
     finally:
         if qmp is not None:

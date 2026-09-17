@@ -157,10 +157,10 @@ static void late_init(void) {
   log_write("sched: zombie reaper thread spawned", KERNEL, LOG_INFO);
 }
 
-/* Ticks to wait for winman to register before concluding it is not coming.
+/* Ticks to wait for heimdall to register before concluding it is not coming.
  * Only the no-WM path depends on this: overshooting costs a few seconds of
  * blank kernel console, undershooting puts a second shell on the kernel
- * channel next to the one winman just opened. */
+ * channel next to the one heimdall just opened. */
 #define WM_REGISTER_GRACE_TICKS 300
 
 /* Boot the userspace world, then supervise it.
@@ -172,7 +172,7 @@ static void late_init(void) {
  * took the machine with it , and it capped the system at one shell, because
  * this task was the only thing running one.
  *
- * Shells now belong to winman. It opens a TTY channel per console window and
+ * Shells now belong to heimdall. It opens a TTY channel per console window and
  * starts a shell on it, so it knows every console shell's pid and can close
  * one on request. What is left here is the fallback: if no window manager
  * registers, nothing else can give the user a prompt, so run one on the
@@ -180,12 +180,12 @@ static void late_init(void) {
  * nothing at all, and every shell in the system , including that fallback ,
  * can exit without consequence. */
 static void init_task_entry(void) {
-  char *winman_argv[] = {(char *)"winman", NULL};
-  long winman_pid = process_spawn_async("/system/bin/winman.elf", winman_argv);
-  if (winman_pid < 0)
-    log_write("winman: launch failed , TTY-only mode", USER, LOG_INFO);
+  char *heimdall_argv[] = {(char *)"heimdall", NULL};
+  long heimdall_pid = process_spawn_async("/system/bin/heimdall.elf", heimdall_argv);
+  if (heimdall_pid < 0)
+    log_write("heimdall: launch failed , TTY-only mode", USER, LOG_INFO);
   else
-    log_write_hex("winman: launched pid: ", (u64)winman_pid, USER,
+    log_write_hex("heimdall: launched pid: ", (u64)heimdall_pid, USER,
                   LOG_INFO);
 
   for (int i = 0; i < WM_REGISTER_GRACE_TICKS && msg_input_owner() == 0; i++)

@@ -2,12 +2,12 @@
  *
  * Kernel-side fallback console. Renders an 8x8 bitmap font into the
  * framebuffer via the font8x8 table. Push/pop give a single-level alt-
- * screen; the drain ring buffers unconsumed text so userspace winman
+ * screen; the drain ring buffers unconsumed text so userspace heimdall
  * can mirror it into its own console window.
  *
- * Lifecycle: active by default. Userspace winman calls tty_set_active(0)
+ * Lifecycle: active by default. Userspace heimdall calls tty_set_active(0)
  * once it registers, after which characters still accumulate in the
- * grid + drain ring but nothing gets blitted. On winman exit, the kernel
+ * grid + drain ring but nothing gets blitted. On heimdall exit, the kernel
  * flips active back on and the shell-fallback path stays visible.
  */
 #include <display/tty.h>
@@ -441,7 +441,7 @@ static void kernel_clear(void) {
     memset(grid, 0, (usize)cols * (usize)rows);
     cx = cy = 0;
     dirty = 1;
-    /* Also notify drain consumers (winman) so their mirror clears too. */
+    /* Also notify drain consumers (heimdall) so their mirror clears too. */
     drain_push(TTY_CTRL_CLEAR);
 }
 
@@ -489,7 +489,7 @@ int tty_is_active(void) { return active; }
  *
  * Channel 0 goes through the grid path above so the kernel keeps rendering
  * it. The others have no grid: their whole state is the drain ring, and the
- * control codes are exactly what tells winman to clear, save, restore or
+ * control codes are exactly what tells heimdall to clear, save, restore or
  * rescale the console window mirroring them. */
 
 void tty_write_ch(int idx, const char *buf, usize n) {
@@ -533,7 +533,7 @@ int tty_pop_ch(int idx) {
     return 0;
 }
 
-/* No grid to reflow off-channel, so there is no scale to return: winman
+/* No grid to reflow off-channel, so there is no scale to return: heimdall
  * owns the console's scale and clamps it. 0 means "code delivered". */
 int tty_zoom_ch(int idx, int delta) {
     if (idx == TTY_KERNEL)
@@ -547,7 +547,7 @@ int tty_zoom_ch(int idx, int delta) {
 
 /* Compositor kthread for the kernel TTY. Sleeps a few ticks between
  * frames , the kernel TTY is a fallback, not a game. Also tracks the
- * input owner so we automatically resume drawing when a winman
+ * input owner so we automatically resume drawing when a heimdall
  * process dies and surrenders ownership.
  *
  * Doubles as the virtio-gpu pump: each iteration polls the device for a

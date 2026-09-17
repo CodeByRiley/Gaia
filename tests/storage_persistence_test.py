@@ -36,7 +36,7 @@ def boot(args, image, pass_number):
     qmp = None
     try:
         deadline = time.monotonic() + args.timeout
-        for expected in (mounted, "winman: ready"):
+        for expected in (mounted, "heimdall: ready"):
             if not wait_for_text(log, expected, deadline):
                 raise RuntimeError(f"missing {expected}\n{log.read_text(errors='replace')}")
         qmp = Qmp(port, deadline)

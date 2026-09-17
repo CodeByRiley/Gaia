@@ -7,7 +7,7 @@ The FAT root on ide.0 keeps that failure from being masked by the disk simply
 becoming the root.
 
 Asserts on the kernel log over serial, not shell output: sh's stdout goes to
-the TTY once winman owns the display, so the syscalls and the partition
+the TTY once heimdall owns the display, so the syscalls and the partition
 scanner logging their own results is what makes this observable.
 
 Requires a built ISO, build/disk-fat.img and build/tests/mbr-base.img
@@ -84,7 +84,7 @@ def main() -> int:
 
         # ahci1 itself must never win the root search: it carries a table.
         expect("rootfs: fat mounted from ahci0 at /", "root did not mount")
-        expect("winman: ready", "desktop did not come up")
+        expect("heimdall: ready", "desktop did not come up")
 
         qmp = Qmp(port, deadline)
         # Mounting p1 is what proves the slice arithmetic: its superblock is

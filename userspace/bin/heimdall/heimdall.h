@@ -1,5 +1,5 @@
-#ifndef WINMAN_INTERNAL_H
-#define WINMAN_INTERNAL_H
+#ifndef HEIMDALL_INTERNAL_H
+#define HEIMDALL_INTERNAL_H
 
 #include <display/fonts/font8x8.h>
 #include <include/sys/types.h>
@@ -15,12 +15,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef WINMAN_DECLARE_STATE
-#define WINMAN_STATE extern
-#define WINMAN_STATE_INIT(value)
+#ifdef HEIMDALL_DECLARE_STATE
+#define HEIMDALL_STATE extern
+#define HEIMDALL_STATE_INIT(value)
 #else
-#define WINMAN_STATE
-#define WINMAN_STATE_INIT(value) = value
+#define HEIMDALL_STATE
+#define HEIMDALL_STATE_INIT(value) = value
 #endif
 
 /* In-band TTY control codes , must match kernel/display/tty.h. Defined
@@ -55,12 +55,12 @@ struct tb_entry {
 };
 
 #define MAX_ICONS 32
-WINMAN_STATE struct desktop_icon desktop_icons[MAX_ICONS];
-WINMAN_STATE int desktop_icon_count WINMAN_STATE_INIT(0);
+HEIMDALL_STATE struct desktop_icon desktop_icons[MAX_ICONS];
+HEIMDALL_STATE int desktop_icon_count HEIMDALL_STATE_INIT(0);
 
 /* Desktop Wallpaper */
-WINMAN_STATE struct bmp_image wallpaper_img;
-WINMAN_STATE int wallpaper_loaded WINMAN_STATE_INIT(0);
+HEIMDALL_STATE struct bmp_image wallpaper_img;
+HEIMDALL_STATE int wallpaper_loaded HEIMDALL_STATE_INIT(0);
 
 /* Start Menu */
 
@@ -76,9 +76,9 @@ WINMAN_STATE int wallpaper_loaded WINMAN_STATE_INIT(0);
  * nicer than a filename and their presence does not depend on what happens
  * to be packaged, so a missing binary shows up as a failed spawn rather
  * than a silently absent menu item. */
-#ifndef WINMAN_DECLARE_STATE
+#ifndef HEIMDALL_DECLARE_STATE
 const struct program start_menu_defaults[] = {
-    {"Shelf (Shell)", "system/bin/sh.elf"},
+    {"Skald (Shell)", "system/bin/sh.elf"},
     {"Desk Elf", "system/bin/deskelf.elf"},
     {"Text Editor", "system/bin/notepad.elf"},
     {"About", "system/bin/about.elf"}};
@@ -95,7 +95,7 @@ extern const struct program start_menu_defaults[4];
  * a hardcoded list that goes stale the moment binaries move. Names and paths
  * are copied into the entry because the directory buffer they came from is
  * reused by the next read. */
-#ifndef WINMAN_DECLARE_STATE
+#ifndef HEIMDALL_DECLARE_STATE
 const char *start_menu_scan_dirs[] = {
     "system/bin",
     "usr/bin",
@@ -118,10 +118,10 @@ struct start_entry {
   char path[START_MENU_PATH_MAX];
 };
 
-WINMAN_STATE struct start_entry start_menu_programs[START_MENU_MAX];
-WINMAN_STATE int start_menu_count WINMAN_STATE_INIT(0);
-WINMAN_STATE int start_menu_open WINMAN_STATE_INIT(0);
-WINMAN_STATE int start_menu_hover WINMAN_STATE_INIT(-1);
+HEIMDALL_STATE struct start_entry start_menu_programs[START_MENU_MAX];
+HEIMDALL_STATE int start_menu_count HEIMDALL_STATE_INIT(0);
+HEIMDALL_STATE int start_menu_open HEIMDALL_STATE_INIT(0);
+HEIMDALL_STATE int start_menu_hover HEIMDALL_STATE_INIT(-1);
 
 extern void *memcpy(void *, const void *, size_t);
 extern void *memset(void *, int, size_t);
@@ -161,10 +161,10 @@ int prompt_handle_click(int mx, int my);
 #define COLOR_BORDER 0x00000000u
 #define COLOR_FILL 0x00FFFFFFu
 
-WINMAN_STATE struct bmp_image cursor_img;
-WINMAN_STATE uint32_t cursor_under[CURSOR_MAX_DRAW_DIM * CURSOR_MAX_DRAW_DIM];
+HEIMDALL_STATE struct bmp_image cursor_img;
+HEIMDALL_STATE uint32_t cursor_under[CURSOR_MAX_DRAW_DIM * CURSOR_MAX_DRAW_DIM];
 
-#ifndef WINMAN_DECLARE_STATE
+#ifndef HEIMDALL_DECLARE_STATE
 const uint8_t fallback_cursor_mask[CURSOR_H][CURSOR_W] = {
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {1, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -203,7 +203,7 @@ extern const uint8_t fallback_cursor_mask[CURSOR_H][CURSOR_W];
 #define STATUSBAR_FG 0x00000000u
 #define STATUSBAR_PAD_X 4
 
-/* Modal prompt dialog. Winman renders it centred on the desktop and drives
+/* Modal prompt dialog. Heimdall renders it centred on the desktop and drives
  * it; the requesting app is blocked in wm_prompt() and sees no input. */
 #define PROMPT_W 320
 #define PROMPT_H 120
@@ -304,7 +304,7 @@ extern const uint8_t fallback_cursor_mask[CURSOR_H][CURSOR_W];
 #define TB_INTERNET_ICON_MAX_DIM 256
 #define TB_INTERNET_ICON_PAD 2
 
-#ifndef WINMAN_DECLARE_STATE
+#ifndef HEIMDALL_DECLARE_STATE
 const uint8_t fallback_taskbar_start_mask[24][24] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -337,7 +337,7 @@ extern const uint8_t fallback_taskbar_start_mask[24][24];
 /* title-bar button glyphs. 0 = background (titlebar btn bg), 1 = foreground.
  * Drawn through draw_button_mask which fills the rect with `bg` first then
  * stamps `fg` only where the mask is 1. */
-#ifndef WINMAN_DECLARE_STATE
+#ifndef HEIMDALL_DECLARE_STATE
 const uint8_t fallback_btn_close_mask[TB_BTN_SIZE][TB_BTN_SIZE] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0}, {0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0},
@@ -350,7 +350,7 @@ const uint8_t fallback_btn_close_mask[TB_BTN_SIZE][TB_BTN_SIZE] = {
 extern const uint8_t fallback_btn_close_mask[TB_BTN_SIZE][TB_BTN_SIZE];
 #endif
 
-#ifndef WINMAN_DECLARE_STATE
+#ifndef HEIMDALL_DECLARE_STATE
 const uint8_t fallback_btn_maximise_mask[TB_BTN_SIZE][TB_BTN_SIZE] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0}, {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
@@ -363,7 +363,7 @@ const uint8_t fallback_btn_maximise_mask[TB_BTN_SIZE][TB_BTN_SIZE] = {
 extern const uint8_t fallback_btn_maximise_mask[TB_BTN_SIZE][TB_BTN_SIZE];
 #endif
 
-#ifndef WINMAN_DECLARE_STATE
+#ifndef HEIMDALL_DECLARE_STATE
 const uint8_t fallback_btn_hide_mask[TB_BTN_SIZE][TB_BTN_SIZE] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -376,7 +376,7 @@ const uint8_t fallback_btn_hide_mask[TB_BTN_SIZE][TB_BTN_SIZE] = {
 extern const uint8_t fallback_btn_hide_mask[TB_BTN_SIZE][TB_BTN_SIZE];
 #endif
 
-#ifndef WINMAN_DECLARE_STATE
+#ifndef HEIMDALL_DECLARE_STATE
 const uint8_t fallback_internet_mask[TB_INTERNET_SIZE][TB_INTERNET_SIZE] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0},
@@ -421,17 +421,17 @@ extern const uint8_t fallback_internet_mask[TB_INTERNET_SIZE][TB_INTERNET_SIZE];
 #define HANDLE_CONSOLE_BASE 128
 #define HANDLE_CONSOLE HANDLE_CONSOLE_BASE /* the boot console, on TTY 0 */
 
-WINMAN_STATE uint32_t *fb_hw;
-WINMAN_STATE uint32_t *fb;
-WINMAN_STATE size_t fb_bytes;
-WINMAN_STATE size_t fb_capacity;
-WINMAN_STATE size_t fb_mapped_bytes;
-WINMAN_STATE int fb_registered;
-WINMAN_STATE int fb_w, fb_h, fb_stride;
-WINMAN_STATE struct gfx_damage desktop_damage;
+HEIMDALL_STATE uint32_t *fb_hw;
+HEIMDALL_STATE uint32_t *fb;
+HEIMDALL_STATE size_t fb_bytes;
+HEIMDALL_STATE size_t fb_capacity;
+HEIMDALL_STATE size_t fb_mapped_bytes;
+HEIMDALL_STATE int fb_registered;
+HEIMDALL_STATE int fb_w, fb_h, fb_stride;
+HEIMDALL_STATE struct gfx_damage desktop_damage;
 
 struct window {
-  uint32_t *surface;  /* page-aligned, owned by winman          */
+  uint32_t *surface;  /* page-aligned, owned by heimdall          */
   void *surface_raw;  /* original malloc ptr for free()         */
   uint64_t client_va; /* va in owner_pml4 (0 if not shared)     */
 
@@ -461,7 +461,7 @@ struct window {
   char title[48];
 };
 
-/* One modal dialog at a time, owned by winman rather than by any window.
+/* One modal dialog at a time, owned by heimdall rather than by any window.
  * `owner_pid` is who gets the reply; `owner_handle` is what it centres on
  * and what dies with it if the window goes away mid-prompt. */
 struct prompt_state {
@@ -495,24 +495,24 @@ struct drag_state {
   int have_ghost;
   int last_gx, last_gy, last_gw, last_gh;
 };
-WINMAN_STATE struct drag_state drag;
+HEIMDALL_STATE struct drag_state drag;
 
-WINMAN_STATE struct window windows[MAX_WINDOWS];
-WINMAN_STATE int focused_handle WINMAN_STATE_INIT(0);
+HEIMDALL_STATE struct window windows[MAX_WINDOWS];
+HEIMDALL_STATE int focused_handle HEIMDALL_STATE_INIT(0);
 
 /* Z-order: handles ordered front-to-back. z_order[0] is topmost (drawn
  * last, hit-tested first). Consoles take slots too , they can be raised
  * over client windows just like any other surface. Re-bound on every
  * create / focus / destroy so the array always reflects current stacking. */
 #define MAX_Z (CON_MAX + MAX_WINDOWS)
-WINMAN_STATE int z_order[MAX_Z];
-WINMAN_STATE int z_count WINMAN_STATE_INIT(0);
+HEIMDALL_STATE int z_order[MAX_Z];
+HEIMDALL_STATE int z_count HEIMDALL_STATE_INIT(0);
 
 /* One console window mirroring one kernel TTY channel. The shell bound to
  * `tty` writes there and reads its keystrokes from there, so two consoles
  * never see each other's text or input.
  *
- * `pid` is the shell winman started on this console. It is what the close
+ * `pid` is the shell heimdall started on this console. It is what the close
  * button kills, and what the reaper watches: when it dies (the user typed
  * `exit`), the console goes with it. */
 struct console {
@@ -537,12 +537,12 @@ struct console {
 };
 
 /* cons[0] mirrors TTY_KERNEL and is the boot console: it is always present,
- * its shell was started by the kernel rather than by winman, and closing it
+ * its shell was started by the kernel rather than by heimdall, and closing it
  * is allowed , the kernel no longer depends on that shell being alive. */
-WINMAN_STATE struct console cons[CON_MAX];
+HEIMDALL_STATE struct console cons[CON_MAX];
 
 /* A handful of event-loop values are shared with lifecycle and prompt
- * modules. They remain private to the Winman binary despite external C
+ * modules. They remain private to the Heimdall binary despite external C
  * linkage because this header is not installed as a userspace API. */
 extern int close_pending_handle;
 extern u32 close_pending_tick;
@@ -550,9 +550,9 @@ extern struct prompt_state prompt;
 extern int shift_held;
 extern int ctrl_held;
 
-#include "winman_prototypes.h"
+#include "heimdall_prototypes.h"
 
-#undef WINMAN_STATE
-#undef WINMAN_STATE_INIT
+#undef HEIMDALL_STATE
+#undef HEIMDALL_STATE_INIT
 
 #endif

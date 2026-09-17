@@ -302,7 +302,7 @@ static void irq_restore(u64 rflags) {
 
 /* Consecutive dispatches served from HIGH before a runnable NORMAL task is
  * guaranteed a turn. This is what keeps the scheduling weighted instead of
- * strict: winman never blocks , it yields at the bottom of its loop and is
+ * strict: heimdall never blocks , it yields at the bottom of its loop and is
  * immediately runnable again , so strict priority would hand it the CPU
  * forever and starve its own clients. At 4, a ready NORMAL task waits at
  * most 4 dispatches, while the display path still gets the large share of
@@ -1007,7 +1007,7 @@ static void mark_task_exited(struct task *task, long code) {
   if (task->vm && task->vm->user_pml4)
     framebuffer_unregister_user(task->vm->user_pml4, task->pid);
 
-  /* A direct framebuffer process can temporarily take ownership from winman.
+  /* A direct framebuffer process can temporarily take ownership from heimdall.
    * When it exits, hand ownership back to the saved owner if it still exists.
    */
   if (msg_input_owner() == task->pid) {

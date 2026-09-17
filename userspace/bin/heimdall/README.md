@@ -1,8 +1,8 @@
-# Winman source layout
+# Heimdall source layout
 
-Winman is one process built from small, independently compiled modules:
+Heimdall is one process built from small, independently compiled modules:
 
-- `winman.c` owns the event loop and IPC/input dispatch.
+- `heimdall.c` owns the event loop and IPC/input dispatch.
 - `desktop.c` discovers launchers and loads desktop artwork.
 - `render.c` composes and presents the desktop, chrome, taskbar, and cursor.
 - `console.c` owns TTY-backed console windows and font rendering.
@@ -10,9 +10,9 @@ Winman is one process built from small, independently compiled modules:
 - `prompt.c` implements modal prompts.
 - `state.c` defines shared process state and fallback artwork once.
 
-`winman.h` and `winman_prototypes.h` are private implementation headers. GUI
+`heimdall.h` and `heimdall_prototypes.h` are private implementation headers. GUI
 applications continue to use `lib/wm.h`; the split does not change the IPC
-protocol or expose Winman internals as a public API.
+protocol or expose Heimdall internals as a public API.
 
 Two mechanisms that are useful outside the window manager live in `lib/`:
 `damage` accumulates clipped repaint rectangles, and `page_alloc` creates

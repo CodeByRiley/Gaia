@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Open several Winman consoles, close every one, and keep going.
+"""Open several Heimdall consoles, close every one, and keep going.
 
 Covers the two things the multi-TTY console work added:
 
@@ -91,7 +91,7 @@ def click(qmp: Qmp) -> None:
 
 def open_console_via_start_menu(qmp: Qmp, position: list[int],
                                 fb_h: int, menu_items: int) -> None:
-    """Click Start, then the pinned "Shelf (Shell)" entry at the top."""
+    """Click Start, then the pinned "Skald (Shell)" entry at the top."""
     taskbar_y = fb_h - 24            # TASKBAR_PX
     home_pointer(qmp, position)
     mouse_move_to(qmp, position, 12, taskbar_y + 12)   # TASKBAR_START_W is 24
@@ -144,22 +144,22 @@ def main() -> int:
     qmp: Qmp | None = None
     try:
         deadline = time.monotonic() + args.timeout
-        if not wait_for_text(log_path, "winman: ready", deadline):
+        if not wait_for_text(log_path, "heimdall: ready", deadline):
             print(read_log(log_path))
-            print("winman did not become ready", file=sys.stderr)
+            print("heimdall did not become ready", file=sys.stderr)
             return 1
 
         log = read_log(log_path)
 
-        # The boot console is opened by winman now, not by the kernel, which
+        # The boot console is opened by heimdall now, not by the kernel, which
         # is what gives the close button a pid to kill.
-        if "winman: console slot=0 tty=0 sh pid=" not in log:
+        if "heimdall: console slot=0 tty=0 sh pid=" not in log:
             print(log)
             print("boot console did not open on tty 0", file=sys.stderr)
             return 1
 
-        fb = re.search(r"winman: fb (\d+)x(\d+)", log)
-        menu = re.search(r"winman: start menu (\d+) entries", log)
+        fb = re.search(r"heimdall: fb (\d+)x(\d+)", log)
+        menu = re.search(r"heimdall: start menu (\d+) entries", log)
         if not fb or not menu:
             print(log)
             print("could not read framebuffer or start-menu geometry",
@@ -174,7 +174,7 @@ def main() -> int:
         # --- two more consoles, each on its own channel -------------------
         for expected_slot in (1, 2):
             open_console_via_start_menu(qmp, position, fb_h, menu_items)
-            marker = f"winman: console slot={expected_slot} tty={expected_slot} sh pid="
+            marker = f"heimdall: console slot={expected_slot} tty={expected_slot} sh pid="
             if not wait_for_count(log_path, marker, 1, proc, deadline):
                 print(read_log(log_path))
                 print(f"console slot {expected_slot} did not open",
@@ -186,7 +186,7 @@ def main() -> int:
         # focused window, so this walks back down the stack.
         for expected_slot in (2, 1, 0):
             alt_f4(qmp)
-            marker = f"winman: console slot={expected_slot} closed"
+            marker = f"heimdall: console slot={expected_slot} closed"
             if not wait_for_count(log_path, marker, 1, proc, deadline):
                 print(read_log(log_path))
                 print(f"console slot {expected_slot} did not close",
@@ -200,7 +200,7 @@ def main() -> int:
 
         # --- and the machine is still usable with zero shells open --------
         open_console_via_start_menu(qmp, position, fb_h, menu_items)
-        if not wait_for_count(log_path, "winman: console slot=0 tty=0 sh pid=",
+        if not wait_for_count(log_path, "heimdall: console slot=0 tty=0 sh pid=",
                               2, proc, deadline):
             print(read_log(log_path))
             print("could not reopen a console after closing every shell",
