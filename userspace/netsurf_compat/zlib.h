@@ -1,5 +1,5 @@
-#ifndef TOS_NETSURF_ZLIB_H
-#define TOS_NETSURF_ZLIB_H
+#ifndef GAIA_NETSURF_ZLIB_H
+#define GAIA_NETSURF_ZLIB_H
 
 #include <stdio.h>
 

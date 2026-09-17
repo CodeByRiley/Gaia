@@ -1,7 +1,7 @@
 [
   {
     "label": "Create Disk",
-    "command": "wsl bash -lc 'cd /mnt/e/Projects/Weird/TOS && .\\tools\\create_disk.sh'",
+    "command": "wsl bash -lc 'cd /mnt/e/Projects/Weird/Gaia && .\\tools\\create_disk.sh'",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
     "show_summary": true,
@@ -22,7 +22,7 @@
       "/d",
       "/s",
       "/c",
-      "\"cd /d E:\\Projects\\Weird\\TOS && tools\\build.bat BUILD_DOOM=0 BUILD_NETSURF=0 FS=EXT2\""
+      "\"cd /d E:\\Projects\\Weird\\Gaia && tools\\build.bat BUILD_DOOM=0 BUILD_NETSURF=0 FS=EXT2\""
     ],
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
@@ -44,7 +44,7 @@
       "/d",
       "/s",
       "/c",
-      "\"cd /d E:\\Projects\\Weird\\TOS && tools\\build.bat CLEAN=1 BUILD_DOOM=0 BUILD_NETSURF=0 FS=EXT2\""
+      "\"cd /d E:\\Projects\\Weird\\Gaia && tools\\build.bat CLEAN=1 BUILD_DOOM=0 BUILD_NETSURF=0 FS=EXT2\""
     ],
     "use_new_terminal": false,
     "allow_concurrent_runs": false,

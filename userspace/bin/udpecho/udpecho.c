@@ -1,7 +1,7 @@
 /* userspace/bin/udpecho/udpecho.c - echo UDP datagrams, via musl sockets.
  *
  * The point of this program is what it does NOT contain: no <lib/syscall.h>,
- * no TOS-specific call, nothing but <sys/socket.h> and <netinet/in.h>.
+ * no Gaia-specific call, nothing but <sys/socket.h> and <netinet/in.h>.
  * Every syscall it makes is issued by musl itself, on the Linux numbers -
  * socket is 41, bind 49, sendto 44, recvfrom 45. If those are not mirrored
  * in the kernel this program does not merely misbehave, it fails at the
@@ -9,7 +9,7 @@
  *
  * That makes it the honest test for ported software. NetSurf's fetcher, and
  * anything else brought over unmodified, will reach the network through
- * these same entry points; a TOS-specific socket API would have proved
+ * these same entry points; a Gaia-specific socket API would have proved
  * nothing about them.
  *
  * recvfrom does not block yet, so the loop polls. Once the socket layer

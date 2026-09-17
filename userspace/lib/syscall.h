@@ -18,9 +18,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef TOS_USE_MUSL
+#ifdef GAIA_USE_MUSL
 /* Built against musl: the POSIX surface comes from the real headers, and
- * the TOS declarations of those same functions are compiled out below.
+ * the Gaia declarations of those same functions are compiled out below.
  * Pulling them in here means every lib/ source keeps working unchanged ,
  * bmp.c calling open()/read() gets musl's, which issue the same syscalls. */
 #include <fcntl.h>
@@ -72,7 +72,7 @@ enum syscall_number {
  * musl's <sys/mman.h> defines the same names with the same values, so a
  * musl-linked translation unit takes them from there and redefining them
  * here is pure -Wmacro-redefined noise. */
-#ifndef TOS_USE_MUSL
+#ifndef GAIA_USE_MUSL
 #define PROT_NONE 0x0
 #define PROT_READ 0x1
 #define PROT_WRITE 0x2
@@ -118,8 +118,8 @@ sysarg_t syscall6(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d,
 
 /* Convert the kernel's negative errno result into the conventional
  * userspace pair: errno is set and the caller receives -1. Musl performs
- * this internally, so libtos keeps its raw results when built with musl. */
-#ifndef TOS_USE_MUSL
+ * this internally, so libgaia keeps its raw results when built with musl. */
+#ifndef GAIA_USE_MUSL
 long syscall_result(sysarg_t result);
 #else
 static inline long syscall_result(sysarg_t result) { return (long)result; }
@@ -133,10 +133,10 @@ static inline long syscall_result(sysarg_t result) { return (long)result; }
 /* These fourteen are also defined by musl, with different prototypes
  * (musl's open() is variadic, its exit() is _Noreturn, and so on). A
  * translation unit built against musl takes musl's declarations from the
- * real headers; declaring TOS's here as well is a hard conflict, so they
- * are compiled out whenever TOS_USE_MUSL is set. Implementations live in
+ * real headers; declaring Gaia's here as well is a hard conflict, so they
+ * are compiled out whenever GAIA_USE_MUSL is set. Implementations live in
  * syscall_posix.c, which musl-linked binaries do not link. */
-#ifndef TOS_USE_MUSL
+#ifndef GAIA_USE_MUSL
 long write(int fd, const void *buf, size_t n);
 long read(int fd, void *buf, size_t n);
 long open(const char *path, int flags);
@@ -163,7 +163,7 @@ long yield(void);
  *
  * mount() and umount() are musl's prototypes at Linux's syscall numbers, so
  * a musl-linked binary calls musl's wrappers and lands in the same place.
- * Two TOS-specific rules apply either way:
+ * Two Gaia-specific rules apply either way:
  *
  *   - `source` is a published volume name ("ahci0"), not a device node. A
  *     "/dev/" prefix is accepted and ignored. There is no loop device, so a
@@ -195,7 +195,7 @@ long blockdev_write(const char *source, uint64_t lba, uint32_t sectors,
                     const void *in);
 long blockdev_flush(const char *source);
 long fs_sync(void);
-#ifndef TOS_USE_MUSL
+#ifndef GAIA_USE_MUSL
 int mount(const char *source, const char *target, const char *filesystemtype,
           unsigned long mountflags, const void *data);
 int umount(const char *target);
@@ -216,7 +216,7 @@ long fstat_raw(int fd, struct stat_user *out);
  * the virtual address space. Physical RAM is allocated one page at a time
  * by the page fault handler when the program actually reads or writes to it.
  */
-#ifndef TOS_USE_MUSL
+#ifndef GAIA_USE_MUSL
 void *mmap(void *addr, size_t len, int prot, int flags);
 int mprotect(void *addr, size_t len, int prot);
 int munmap(void *addr, size_t len);
@@ -240,7 +240,7 @@ long get_ticks(void);
  * child's pid immediately so the caller (e.g., the shell) stays free. */
 long exec(const char *path, char *const argv[]);
 long spawn(const char *path, char *const argv[]);
-#ifndef TOS_USE_MUSL
+#ifndef GAIA_USE_MUSL
 long kill(long pid, int signal);
 #endif
 long sys_shutdown(int time, const char *reason);

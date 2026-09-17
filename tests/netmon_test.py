@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Boot TOS with an e1000, drive traffic at it, and check netmon sees it.
+"""Boot Gaia with an e1000, drive traffic at it, and check netmon sees it.
 
 The interesting assertion is that the driver keeps receiving. RDT names the
 descriptor the NIC must not write, so releasing a consumed descriptor means
@@ -56,7 +56,7 @@ def pcap_inbound(path: Path, guest_mac: bytes) -> int:
 
 def poke(port: int, attempts: int = 4) -> None:
     """Nudge SLIRP into addressing the guest. The connects never complete --
-    nothing in TOS answers a SYN yet -- which is the point: the frames
+    nothing in Gaia answers a SYN yet -- which is the point: the frames
     arrive regardless."""
     for _ in range(attempts):
         sock = socket.socket()

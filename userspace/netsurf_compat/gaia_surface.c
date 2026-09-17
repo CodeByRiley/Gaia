@@ -16,18 +16,18 @@
 #include "plot.h"
 #include "surface.h"
 
-struct tos_surface {
+struct gaia_surface {
     struct wm_window window;
 };
 
-static void tos_set_cursor_state(nsfb_t *nsfb, bool plotted)
+static void gaia_set_cursor_state(nsfb_t *nsfb, bool plotted)
 {
     if (nsfb != NULL && nsfb->cursor != NULL) {
         nsfb->cursor->plotted = plotted;
     }
 }
 
-static int tos_defaults(nsfb_t *nsfb)
+static int gaia_defaults(nsfb_t *nsfb)
 {
     nsfb->width = 800;
     nsfb->height = 600;
@@ -35,7 +35,7 @@ static int tos_defaults(nsfb_t *nsfb)
     return select_plotters(nsfb) ? 0 : -1;
 }
 
-static int tos_geometry(nsfb_t *nsfb, int width, int height,
+static int gaia_geometry(nsfb_t *nsfb, int width, int height,
                         enum nsfb_format_e format)
 {
     if (format != NSFB_FMT_XRGB8888) {
@@ -45,14 +45,14 @@ static int tos_geometry(nsfb_t *nsfb, int width, int height,
     nsfb->width = width;
     nsfb->height = height;
     nsfb->format = format;
-    struct tos_surface *surface = nsfb->surface_priv;
+    struct gaia_surface *surface = nsfb->surface_priv;
     nsfb->linelen = surface == NULL ? width * 4 : (int)surface->window.pitch;
     return select_plotters(nsfb) ? 0 : -1;
 }
 
-static int tos_initialise(nsfb_t *nsfb)
+static int gaia_initialise(nsfb_t *nsfb)
 {
-    struct tos_surface *surface = calloc(1, sizeof(*surface));
+    struct gaia_surface *surface = calloc(1, sizeof(*surface));
     if (surface == NULL) {
         return -1;
     }
@@ -66,13 +66,13 @@ static int tos_initialise(nsfb_t *nsfb)
     nsfb->surface_priv = surface;
     nsfb->ptr = (uint8_t *)(uintptr_t)surface->window.surface_va;
     nsfb->linelen = (int)surface->window.pitch;
-    tos_set_cursor_state(nsfb, false);
+    gaia_set_cursor_state(nsfb, false);
     return 0;
 }
 
-static int tos_finalise(nsfb_t *nsfb)
+static int gaia_finalise(nsfb_t *nsfb)
 {
-    struct tos_surface *surface = nsfb->surface_priv;
+    struct gaia_surface *surface = nsfb->surface_priv;
     if (surface != NULL) {
         wm_window_destroy(surface->window.handle);
         free(surface);
@@ -82,7 +82,7 @@ static int tos_finalise(nsfb_t *nsfb)
     return 0;
 }
 
-static enum nsfb_key_code_e tos_keycode(int key)
+static enum nsfb_key_code_e gaia_keycode(int key)
 {
     switch (key) {
     case KEY_TAB: return NSFB_KEY_TAB;
@@ -139,7 +139,7 @@ static enum nsfb_key_code_e tos_keycode(int key)
     }
 }
 
-static enum nsfb_key_code_e tos_mouse_button(int buttons)
+static enum nsfb_key_code_e gaia_mouse_button(int buttons)
 {
     if (buttons & MOUSE_BTN_LEFT) return NSFB_KEY_MOUSE_1;
     if (buttons & MOUSE_BTN_MIDDLE) return NSFB_KEY_MOUSE_2;
@@ -149,9 +149,9 @@ static enum nsfb_key_code_e tos_mouse_button(int buttons)
     return NSFB_KEY_UNKNOWN;
 }
 
-static bool tos_input(nsfb_t *nsfb, nsfb_event_t *event, int timeout)
+static bool gaia_input(nsfb_t *nsfb, nsfb_event_t *event, int timeout)
 {
-    struct tos_surface *surface = nsfb->surface_priv;
+    struct gaia_surface *surface = nsfb->surface_priv;
     struct wm_event input;
     (void)timeout;
 
@@ -163,11 +163,11 @@ static bool tos_input(nsfb_t *nsfb, nsfb_event_t *event, int timeout)
     switch (input.type) {
     case WM_EV_KEY_DOWN:
         event->type = NSFB_EVENT_KEY_DOWN;
-        event->value.keycode = tos_keycode(input.param);
+        event->value.keycode = gaia_keycode(input.param);
         return true;
     case WM_EV_KEY_UP:
         event->type = NSFB_EVENT_KEY_UP;
-        event->value.keycode = tos_keycode(input.param);
+        event->value.keycode = gaia_keycode(input.param);
         return true;
     case WM_EV_MOUSE_MOVE:
         event->type = NSFB_EVENT_MOVE_ABSOLUTE;
@@ -177,11 +177,11 @@ static bool tos_input(nsfb_t *nsfb, nsfb_event_t *event, int timeout)
         return true;
     case WM_EV_MOUSE_DOWN:
         event->type = NSFB_EVENT_KEY_DOWN;
-        event->value.keycode = tos_mouse_button(input.param);
+        event->value.keycode = gaia_mouse_button(input.param);
         return true;
     case WM_EV_MOUSE_UP:
         event->type = NSFB_EVENT_KEY_UP;
-        event->value.keycode = tos_mouse_button(input.param);
+        event->value.keycode = gaia_mouse_button(input.param);
         return true;
     case WM_EV_RESIZE:
         surface->window.surface_va = input.surface_va;
@@ -192,7 +192,7 @@ static bool tos_input(nsfb_t *nsfb, nsfb_event_t *event, int timeout)
         nsfb->linelen = (int)input.pitch;
         nsfb->width = input.w;
         nsfb->height = input.h;
-        tos_set_cursor_state(nsfb, false);
+        gaia_set_cursor_state(nsfb, false);
         event->type = NSFB_EVENT_RESIZE;
         event->value.resize.w = input.w;
         event->value.resize.h = input.h;
@@ -206,38 +206,38 @@ static bool tos_input(nsfb_t *nsfb, nsfb_event_t *event, int timeout)
     }
 }
 
-static int tos_claim(nsfb_t *nsfb, nsfb_bbox_t *box)
+static int gaia_claim(nsfb_t *nsfb, nsfb_bbox_t *box)
 {
     (void)nsfb;
     (void)box;
     return 0;
 }
 
-static int tos_update(nsfb_t *nsfb, nsfb_bbox_t *box)
+static int gaia_update(nsfb_t *nsfb, nsfb_bbox_t *box)
 {
-    struct tos_surface *surface = nsfb->surface_priv;
+    struct gaia_surface *surface = nsfb->surface_priv;
     (void)box;
 
-    tos_set_cursor_state(nsfb, false);
+    gaia_set_cursor_state(nsfb, false);
     return surface == NULL ? -1 : wm_window_invalidate(surface->window.handle);
 }
 
-static int tos_cursor(nsfb_t *nsfb, struct nsfb_cursor_s *cursor)
+static int gaia_cursor(nsfb_t *nsfb, struct nsfb_cursor_s *cursor)
 {
     (void)cursor;
-    tos_set_cursor_state(nsfb, false);
+    gaia_set_cursor_state(nsfb, false);
     return 0;
 }
 
-static const nsfb_surface_rtns_t tos_rtns = {
-    .defaults = tos_defaults,
-    .initialise = tos_initialise,
-    .finalise = tos_finalise,
-    .geometry = tos_geometry,
-    .input = tos_input,
-    .claim = tos_claim,
-    .update = tos_update,
-    .cursor = tos_cursor,
+static const nsfb_surface_rtns_t gaia_rtns = {
+    .defaults = gaia_defaults,
+    .initialise = gaia_initialise,
+    .finalise = gaia_finalise,
+    .geometry = gaia_geometry,
+    .input = gaia_input,
+    .claim = gaia_claim,
+    .update = gaia_update,
+    .cursor = gaia_cursor,
 };
 
-NSFB_SURFACE_DEF(tos, NSFB_SURFACE_SDL, &tos_rtns)
+NSFB_SURFACE_DEF(gaia, NSFB_SURFACE_SDL, &gaia_rtns)

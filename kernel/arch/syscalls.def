@@ -2,8 +2,8 @@
  *
  * Include only after defining SYSCALL_BOTH(name, number),
  * SYSCALL_KERNEL(name, number), and SYSCALL_ALIAS_BOTH(name, target).
- * BOTH entries are exposed by libtos. KERNEL entries are Linux-compatible
- * calls issued directly by musl, so libtos needs no public constant.
+ * BOTH entries are exposed by libgaia. KERNEL entries are Linux-compatible
+ * calls issued directly by musl, so libgaia needs no public constant.
  */
 
 SYSCALL_BOTH(READ, 0)

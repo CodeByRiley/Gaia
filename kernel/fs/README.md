@@ -103,7 +103,7 @@ is not a snapshot of concurrent namespace changes.
   by `VFS_PATH_MAX`. FAT's legacy direct API retains DOS path parsing for
   its existing tests; the VFS does not use that parser.
 - Mount names are case-sensitive, even on FAT. Repeated/trailing slashes
-  are normalized; dot components in mount names are rejected. Existing TOS
+  are normalized; dot components in mount names are rejected. Existing Gaia
   synthetic mountpoints are supported without requiring a disk entry there;
   ancestor components must still resolve when the mount is accessed.
 - FAT geometry and persistence state live in one `fat_volume` record.

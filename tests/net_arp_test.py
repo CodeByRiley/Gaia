@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Boot TOS and check the ARP layer both answers and speaks first.
+"""Boot Gaia and check the ARP layer both answers and speaks first.
 
 netmon_test.py covers the receive path and the RX descriptor ring. What it
-cannot show is *origination* -- a frame TOS composed on its own initiative
+cannot show is *origination* -- a frame Gaia composed on its own initiative
 rather than by turning a received one around. Every frame the old
 driver-resident ARP/ICMP ever sent was a reply, and it found the
 destination MAC by copying it out of the request it was answering. Nothing
@@ -171,7 +171,7 @@ def main() -> int:
             print("  " + describe(arp))
 
         # Origination: a broadcast request for our own address, which only a
-        # frame TOS built itself can be.
+        # frame Gaia built itself can be.
         announce = [
             a for a in from_guest
             if a["oper"] == ARP_OP_REQUEST

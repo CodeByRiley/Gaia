@@ -21,7 +21,7 @@ int main(void) {
 
     struct utsname uts;
     if (uname(&uts) != 0) return fail("uname");
-    if (strcmp(uts.sysname, "TOS") != 0 ||
+    if (strcmp(uts.sysname, "Gaia") != 0 ||
         strcmp(uts.machine, "x86_64") != 0)
         return fail("uname-shape");
 

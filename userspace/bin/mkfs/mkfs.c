@@ -1,4 +1,4 @@
-/* Create the FAT32 layout supported by TOS on an unmounted whole volume. */
+/* Create the FAT32 layout supported by Gaia on an unmounted whole volume. */
 #include <lib/syscall.h>
 #include <stdint.h>
 #include <errno.h>
@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
   boot[0] = 0xeb;
   boot[1] = 0x58;
   boot[2] = 0x90;
-  memcpy(boot + 3, "TOSFAT32", 8);
+  memcpy(boot + 3, "GAIA    ", 8);
   put16(boot + 11, SECTOR);
   boot[13] = 1;
   put16(boot + 14, RESERVED);
@@ -83,8 +83,8 @@ int main(int argc, char **argv) {
   put16(boot + 50, 6);
   boot[64] = 0x80;
   boot[66] = 0x29;
-  put32(boot + 67, 0x544f5331);
-  memcpy(boot + 71, "TOSDISK    FAT32   ", 19);
+  put32(boot + 67, 0x47414941);
+  memcpy(boot + 71, "GAIADISK   FAT32   ", 19);
   boot[510] = 0x55;
   boot[511] = 0xaa;
   put32(fsinfo, 0x41615252);

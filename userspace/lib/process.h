@@ -1,6 +1,6 @@
 /* Executable lookup, launch, inspection, and bounded lifecycle waits. */
-#ifndef TOS_PROCESS_H
-#define TOS_PROCESS_H
+#ifndef GAIA_PROCESS_H
+#define GAIA_PROCESS_H
 
 #include <lib/syscall.h>
 #include <stddef.h>
@@ -31,7 +31,7 @@ long process_snapshot(struct proc_info *out, size_t capacity);
 int process_get(int pid, struct proc_info *out);
 int process_is_alive(int pid);
 
-/* Wait until a process disappears or reaches ZOMBIE/DEAD. TOS does not yet
+/* Wait until a process disappears or reaches ZOMBIE/DEAD. Gaia does not yet
  * expose child exit status through proc_list, so this reports lifecycle only.
  * timeout_ticks == 0 performs one poll. */
 int process_wait(int pid, uint32_t timeout_ticks, struct proc_info *last_seen);

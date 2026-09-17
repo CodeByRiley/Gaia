@@ -4,8 +4,8 @@
 # No bear on Windows (LD_PRELOAD can't hook .exe), so re-derive the compile
 # lines from the same flag sets the Makefiles use. clangd allows exactly one
 # entry per source file, so where a source builds several ways (lib/foo.o
-# legacy, lib/foo.tos.o musl, lib/foo.pe.o mingw) this picks the variant the
-# file is actually edited against: musl for bin/ + libtos objects, legacy
+# legacy, lib/foo.gaia.o musl, lib/foo.pe.o mingw) this picks the variant the
+# file is actually edited against: musl for bin/ + libgaia objects, legacy
 # USER_CFLAGS for the rest of lib/, cross-elf for kernel/. .pe.o-only sources
 # are skipped.
 #
@@ -20,11 +20,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 US = ROOT / "userspace"
 MUSL_SRC = US / "libc/musl-1.2.6"
-MUSL_BUILD = US / "libc/build-musl-tos"
+MUSL_BUILD = US / "libc/build-musl-gaia"
 
 if not (MUSL_BUILD / "obj/include/bits/alltypes.h").exists():
     sys.exit("musl build tree missing generated headers;\n"
-             "run: sh libc/build_tos_musl.sh   (then re-run this)")
+             "run: sh libc/build_gaia_musl.sh   (then re-run this)")
 
 # --- flag sets, kept in sync with the Makefiles --------------------------
 # Deliberately NO -nostdinc and NO cross-gcc -isystem: clangd injects its own
@@ -52,7 +52,7 @@ KERNEL_FLAGS = [
 MUSL_FLAGS = [
     "x86_64-elf-gcc", "-c",
     "-std=gnu11", "-ffreestanding", "-fno-pie", "-mno-red-zone",
-    "-Wall", "-Wextra", "-DTOS_USE_MUSL", *MUSL_INC, *USER_INCS,
+    "-Wall", "-Wextra", "-DGAIA_USE_MUSL", *MUSL_INC, *USER_INCS,
 ]
 USER_FLAGS = [  # USER_CFLAGS: hand-rolled libc
     "x86_64-elf-gcc", "-c",
@@ -93,8 +93,8 @@ for f in rglob(ROOT / "kernel"):
 add(ROOT / "build/generated/symtab.c", ROOT, KERNEL_FLAGS)
 
 # --- userspace ------------------------------------------------------------
-# Keep in sync with LIBTOS_SRCS / SIMPLE_BINS in userspace/Makefile.
-LIBTOS_SRCS = {
+# Keep in sync with LIBGAIA_SRCS / SIMPLE_BINS in userspace/Makefile.
+LIBGAIA_SRCS = {
     "lib/syscall.c", "lib/event.c", "lib/wm.c", "lib/app.c",
     "lib/process.c", "lib/gfx.c", "lib/ui.c", "lib/ttf.c", "lib/bmp.c",
     "lib/damage.c", "lib/page_alloc.c", "lib/keymap.c", "lib/console.c",
@@ -104,7 +104,7 @@ SIMPLE_BINS = {"thread"}
 
 for f in rglob(US / "lib"):
     rel = f.relative_to(US).as_posix()
-    add(f, US, MUSL_FLAGS if rel in LIBTOS_SRCS else USER_FLAGS)
+    add(f, US, MUSL_FLAGS if rel in LIBGAIA_SRCS else USER_FLAGS)
 
 for f in rglob(US / "bin"):
     rel = f.relative_to(US).as_posix()
@@ -163,7 +163,7 @@ NETSURF_PRIVATE = [
     ("bin/netsurf/libnspsl/",       [f"-I{NS}/libnspsl/src"]),
     ("bin/netsurf/libsvgtiny/",     [f"-I{NS}/libsvgtiny/src"]),
     ("bin/netsurf/netsurf/",        [f"-I{NS}/netsurf"]),
-    ("netsurf_compat/tos_surface",  [f"-I{NS}/libnsfb/src", f"-I{NS}/netsurf"]),
+    ("netsurf_compat/gaia_surface",  [f"-I{NS}/libnsfb/src", f"-I{NS}/netsurf"]),
     ("netsurf_compat/messages",     [f"-I{NS}/netsurf"]),
     ("netsurf_compat/generated/framebuffer-gui", [f"-I{NS}/netsurf"]),
     ("netsurf_compat/generated/fbtk-text",

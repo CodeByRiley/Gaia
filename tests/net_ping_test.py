@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Boot TOS, run `ping` in the shell, and check ICMP echo on the wire.
+"""Boot Gaia, run `ping` in the shell, and check ICMP echo on the wire.
 
 ICMP echo reply was the one layer of the network stack with no coverage,
 and the reason was environmental rather than difficult: SLIRP does not
 forward inbound ICMP to the guest, so a host-side `ping 10.0.2.30` never
-reaches TOS no matter what the code does. Any test built on that would
+reaches Gaia no matter what the code does. Any test built on that would
 have failed forever and told us nothing.
 
 Outbound works, though - SLIRP answers pings addressed to the gateway - so
 the guest has to be the one that asks. That makes this a stronger test than
-the host-pings-guest version would have been: an echo request TOS composed
+the host-pings-guest version would have been: an echo request Gaia composed
 itself has to travel through ARP resolution, the IPv4 header and checksum,
 and the driver's transmit ring before SLIRP will even look at it, and the
 reply has to come back up through the receive ring and match a waiting

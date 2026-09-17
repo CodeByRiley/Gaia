@@ -35,7 +35,7 @@
 
 struct ipv4_hdr {
   u8 version_ihl;
-  u8 tos;
+  u8 gaia;
   u16 total_length;
   u16 id;
   u16 flags_fragment;

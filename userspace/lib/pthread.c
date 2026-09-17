@@ -1,5 +1,5 @@
 #include <include/sys/pthread.h>
-#ifdef TOS_USE_MUSL
+#ifdef GAIA_USE_MUSL
 #include <stdlib.h>
 #include <errno.h>
 #else

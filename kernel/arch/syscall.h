@@ -14,7 +14,7 @@
 #include <arch/syscall_abi.h>
 
 /* Numbers follow Linux x86_64 wherever the call means the same thing. The
- * registry also records whether libtos exposes a call or only musl issues it
+ * registry also records whether libgaia exposes a call or only musl issues it
  * directly. Both sides include the same table, so a number cannot drift. */
 enum syscall_number {
 #define SYSCALL_BOTH(name, number) SYS_##name = number,

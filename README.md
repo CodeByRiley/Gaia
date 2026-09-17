@@ -1,10 +1,10 @@
-# TOS
+# Gaia
 
-TOS is an experimental x86_64 operating system built from scratch. It boots with GRUB/Multiboot2, runs user programs in ring 3, and includes a graphical desktop alongside a growing set of Linux-compatible system calls.
+Gaia is an experimental x86_64 operating system built from scratch. It boots with GRUB/Multiboot2, runs user programs in ring 3, and includes a graphical desktop alongside a growing set of Linux-compatible system calls.
 
-Most user programs are statically linked with musl. TOS-specific features—windows, graphics, audio, IPC, and process inspection—are provided by `libtos`.
+Most user programs are statically linked with musl. Gaia-specific features—windows, graphics, audio, IPC, and process inspection—are provided by `libgaia`.
 
-TOS is mainly intended for QEMU and OS-development experiments. It is not a general-purpose or security-hardened operating system.
+Gaia is mainly intended for QEMU and OS-development experiments. It is not a general-purpose or security-hardened operating system.
 
 ## What works
 
@@ -32,21 +32,21 @@ You will need:
 - NASM.
 - Python on Windows. The kernel build always runs `tools/gen_asm_offsets.py` and `tools/gen_symtab.py`; the `clangd` target also needs Python.
 - WSL with GRUB's BIOS/i386-pc and UEFI/x86_64-efi modules, `xorriso`, `mtools`, and `mkfs.fat`. On Ubuntu that is `sudo apt install grub-pc-bin grub-efi-amd64-bin grub-common xorriso mtools dosfstools`. Disk-image creation, ISO creation, and cleaning run through `wsl bash`.
-- QEMU (`qemu-system-x86_64`) to run TOS.
+- QEMU (`qemu-system-x86_64`) to run Gaia.
 - `python3` inside WSL for the QEMU test suite.
 
 Two things trip people up on Windows:
 
 - **Use `mingw32-make`, not MSYS2's own `make`.** MSYS2's `make` reports a `/c/...` working directory that `wslpath` converts to the wrong place; the build stops with an error saying so.
-- **The disk-image, ISO, and clean steps always run in WSL, even when you start the build from an MSYS2 or Git Bash shell.** MSYS2 packages neither `xorriso` nor a usable i386-pc GRUB, so running them "natively" just picks up whatever unrelated `grub-mkimage` is on `PATH` and fails later with errors about `moddep.lst` or `kernel.img is miscompiled`. Set `TOS_NATIVE_TOOLS=1` only if your shell genuinely has the whole set.
+- **The disk-image, ISO, and clean steps always run in WSL, even when you start the build from an MSYS2 or Git Bash shell.** MSYS2 packages neither `xorriso` nor a usable i386-pc GRUB, so running them "natively" just picks up whatever unrelated `grub-mkimage` is on `PATH` and fails later with errors about `moddep.lst` or `kernel.img is miscompiled`. Set `GAIA_NATIVE_TOOLS=1` only if your shell genuinely has the whole set.
 
 On Linux everything runs natively and no WSL is involved.
 
-Clone TOS and its HolyD submodule:
+Clone Gaia and its HolyD submodule:
 
 ```powershell
-git clone --recursive https://github.com/CodeByRiley/TOS.git
-cd TOS
+git clone --recursive https://github.com/CodeByRiley/Gaia.git
+cd Gaia
 ```
 
 If you already cloned the repository without its submodules:
@@ -89,7 +89,7 @@ dist/x86_64/kernel.bin
 
 ### Userspace
 
-The `userspace/` sub-build bootstraps musl when needed and builds the programs and `libtos`.
+The `userspace/` sub-build bootstraps musl when needed and builds the programs and `libgaia`.
 
 It supports these options:
 
@@ -130,7 +130,7 @@ bash tools/build_iso.sh
 
 The GRUB tools and module directories must come from the same GRUB install. A mismatch surfaces as a missing `moddep.lst` or as `kernel.img is miscompiled: its start address is 0x0`.
 
-Run TOS with the full QEMU setup:
+Run Gaia with the full QEMU setup:
 
 ```powershell
 .\tools\run.bat
@@ -138,9 +138,9 @@ Run TOS with the full QEMU setup:
 
 This starts QEMU with x86_64 OVMF/UEFI firmware and enables virtio graphics, e1000 networking, SB16 audio, and USB tablet input. The OVMF variable store is copied to `build/edk2-x86_64-vars.fd` on first run, so the template installed with QEMU remains unchanged.
 
-On UEFI, GRUB obtains the GOP framebuffer and passes it to the kernel as the standard Multiboot2 framebuffer tag. TOS uses direct writes for its native 32-bit BGR layout; 24-bit or differently ordered GOP modes use a 32-bit shadow surface and convert only damaged rectangles. GRUB normally calls `ExitBootServices` before entering TOS, so the kernel records EFI metadata for diagnostics and future runtime-service work but does not call GOP or other boot-service protocols after handoff.
+On UEFI, GRUB obtains the GOP framebuffer and passes it to the kernel as the standard Multiboot2 framebuffer tag. Gaia uses direct writes for its native 32-bit BGR layout; 24-bit or differently ordered GOP modes use a 32-bit shadow surface and convert only damaged rectangles. GRUB normally calls `ExitBootServices` before entering Gaia, so the kernel records EFI metadata for diagnostics and future runtime-service work but does not call GOP or other boot-service protocols after handoff.
 
-VirtualBox window resizing uses a post-boot path because GOP cannot change modes after `ExitBootServices`. With the VM's graphics controller set to **VMSVGA**, TOS reports its graphics capability through VirtualBox VMMDev, polls host display-change hints, programs the VMware SVGA II mode registers, and publishes damaged rectangles through the SVGA FIFO. The original GOP/VBE mapping remains the fallback when either VirtualBox device is absent.
+VirtualBox window resizing uses a post-boot path because GOP cannot change modes after `ExitBootServices`. With the VM's graphics controller set to **VMSVGA**, Gaia reports its graphics capability through VirtualBox VMMDev, polls host display-change hints, programs the VMware SVGA II mode registers, and publishes damaged rectangles through the SVGA FIFO. The original GOP/VBE mapping remains the fallback when either VirtualBox device is absent.
 
 The main generated files are:
 
@@ -162,7 +162,7 @@ build/disk-ext2.img      optional ext2 root filesystem
 # Does not build userspace, the disk image, or the ISO.
 mingw32-make -j12 kernel
 
-# Build userspace, including musl, programs, and libtos.
+# Build userspace, including musl, programs, and libgaia.
 # Does not build the kernel, disk image, or ISO.
 mingw32-make userspace
 
@@ -204,9 +204,9 @@ DOOM and NetSurf are optional because their source or resource files are not inc
 
 A normal build does not require DOOM WADs, music, NetSurf resources, or NVIDIA firmware.
 
-## Using TOS
+## Using Gaia
 
-When it starts, TOS launches Heimdall and the Skald shell.
+When it starts, Gaia launches Heimdall and the Skald shell.
 
 Type `help` to see the shell's built-in commands. External programs can be run without their `.elf` suffix. Add `&` to the end of a command to run it in the background and keep using the shell.
 
@@ -252,10 +252,10 @@ The kernel currently implements the subset of the Linux x86_64 syscall ABI neede
 
 Where possible, programs use normal POSIX headers and APIs.
 
-TOS-specific features are provided by:
+Gaia-specific features are provided by:
 
 ```text
-userspace/lib/libtos.a
+userspace/lib/libgaia.a
 ```
 
 These programs are not included by default
@@ -266,11 +266,11 @@ These programs are not included by default
 	
 - [NetSurf](https://www.netsurf-browser.org/)
 
-`libtos` handles the framebuffer, Heimdall IPC, console I/O, drawing, fonts, audio, input, and system inspection.
+`libgaia` handles the framebuffer, Heimdall IPC, console I/O, drawing, fonts, audio, input, and system inspection.
 
-An older hand-written libc is still used by programs that cannot yet use musl, including the native TOS thread test and the DOOM port. PE builds use a separate MinGW-compatible startup and syscall layer.
+An older hand-written libc is still used by programs that cannot yet use musl, including the native Gaia thread test and the DOOM port. PE builds use a separate MinGW-compatible startup and syscall layer.
 
-HolyD is maintained in the [HolyD repository](https://github.com/CodeByRiley/HolyD) and included here as `userspace/bin/holyd`. Its lexer, parser, bytecode compiler, VM, windowing FFI, and UDP FFI are built into the TOS image. The same scripts can also run in the standalone Windows build.
+HolyD is maintained in the [HolyD repository](https://github.com/CodeByRiley/HolyD) and included here as `userspace/bin/holyd`. Its lexer, parser, bytecode compiler, VM, windowing FFI, and UDP FFI are built into the Gaia image. The same scripts can also run in the standalone Windows build.
 
 More information is available in:
 
@@ -334,7 +334,7 @@ You can override the host compiler with `HOST_CC`:
 mingw32-make test-host HOST_CC=gcc
 ```
 
-The QEMU suite first rebuilds the full image and then runs TOS under `qemu-system-x86_64` inside WSL:
+The QEMU suite first rebuilds the full image and then runs Gaia under `qemu-system-x86_64` inside WSL:
 
 ```powershell
 mingw32-make test-qemu-heavy
@@ -396,9 +396,9 @@ kernel/
 
 userspace/
   bin/              application directories; HolyD is a submodule
-  games/doom/       doomgeneric port and TOS platform code
+  games/doom/       doomgeneric port and Gaia platform code
   include/          legacy userspace headers
-  lib/              libtos, legacy libc code, startup, and syscall stubs
+  lib/              libgaia, legacy libc code, startup, and syscall stubs
   libc/             musl 1.2.6 source, build scripts, and compatibility notes
   netsurf_compat/   compatibility layer for the experimental NetSurf port
 
@@ -415,7 +415,7 @@ Kernel headers are included relative to `kernel/`, for example:
 #include <fs/fat/fat.h>
 ```
 
-Userspace also includes the repository root when it needs to share an ABI definition. New musl programs should use standard headers whenever possible and include TOS syscall headers only for services without a POSIX equivalent.
+Userspace also includes the repository root when it needs to share an ABI definition. New musl programs should use standard headers whenever possible and include Gaia syscall headers only for services without a POSIX equivalent.
 
 ## Current limits
 

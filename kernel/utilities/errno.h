@@ -3,7 +3,7 @@
  * A syscall that fails returns the NEGATED code, which is the Linux
  * convention and the reason these numbers are the Linux ones rather than
  * anything of our own: musl's __syscall_ret turns a return in [-4095, -1]
- * into errno = -ret and a -1 result without knowing anything about TOS, so a
+ * into errno = -ret and a -1 result without knowing anything about Gaia, so a
  * musl-linked caller gets working errno and strerror() for free.
  *
  * The same numbers appear in userspace/include/errno.h for the hand-rolled

@@ -247,10 +247,10 @@ static long sys_uname(struct linux_utsname *out) {
     return -EFAULT;
 
   memset(out, 0, sizeof(*out));
-  uts_field(out->sysname, "TOS");
-  uts_field(out->nodename, "tos");
+  uts_field(out->sysname, "Gaia");
+  uts_field(out->nodename, "gaia");
   uts_field(out->release, "development");
-  uts_field(out->version, "TOS x86_64");
+  uts_field(out->version, "Gaia x86_64");
   uts_field(out->machine, "x86_64");
   uts_field(out->domainname, "localdomain");
   return 0;
@@ -1821,7 +1821,7 @@ static long sys_mkdir(const char *path) {
 
 /* ---------------- Mounting --------------------------------------------
  *
- * mount() and umount() take Linux's numbers and argument order, but a TOS
+ * mount() and umount() take Linux's numbers and argument order, but a Gaia
  * `source` is a published volume name rather than a device node: the storage
  * drivers publish what they found (see drivers/storage/blockdev.h) and
  * SYS_BLKDEV_LIST is how userspace learns the names. A leading "/dev/" is
@@ -2135,7 +2135,7 @@ static long sys_net_capture(u64 *cursor, struct net_frame *out,
  * musl's socket(), bind(), sendto() and recvfrom() issue syscalls 41, 49,
  * 44 and 45 directly. Answering on those numbers is the whole point: it
  * means ported code and musl's own socket API work untouched, rather than
- * every caller needing a TOS-specific shim.
+ * every caller needing a Gaia-specific shim.
  *
  * Sockets live in the same fd table as files so close() needs no special
  * case. A slot holds one or the other, never both. */
@@ -2469,11 +2469,11 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_fstatat((int)a1, (const char *)(uintptr_t)a2,
                       (struct linux_kstat *)(uintptr_t)a3, (int)a4);
     break;
-  /* 217 is getdents64 and nothing else. It used to also carry TOS's
+  /* 217 is getdents64 and nothing else. It used to also carry Gaia's
    * index-based walk, disambiguated by testing whether the first argument
    * looked like an fd , which is a guess about a pointer value, and exactly
    * the kind of overload that makes a libc built for Linux misbehave. The
-   * TOS form now has its own number. */
+   * Gaia form now has its own number. */
   case SYS_READDIR:
     ret = sys_getdents64((int)a1, (void *)(uintptr_t)a2, (usize)a3);
     break;

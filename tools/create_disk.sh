@@ -4,9 +4,9 @@ set -euo pipefail
 # Run from the repository root; every path below is repo-relative.
 cd "$(dirname "$0")/.."
 
-# FAT remains the default, while TOS_ROOTFS_TYPE=ext2 builds the same payload
+# FAT remains the default, while GAIA_ROOTFS_TYPE=ext2 builds the same payload
 # into an ext2 image. Check only the tools needed by the selected backend.
-ROOTFS_TYPE="${TOS_ROOTFS_TYPE:-fat}"
+ROOTFS_TYPE="${GAIA_ROOTFS_TYPE:-fat}"
 case "$ROOTFS_TYPE" in
 	fat) required_tools=(dd mkfs.fat mmd mdir mcopy) ;;
 	ext2) required_tools=(dd mkfs mktemp cp) ;;
@@ -86,8 +86,8 @@ optional_payloads=(
 	"userspace/bin/netsurf/netsurf/frontends/framebuffer/res/welcome.html::res/netsurf/welcome.html"
 	"userspace/bin/netsurf/netsurf/resources/icons/content.png::res/netsurf/icons/content.png"
 	"userspace/bin/netsurf/netsurf/resources/icons/directory.png::res/netsurf/icons/directory.png"
-	"userspace/libc/build-musl-tos/muslhello.elf::usr/bin/muslhello.elf"
-	"userspace/libc/build-musl-tos/muslposix.elf::usr/bin/muslposix.elf"
+	"userspace/libc/build-musl-gaia/muslhello.elf::usr/bin/muslhello.elf"
+	"userspace/libc/build-musl-gaia/muslposix.elf::usr/bin/muslposix.elf"
 	"rootfs/games/doom/doom.wad::games/doom/doom.wad"
 	"userspace/bin/doom/doom.elf::usr/bin/doom.elf"
 	"rootfs/firmware/gsp_ga10x.bin::firmware/gsp_ga10x.bin"

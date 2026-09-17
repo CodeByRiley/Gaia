@@ -221,7 +221,7 @@ def main() -> int:
             return 1
 
         required = [
-            "*** TOS KERNEL PANIC ***",
+            "*** Gaia KERNEL PANIC ***",
             "panic(cpu 0 caller ",
             "Exception: vector 2 (NMI)",
             "Panicked task:",

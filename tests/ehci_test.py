@@ -1,4 +1,4 @@
-"""Boot TOS with QEMU EHCI and prove control plus periodic transfers work."""
+"""Boot Gaia with QEMU EHCI and prove control plus periodic transfers work."""
 
 from pathlib import Path
 import re

@@ -1,4 +1,4 @@
-# TOS userspace libraries
+# Gaia userspace libraries
 
 The userspace library layer keeps applications above the raw syscall and IPC
 protocols. The intended dependency direction is:
@@ -26,7 +26,7 @@ simple programs can use `app_run` and callbacks.
 ## Processes
 
 `process.h` centralizes executable lookup and process inspection. It supports
-colon-separated search paths and the TOS `.elf`/`.exe` naming convention, then
+colon-separated search paths and the Gaia `.elf`/`.exe` naming convention, then
 wraps spawn, synchronous exec, snapshots, liveness checks, and bounded waits.
 
 `process_wait` reports that a PID has disappeared or reached zombie/dead state.

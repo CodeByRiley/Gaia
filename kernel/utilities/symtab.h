@@ -40,4 +40,4 @@ extern const usize __ksymtab_count WEAK;
  */
 const char *symtab_resolve(u64 address, u64 *offset_out);
 
-#endif /* TOS_UTILITIES_SYMTAB_H */
+#endif /* GAIA_UTILITIES_SYMTAB_H */

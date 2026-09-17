@@ -10,7 +10,7 @@
 #include <lib/syscall.h>
 #include <errno.h>
 
-/* TOS-specific wrappers intentionally preserve their raw return values: some
+/* Gaia-specific wrappers intentionally preserve their raw return values: some
  * APIs have their own documented negative results. They still record a Linux
  * syscall failure in errno, so programs can report strerror(errno) without
  * losing compatibility with callers that inspect the original result. */
@@ -20,7 +20,7 @@ static sysarg_t syscall_record_error(sysarg_t result) {
     return result;
 }
 
-/* This source is the sole C caller of syscallN() for TOS-specific APIs.
+/* This source is the sole C caller of syscallN() for Gaia-specific APIs.
  * Decorating each invocation here keeps errno reporting consistent without
  * changing the raw ABI exported by those APIs. */
 #define syscall0(n) syscall_record_error(syscall0(n))

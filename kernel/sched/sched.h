@@ -108,7 +108,7 @@ struct task_input {
   volatile u32 tail;
 };
 
-/* Linux x86_64 rt_sigaction state. TOS does not yet deliver asynchronous
+/* Linux x86_64 rt_sigaction state. Gaia does not yet deliver asynchronous
  * handlers, but retaining dispositions makes registration and lookup honest
  * and lets ports install SIG_IGN without a userspace-specific shim. */
 #define TASK_SIGNAL_COUNT 64

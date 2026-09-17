@@ -154,7 +154,7 @@ static long iterate(struct vfs_inode *dir, uint32_t *index, struct vfs_dirent *o
 
 /* The backend owns the normal directory cookie. Once it reaches EOF, reserve
  * the high bit for a short VFS-only pass that adds direct child mountpoints.
- * Backends in TOS have bounded directories, so none can reach 2^31 entries.
+ * Backends in Gaia have bounded directories, so none can reach 2^31 entries.
  * This makes a mounted /mnt/ahci1p1 visible in `ls /mnt` even though it is a
  * namespace overlay, not a directory entry written into the parent disk. */
 #define VFS_READDIR_MOUNT_PHASE 0x80000000u

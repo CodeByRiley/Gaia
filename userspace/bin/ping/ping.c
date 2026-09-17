@@ -3,9 +3,9 @@
  * This exists because ICMP echo reply was the one layer of the new stack
  * that shipped with no test behind it, and it was untestable for a dull
  * reason: QEMU's SLIRP backend does not forward inbound ICMP to the guest,
- * so `ping 10.0.2.30` from the host can never reach TOS however correct
+ * so `ping 10.0.2.30` from the host can never reach Gaia however correct
  * the code is. The direction that does work is outbound - SLIRP answers
- * pings addressed to the gateway - and nothing in TOS could originate one.
+ * pings addressed to the gateway - and nothing in Gaia could originate one.
  *
  * So the useful tool and the missing test are the same thing. Pinging
  * 10.0.2.2 exercises the entire stack end to end in one command: ARP

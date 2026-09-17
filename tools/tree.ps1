@@ -53,7 +53,7 @@ $Skip = @(
     'build',
     'dist',
     'musl-1.2.6',
-    'build-musl-tos',
+    'build-musl-gaia',
     'netsurf',
     'doomgeneric'
 )

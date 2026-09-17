@@ -196,7 +196,7 @@ static void panic_serial_report(const struct panic_record *record,
                                 const struct panic_machine_state *machine) {
   struct task *task = panic_task(record->cpu_id);
 
-  serial_write_str("\n*** TOS KERNEL PANIC ***\n");
+  serial_write_str("\n*** Gaia KERNEL PANIC ***\n");
   char caller_sym[128];
   panic_symstr(caller_sym, sizeof(caller_sym), record->caller);
 
@@ -227,7 +227,7 @@ static void panic_serial_report(const struct panic_record *record,
     serial_write_str("Panicked task: scheduler not initialized\n");
   }
 
-  panic_serialf("Kernel version: TOS x86_64 development (%s %s)\n", __DATE__,
+  panic_serialf("Kernel version: Gaia x86_64 development (%s %s)\n", __DATE__,
                 __TIME__);
   panic_serialf("Uptime ticks: %llu\n", (unsigned long long)pit_ticks());
   panic_serialf(
@@ -320,7 +320,7 @@ static int panic_screen(const struct panic_record *record) {
 
   gfx_clear(&surface, PANIC_BG);
   gfx_fill(&surface, gfx_rect_make(0, 0, surface.w, 5), PANIC_ACCENT);
-  gfx_text(&surface, 24, 20, "TOS", PANIC_MUTED, 1);
+  gfx_text(&surface, 24, 20, "Gaia", PANIC_MUTED, 1);
 
   int icon_y = surface.h / 5;
   if (icon_y < 72)
@@ -332,7 +332,7 @@ static int panic_screen(const struct panic_record *record) {
                   headline_scale);
   y += GFX_GLYPH_H * headline_scale + 18;
   screen_centered(&surface, y,
-                  "TOS stopped because the kernel encountered a problem.",
+                  "Gaia stopped because the kernel encountered a problem.",
                   PANIC_MUTED, 1);
   y += 28;
   screen_wrapped(&surface, &y, record->message, PANIC_FG, 1, surface.w - 64);
@@ -542,17 +542,17 @@ static void panic_diagnostic_screen(const struct panic_record *record,
   int y = 8;
   snprintf(screen_line, sizeof(screen_line), "*** STOP: 0x%08llx (%s)",
            (unsigned long long)panic_stop_code(record),
-           record->exception ? record->exception : "TOS_KERNEL_PANIC");
+           record->exception ? record->exception : "GAIA_KERNEL_PANIC");
   diag_line(&surface, &y, 8, screen_line, PANIC_FG);
 
   snprintf(screen_line, sizeof(screen_line),
-           "TOS_KERNEL_PANIC: Address %016llx base at %016llx - kernel",
+           "GAIA_KERNEL_PANIC: Address %016llx base at %016llx - kernel",
            (unsigned long long)record->caller,
            (unsigned long long)(uintptr_t)_kernel_start);
   diag_line(&surface, &y, 8, screen_line, PANIC_FG);
 
   snprintf(screen_line, sizeof(screen_line),
-           "CPU %d: TOS x86_64 development  uptime ticks %llu", record->cpu_id,
+           "CPU %d: Gaia x86_64 development  uptime ticks %llu", record->cpu_id,
            (unsigned long long)pit_ticks());
   diag_line(&surface, &y, 8, screen_line, PANIC_MUTED);
 

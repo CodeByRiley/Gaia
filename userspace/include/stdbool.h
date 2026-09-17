@@ -1,5 +1,5 @@
-#ifndef TOS_STDBOOL_H
-#define TOS_STDBOOL_H
+#ifndef GAIA_STDBOOL_H
+#define GAIA_STDBOOL_H
 
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
 #define bool  _Bool

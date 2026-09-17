@@ -1,16 +1,16 @@
-# TOS musl Bootstrap
+# Gaia musl Bootstrap
 
-This directory holds the TOS musl bring-up. The current baseline is musl 1.2.6
+This directory holds the Gaia musl bring-up. The current baseline is musl 1.2.6
 configured for a static x86_64 freestanding build with the existing
 `x86_64-elf-*` cross toolchain.
 
 Build it from PowerShell with MSYS bash:
 
 ```powershell
-& 'C:\msys64\usr\bin\bash.exe' userspace/libc/build_tos_musl.sh
+& 'C:\msys64\usr\bin\bash.exe' userspace/libc/build_gaia_musl.sh
 ```
 
-The script creates `userspace/libc/build-musl-tos`, configures musl with
+The script creates `userspace/libc/build-musl-gaia`, configures musl with
 `--disable-shared`, and builds:
 
 - `lib/libc.a`
@@ -21,12 +21,12 @@ The script creates `userspace/libc/build-musl-tos`, configures musl with
 Link the smoke test:
 
 ```powershell
-& 'C:\msys64\usr\bin\bash.exe' userspace/libc/link_tos_musl.sh `
-    userspace/libc/build-musl-tos/muslhello.elf `
+& 'C:\msys64\usr\bin\bash.exe' userspace/libc/link_gaia_musl.sh `
+    userspace/libc/build-musl-gaia/muslhello.elf `
     userspace/libc/tests/hello.c
 
-& 'C:\msys64\usr\bin\bash.exe' userspace/libc/link_tos_musl.sh `
-    userspace/libc/build-musl-tos/muslposix.elf `
+& 'C:\msys64\usr\bin\bash.exe' userspace/libc/link_gaia_musl.sh `
+    userspace/libc/build-musl-gaia/muslposix.elf `
     userspace/libc/tests/posix_smoke.c
 ```
 
@@ -38,17 +38,17 @@ python tests/musl_smoke_test.py --timeout 60
 python tests/musl_posix_smoke_test.py --timeout 60
 ```
 
-`tos-musl.mk` exists for one host-build reason: the upstream musl archive rule
+`gaia-musl.mk` exists for one host-build reason: the upstream musl archive rule
 passes every object file to `ar` in a single command. On Windows/MSYS that can
 hit the process argument length limit. GNU `ar` supports response files, so the
 overlay writes the object list to `lib/libc.a.rsp` and invokes `ar` with
 `@lib/libc.a.rsp`.
 
 musl is the default libc for userspace. Every program under `bin/` links
-`crt1.o` + `libc.a` plus `lib/libtos.a` (the TOS-only half: heimdall IPC, the
+`crt1.o` + `libc.a` plus `lib/libgaia.a` (the Gaia-only half: heimdall IPC, the
 framebuffer, the console, audio, the drawing and font helpers), except:
 
-- `bin/thread` , drives TOS's own `SYS_THREAD_CREATE`/`EXIT`/`JOIN`, while
+- `bin/thread` , drives Gaia's own `SYS_THREAD_CREATE`/`EXIT`/`JOIN`, while
   musl's pthreads issue Linux `clone(2)`, which the kernel does not implement.
 - `games/doom` , a vendored tree that has not been re-ported.
 - the PE builds (`*.exe`) , mingw targets, a separate toolchain entirely.
@@ -69,7 +69,7 @@ musl programs to run unchanged:
 - process/time probes used by libc: `getpid`, `exit_group`,
   `set_tid_address`, `clock_gettime`, `gettimeofday`, `nanosleep`, `poll`,
   `fcntl`, `uname`, and tty-shaped `ioctl` calls
-- signal disposition registration and lookup through `rt_sigaction`; TOS does
+- signal disposition registration and lookup through `rt_sigaction`; Gaia does
   not yet deliver asynchronous userspace signal handlers
 
 This is still a bootstrap layer, not a full Linux personality. The important

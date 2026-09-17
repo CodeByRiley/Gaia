@@ -3,7 +3,7 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 src_name=${MUSL_SRC:-musl-1.2.6}
-build_name=${MUSL_BUILD:-build-musl-tos}
+build_name=${MUSL_BUILD:-build-musl-gaia}
 
 cd "$script_dir"
 
@@ -30,4 +30,4 @@ if [ "$#" -eq 0 ]; then
     set -- lib/libc.a lib/crt1.o lib/crti.o lib/crtn.o
 fi
 
-exec make -f "../$src_name/Makefile" -f ../tos-musl.mk "$@"
+exec make -f "../$src_name/Makefile" -f ../gaia-musl.mk "$@"

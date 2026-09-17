@@ -2,8 +2,8 @@
  * This API is intentionally single-consumer and is not thread-safe. Once a
  * program uses libevent (directly or through libwm), all of its IPC receives
  * should go through this API rather than calling ipc_recv directly. */
-#ifndef TOS_EVENT_H
-#define TOS_EVENT_H
+#ifndef GAIA_EVENT_H
+#define GAIA_EVENT_H
 
 #include <lib/syscall.h>
 #include <stdint.h>

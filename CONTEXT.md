@@ -72,15 +72,15 @@ volume in RAM.
 either owns scanout or does not; `kernel/display/framebuffer.c` tracks which.
 
 **Damage** , the accumulated rectangles that changed since the last present.
-Accumulated separately in libtos, in the `SYS_FB_PRESENT` ABI, and in the
+Accumulated separately in libgaia, in the `SYS_FB_PRESENT` ABI, and in the
 kernel, with three different budgets.
 
 ## Userspace
 
 **Syscall registry** , `kernel/arch/syscalls.def`: the one assignment of every
-syscall name to a number. **Both** entries are visible to libtos; **kernel**
+syscall name to a number. **Both** entries are visible to libgaia; **kernel**
 entries implement Linux-compatible calls that musl issues directly. Aliases
-are explicit. A number has one meaning: Linux futex is 202, while TOS thread
+are explicit. A number has one meaning: Linux futex is 202, while Gaia thread
 join remains 1102.
 
 **Syscall payload** , a struct copied byte-for-byte across the ring boundary.
@@ -91,5 +91,5 @@ are no kernel/userspace mirror structs whose field order can drift.
 it over IPC through **libwm** (`userspace/lib/wm.h`) and never see the wire
 protocol.
 
-**libtos** , the TOS-specific userspace library: windows, graphics, audio, IPC,
+**libgaia** , the Gaia-specific userspace library: windows, graphics, audio, IPC,
 process inspection. Distinct from musl, which supplies the standard C library.

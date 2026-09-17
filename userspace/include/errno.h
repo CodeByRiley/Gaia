@@ -5,7 +5,7 @@
 #include "utilities/types.h"
 
 /* MinGW's host headers define errno as a DLL-backed function-like macro.
- * TOS's freestanding legacy libc owns a simple process-global integer instead.
+ * Gaia's freestanding legacy libc owns a simple process-global integer instead.
  * Undefine it before declaring the ABI symbol so PE and ELF agree. */
 #ifdef errno
 #undef errno

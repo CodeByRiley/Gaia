@@ -12,7 +12,7 @@
  *   - Not thread-safe (no userspace threads yet).
  */
 #include <lib/syscall.h>
-#ifdef TOS_USE_MUSL
+#ifdef GAIA_USE_MUSL
 #include <string.h>
 #else
 #include <include/errno.h>

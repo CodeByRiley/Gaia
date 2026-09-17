@@ -330,7 +330,7 @@ static int load_request_image(struct spawn_request *req,
    *   NULL            empty envp terminator
    *   AT_NULL, 0      empty auxiliary vector
    *
-   * The original TOS crt0 only consumes argc/argv, but musl's crt1 scans
+   * The original Gaia crt0 only consumes argc/argv, but musl's crt1 scans
    * envp and auxv before calling main. Supplying explicit terminators keeps
    * both startup paths on the same ABI. */
   u64 initial_stack[ARGV_MAX + 5];

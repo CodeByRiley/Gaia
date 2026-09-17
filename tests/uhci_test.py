@@ -1,4 +1,4 @@
-"""Boot TOS with QEMU UHCI and prove control plus interrupt transfers work.
+"""Boot Gaia with QEMU UHCI and prove control plus interrupt transfers work.
 
 The mirror of ehci_test.py for the other host controller. Both drivers now
 enumerate through the shared device model in drivers/usb/usb_device.c, and

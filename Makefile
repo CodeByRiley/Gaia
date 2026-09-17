@@ -50,8 +50,8 @@ BUILD_NETSURF   ?= 0
 # later with things like "kernel.img is miscompiled". On Windows these steps
 # always go through WSL.
 #
-# TOS_NATIVE_TOOLS=1 opts out, for a shell that genuinely has all of them.
-TOS_NATIVE_TOOLS ?= 0
+# GAIA_NATIVE_TOOLS=1 opts out, for a shell that genuinely has all of them.
+GAIA_NATIVE_TOOLS ?= 0
 
 # mingw32-make sees OS=Windows_NT; MSYS2's own make does not, but it does set
 # MSYSTEM. Either one means we are on Windows and the tools live in WSL.
@@ -59,7 +59,7 @@ windows_host := $(if $(filter Windows_NT,$(OS))$(MSYSTEM),1,)
 NASM ?= nasm
 
 ifeq ($(windows_host),1)
-  ifeq ($(TOS_NATIVE_TOOLS),1)
+  ifeq ($(GAIA_NATIVE_TOOLS),1)
     run_linux = $(1)
   else
     # wslpath only understands drive-letter paths, so mingw32-make's
@@ -141,7 +141,7 @@ endif
 $(disk_img): userspace tools/create_disk.sh $(rootfs_payload_files) | $(kernel_bin)
 	@echo "Creating Disk Image"
 	@mkdir -p $(dir $@)
-	@$(call run_linux,IMG=$(disk_img) TOS_ROOTFS_TYPE=$(ROOTFS_TYPE) bash tools/create_disk.sh)
+	@$(call run_linux,IMG=$(disk_img) GAIA_ROOTFS_TYPE=$(ROOTFS_TYPE) bash tools/create_disk.sh)
 	@test -s "$@"
 	@echo "Disk Image Finished"
 
@@ -428,7 +428,7 @@ test-host: $(HOST_TEST_BINS)
 # HolyD builds as a native Windows program as well as into the image. That
 # build is the submodule's own , it has a Makefile, and keeping a second
 # source list here is exactly how the two would drift. This target is a
-# convenience so it still runs from the top of the TOS tree.
+# convenience so it still runs from the top of the Gaia tree.
 .PHONY: holyd-win
 holyd-win:
 	$(MAKE) -C userspace/bin/holyd

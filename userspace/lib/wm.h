@@ -13,7 +13,7 @@
 #ifndef USER_WM_H
 #define USER_WM_H
 
-#ifdef TOS_USE_MUSL
+#ifdef GAIA_USE_MUSL
 #include <stdio.h>
 #else
 #include <include/stdio.h>

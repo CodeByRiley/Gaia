@@ -75,7 +75,7 @@ static uint32_t chan(uint32_t px, uint32_t mask, int shift, int width) {
 
 /* Length of an open file, or -1.
  *
- * TOS answers this with fstat_raw. Nothing else has that syscall , holyd's
+ * Gaia answers this with fstat_raw. Nothing else has that syscall , holyd's
  * Windows build links this file for its font and sprite drawing , so there
  * the size comes from seeking to the end and back. */
 static long file_size(int fd) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Boot TOS and verify a broader musl/POSIX compatibility smoke."""
+"""Boot Gaia and verify a broader musl/POSIX compatibility smoke."""
 
 from __future__ import annotations
 

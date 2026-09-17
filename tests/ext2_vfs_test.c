@@ -1,4 +1,4 @@
-/* Exercise TOS's ext2 backend against an image made by mke2fs. */
+/* Exercise Gaia's ext2 backend against an image made by mke2fs. */
 #include "fs/ext2/ext2.h"
 #include "fs/vfs/vfs.h"
 #include "vfs_backend_checks.h"

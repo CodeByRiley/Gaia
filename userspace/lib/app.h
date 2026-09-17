@@ -1,6 +1,6 @@
 /* One-window application runtime over libwm and libgfx. */
-#ifndef TOS_APP_H
-#define TOS_APP_H
+#ifndef GAIA_APP_H
+#define GAIA_APP_H
 
 #include <lib/gfx.h>
 #include <lib/wm.h>

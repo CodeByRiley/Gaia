@@ -8,7 +8,7 @@ fi
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 src_name=${MUSL_SRC:-musl-1.2.6}
-build_name=${MUSL_BUILD:-build-musl-tos}
+build_name=${MUSL_BUILD:-build-musl-gaia}
 cc=${CC:-/c/elf-tools/bin/x86_64-elf-gcc}
 
 out=$1
@@ -19,7 +19,7 @@ build_dir="$script_dir/$build_name"
 ld_script="$script_dir/../lib/user.ld"
 
 if [ ! -f "$build_dir/lib/libc.a" ]; then
-    "$script_dir/build_tos_musl.sh"
+    "$script_dir/build_gaia_musl.sh"
 fi
 
 gcc_include=$("$cc" -print-file-name=include)
@@ -39,7 +39,7 @@ exec "$cc" \
     -I "$src_dir/arch/generic" \
     -I "$src_dir/include" \
     -isystem "$gcc_include" \
-    -DTOS_USE_MUSL \
+    -DGAIA_USE_MUSL \
     -DDEBUG \
     -MMD -MF "${out%.elf}.d" \
     -I "$script_dir/.." \

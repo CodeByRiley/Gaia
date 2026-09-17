@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Boot TOS and verify a musl-linked binary reaches main()."""
+"""Boot Gaia and verify a musl-linked binary reaches main()."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def main() -> int:
 
         qmp = Qmp(qmp_port, deadline)
         send_text(qmp, "muslhello\n")
-        if not wait_for_text(log_path, "hello from musl on TOS", deadline):
+        if not wait_for_text(log_path, "hello from musl on Gaia", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
             print("musl smoke binary did not run", file=sys.stderr)
             return 1

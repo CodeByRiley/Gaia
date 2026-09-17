@@ -5,7 +5,7 @@
  * the guest must then set a new mode on the display controller. VirtualBox's
  * default Linux controller is VMSVGA, a VMware SVGA II compatible device.
  *
- * This driver deliberately implements only the small 2D subset TOS needs:
+ * This driver deliberately implements only the small 2D subset Gaia needs:
  * VMMDev graphics-capability reporting and display hints, SVGA mode registers,
  * and SVGA_CMD_UPDATE through the command FIFO. No 3D or screen objects are
  * involved.

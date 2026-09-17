@@ -1,21 +1,21 @@
-/* userspace/lib/ttf.c - small stb_truetype wrapper for TOS userspace.
+/* userspace/lib/ttf.c - small stb_truetype wrapper for Gaia userspace.
  *
  * This is intentionally self-contained: stb_truetype is given our allocator,
  * string routines, and a tiny private math subset so userspace programs can
  * link TTF support without pulling in a host C runtime or the DOOM-only math
  * object.
  */
-#ifdef TOS_USE_MUSL
+#ifdef GAIA_USE_MUSL
 #include <stdio.h>
 #else
 #include <include/stdio.h>
 #endif
-#ifdef TOS_USE_MUSL
+#ifdef GAIA_USE_MUSL
 #include <stdlib.h>
 #else
 #include <include/stdlib.h>
 #endif
-#ifdef TOS_USE_MUSL
+#ifdef GAIA_USE_MUSL
 #include <string.h>
 #else
 #include <include/string.h>

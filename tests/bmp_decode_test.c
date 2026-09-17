@@ -10,7 +10,7 @@
  * BI_RGB, top-down row order, and a 32-bit image whose alpha channel is
  * all zeroes (which must be promoted to opaque, not treated as invisible).
  *
- * bmp.c calls the TOS syscall wrappers; this file supplies host-backed
+ * bmp.c calls the Gaia syscall wrappers; this file supplies host-backed
  * definitions of exactly those four, so no part of lib/syscall.c is
  * needed.
  *

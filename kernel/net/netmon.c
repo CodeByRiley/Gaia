@@ -1,6 +1,6 @@
 /* kernel/net/netmon.c , implementation of the NIC capture ring.
  *
- * One global interface. TOS binds a single NIC today, and giving the ring
+ * One global interface. Gaia binds a single NIC today, and giving the ring
  * an index before there is a second card to put in it would be structure
  * without a user; netmon_bind() simply describes whichever driver called
  * it last.

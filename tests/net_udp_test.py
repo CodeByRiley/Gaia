@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Send a UDP datagram to TOS and check it comes back.
+"""Send a UDP datagram to Gaia and check it comes back.
 
 This is the test for the Linux socket syscall numbers. udpecho is built
-against musl's <sys/socket.h> and contains nothing TOS-specific, so every
+against musl's <sys/socket.h> and contains nothing Gaia-specific, so every
 call it makes goes out on the Linux numbers: socket is 41, bind 49,
 sendto 44, recvfrom 45. Before those were mirrored in the kernel the
 program did not misbehave subtly, it died at the first call and the serial
@@ -16,7 +16,7 @@ back on the wire addressed from that source. Checking any one of those in
 isolation would let the others stay broken.
 
 It also stands in for ported software generally. NetSurf's fetcher will
-reach the network through these same entry points; a TOS-specific socket
+reach the network through these same entry points; a Gaia-specific socket
 API would have proved nothing about whether they work.
 """
 
@@ -33,7 +33,7 @@ from kernel_panic_test import Qmp, available_port, wait_for_text
 from path_lookup_test import send_text
 
 GUEST_ECHO_PORT = 7777
-PAYLOAD = b"tos-udp-roundtrip"
+PAYLOAD = b"gaia-udp-roundtrip"
 
 
 def main() -> int:

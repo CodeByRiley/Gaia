@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Boot TOS and verify bare commands resolve through the default PATH.
+"""Boot Gaia and verify bare commands resolve through the default PATH.
 
 Two lookups, one per directory that actually holds binaries: `hello` from
 /usr/bin and `ls` from /system/bin.

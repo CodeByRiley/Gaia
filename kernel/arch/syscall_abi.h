@@ -1,7 +1,7 @@
 /* kernel/arch/syscall_abi.h , data copied across the syscall boundary.
  *
- * This is the one definition of each native TOS ABI payload. Kernel headers
- * and libtos both include it; changing field order or width therefore changes
+ * This is the one definition of each native Gaia ABI payload. Kernel headers
+ * and libgaia both include it; changing field order or width therefore changes
  * both consumers in the same compilation rather than relying on mirrored
  * structs and size-only assertions.
  */

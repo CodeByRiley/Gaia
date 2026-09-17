@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Boot TOS and smoke-test Deskelf's libwm event loop."""
+"""Boot Gaia and smoke-test Deskelf's libwm event loop."""
 
 from __future__ import annotations
 

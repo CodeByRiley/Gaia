@@ -43,7 +43,7 @@ int ipv4_output_framed(u8 *frame, const u8 dst[IPV4_ALEN],
 
   struct ipv4_hdr *ip = (struct ipv4_hdr *)(frame + ETH_HDR_LEN);
   ip->version_ihl = 0x45; /* IPv4, 20-byte header, no options */
-  ip->tos = 0;
+  ip->gaia = 0;
   ip->total_length = to_be16(total_len);
   ip->id = to_be16(ipv4_next_id++);
   ip->flags_fragment = 0;

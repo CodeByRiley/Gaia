@@ -1,6 +1,6 @@
 /* kernel/net/netif.h , the bound network interface.
  *
- * One interface. TOS binds a single NIC, and giving this an index before
+ * One interface. Gaia binds a single NIC, and giving this an index before
  * there is a second card to put in it would be structure without a user ,
  * the same call netmon.c made for its capture ring. When a second card
  * appears, netif_get() grows into netif_at(i) and the protocol files take

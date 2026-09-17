@@ -2,7 +2,7 @@
  *
  * Split out of syscall.c because musl defines every one of these. A
  * binary linked against musl uses musl's versions and must not link this
- * file; libtos.a is built from the rest of lib/, which collides with
+ * file; libgaia.a is built from the rest of lib/, which collides with
  * nothing in libc.a.
  *
  * The hand-rolled libc build also translates the kernel's negative errno
@@ -33,7 +33,7 @@ long chdir(const char *path) {
 }
 /* Mounting. musl declares these, so like the rest of this file they exist
  * only for the hand-rolled libc; a musl binary reaches the same syscalls
- * through musl's own wrappers. See lib/syscall.h for what TOS accepts. */
+ * through musl's own wrappers. See lib/syscall.h for what Gaia accepts. */
 int mount(const char *source, const char *target, const char *filesystemtype,
           unsigned long mountflags, const void *data) {
     return (int)syscall_result(syscall5(SYS_MOUNT, (sysarg_t)(uintptr_t)source,

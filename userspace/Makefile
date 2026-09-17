@@ -53,7 +53,7 @@ PE_VARIANT_OBJS := $(foreach b,$(PE_VARIANTS),bin/$(b)/$(b).pe.o)
 PE_VARIANT_EXES := $(foreach b,$(PE_VARIANTS),bin/$(b)/$(b).exe)
 
 # The hand-rolled libc. musl is the default now (see MUSL_BINS), so the only
-# things still linking this are thread.elf , which drives TOS's own thread
+# things still linking this are thread.elf , which drives Gaia's own thread
 # syscalls rather than clone(2) , and DOOM, which is a vendored tree nobody
 # has re-ported. Do not add binaries here; add them to MUSL_BINS.
 #
@@ -77,16 +77,16 @@ LIB_C_OBJS := $(filter-out lib/crt0.o lib/syscall_asm.o, $(LIB_OBJS)) $(TTF_OBJS
 # One binary per directory under bin/, named after the directory.
 # Doom is special (multi-source) and gets its own rules.
 #
-# musl is the default libc: everything below links crt1/libc.a plus libtos.a
+# musl is the default libc: everything below links crt1/libc.a plus libgaia.a
 # rather than crt0.o + LIB_OBJS, and reaches POSIX through the real headers.
 # The list is explicit rather than a wildcard so adding a binary is a
 # deliberate act; a name here must NOT also appear in SIMPLE_BINS.
 #
 # The rule below builds one .c into one .elf. Programs with several
 # translation units have explicit rules below (Heimdall and HolyD).
-MUSL_DIR      := libc/build-musl-tos
+MUSL_DIR      := libc/build-musl-gaia
 MUSL_SRC_DIR  := libc/musl-1.2.6
-MUSL_LINK     := libc/link_tos_musl.sh
+MUSL_LINK     := libc/link_gaia_musl.sh
 MUSL_LINKER_SCRIPT := lib/user.ld
 MUSL_LIBC     := $(MUSL_DIR)/lib/libc.a
 MUSL_BINS     := cat plist hello ls pkill gfx btop uidemo deskelf notepad tree \
@@ -100,29 +100,29 @@ MUSL_BIN_ELFS := $(foreach b,$(MUSL_BINS),bin/$(b)/$(b).elf)
 HEIMDALL_SRCS := bin/heimdall/heimdall.c bin/heimdall/state.c bin/heimdall/desktop.c \
                bin/heimdall/render.c bin/heimdall/console.c \
                bin/heimdall/window.c bin/heimdall/prompt.c
-HEIMDALL_OBJS := $(HEIMDALL_SRCS:.c=.tos.o)
+HEIMDALL_OBJS := $(HEIMDALL_SRCS:.c=.gaia.o)
 HEIMDALL_ELF  := bin/heimdall/heimdall.elf
 
-# libtos.a , the parts of lib/ that musl does not provide: heimdall IPC, the
-# framebuffer, the console, audio, TOS-only syscalls, and the drawing and
-# font helpers. Everything here is TOS-specific and collides with nothing in
+# libgaia.a , the parts of lib/ that musl does not provide: heimdall IPC, the
+# framebuffer, the console, audio, Gaia-only syscalls, and the drawing and
+# font helpers. Everything here is Gaia-specific and collides with nothing in
 # libc.a; the POSIX wrappers that did collide live in syscall_posix.c, which
 # a musl binary never links.
 #
 # Built from the same sources as the legacy objects but against musl's
-# headers, so a .tos.o is not interchangeable with a .o , same pattern as
+# headers, so a .gaia.o is not interchangeable with a .o , same pattern as
 # the .pe.o variants above.
-LIBTOS_SRCS := lib/syscall.c lib/event.c lib/wm.c lib/app.c lib/process.c \
+LIBGAIA_SRCS := lib/syscall.c lib/event.c lib/wm.c lib/app.c lib/process.c \
                lib/gfx.c lib/ui.c lib/ttf.c \
                lib/bmp.c lib/damage.c lib/page_alloc.c lib/keymap.c \
                lib/console.c lib/time_stub.c
-LIBTOS_COBJS := $(LIBTOS_SRCS:.c=.tos.o)
+LIBGAIA_COBJS := $(LIBGAIA_SRCS:.c=.gaia.o)
 # syscall_asm.o is assembly and identical either way , reuse it rather than
 # assembling a second copy.
-LIBTOS_OBJS  := $(LIBTOS_COBJS) lib/syscall_asm.o
-LIBTOS      := lib/libtos.a
+LIBGAIA_OBJS  := $(LIBGAIA_COBJS) lib/syscall_asm.o
+LIBGAIA      := lib/libgaia.a
 
-# musl's headers must come before TOS's so <stdio.h> and friends resolve to
+# musl's headers must come before Gaia's so <stdio.h> and friends resolve to
 # musl. -nostdinc drops the host's entirely; the compiler's own include dir
 # is added back for stddef.h / stdarg.h.
 MUSL_INC    := -nostdinc \
@@ -134,9 +134,9 @@ MUSL_INC    := -nostdinc \
 MUSL_CFLAGS := -ffreestanding -nostdlib -fno-pie -mno-red-zone -static \
                -O2 -Wall -Wextra -std=gnu11 -MMD -MP \
                $(MUSL_INC) -I . -I lib -I include -I ../kernel \
-               -DTOS_USE_MUSL -DDEBUG
+               -DGAIA_USE_MUSL -DDEBUG
 
-# thread.elf stays on the hand-rolled lib: it drives TOS's own thread
+# thread.elf stays on the hand-rolled lib: it drives Gaia's own thread
 # syscalls (SYS_THREAD_CREATE/EXIT/JOIN), and musl's pthreads issue
 # Linux clone(2), which the kernel does not implement.
 SIMPLE_BINS := thread
@@ -173,11 +173,11 @@ HOLYD_SOURCES := $(filter-out $(HOLYD_SRC_DIR)/ffi_win32.c, \
                  $(wildcard $(HOLYD_SRC_DIR)/parser/*.c) \
                  $(wildcard $(HOLYD_SRC_DIR)/ast/*.c)
 # holyd is the one musl program built from more than one translation unit,
-# so it compiles to .tos.o objects of its own rather than going through the
+# so it compiles to .gaia.o objects of its own rather than going through the
 # one-source-per-binary MUSL_BIN rule below.
-HOLYD_OBJS := $(HOLYD_SOURCES:.c=.tos.o)
-# The platform adapters in HolyD must choose TOS's public gfx/BMP/input/font
-# interfaces. Keep this explicit instead of detecting TOS from include paths.
+HOLYD_OBJS := $(HOLYD_SOURCES:.c=.gaia.o)
+# The platform adapters in HolyD must choose Gaia's public gfx/BMP/input/font
+# interfaces. Keep this explicit instead of detecting Gaia from include paths.
 HOLYD_CFLAGS := $(MUSL_CFLAGS) -I $(HOLYD_SRC_DIR) \
                  -DHOLYD_TARGET_TOS=1 -MMD -MP
 
@@ -266,7 +266,7 @@ $(SIMPLE_BIN_OBJS): %.o: %.c
 # private state or module interface can leave stale objects in the image.
 # Leading '-' so a clean tree with no .d files yet is not an error.
 #
-# The musl-linked binaries and libtos objects belong here as much as anything
+# The musl-linked binaries and libgaia objects belong here as much as anything
 # else, and for a sharper reason: they include ../kernel/arch/syscall_abi.h,
 # which is the ONE definition of every struct crossing a syscall. Single
 # sourcing it is only worth anything if both sides rebuild together -- without
@@ -274,11 +274,11 @@ $(SIMPLE_BIN_OBJS): %.o: %.c
 # userspace binary reading the old layout, which does not fail to build, it
 # just decodes the reply wrongly at runtime.
 #
-# link_tos_musl.sh already writes bin/foo/foo.d for each binary it links; those
+# link_gaia_musl.sh already writes bin/foo/foo.d for each binary it links; those
 # were being generated and then ignored.
 USER_DEP_FILES := $(patsubst %.o,%.d,$(LIB_C_OBJS) $(SIMPLE_BIN_OBJS) $(HOLYD_OBJS) $(NETSURF_OBJS)) \
-                  $(HEIMDALL_OBJS:.tos.o=.tos.d) \
-                  $(LIBTOS_COBJS:.tos.o=.tos.d) \
+                  $(HEIMDALL_OBJS:.gaia.o=.gaia.d) \
+                  $(LIBGAIA_COBJS:.gaia.o=.gaia.d) \
                   $(MUSL_BIN_ELFS:.elf=.d)
 -include $(USER_DEP_FILES)
 
@@ -294,60 +294,60 @@ $(TTF_BIN_ELFS): bin/%.elf: bin/%.o $(LIB_OBJS) $(TTF_OBJS)
 
 # --- musl-linked binaries ------------------------------------------------
 
-# link_tos_musl.sh owns the include paths and the crt1/crti/libc.a/crtn
+# link_gaia_musl.sh owns the include paths and the crt1/crti/libc.a/crtn
 # ordering. Going through it keeps one copy of those flags rather than a
 # second set here that could drift.
 
 # musl itself. The build tree is generated rather than committed (see
 # libc/.gitignore), so a clean checkout has to produce it before anything
 # can compile against it. Without this rule make stops dead at "No rule to
-# make target 'libc/build-musl-tos/lib/libc.a'", and building musl becomes
+# make target 'libc/build-musl-gaia/lib/libc.a'", and building musl becomes
 # a manual step that only gets remembered after CI fails.
 #
-# build_tos_musl.sh configures on the first run only and is safe to
+# build_gaia_musl.sh configures on the first run only and is safe to
 # re-enter. MAKEFLAGS is cleared because the script drives musl's own
 # Makefile with a plain `make`, which would otherwise inherit this build's
 # jobserver and warn that it cannot reach it.
 $(MUSL_LIBC):
-	MAKEFLAGS= CC=$(USER_ELF_CC) "$(SHELL)" libc/build_tos_musl.sh
+	MAKEFLAGS= CC=$(USER_ELF_CC) "$(SHELL)" libc/build_gaia_musl.sh
 
-# A .tos.o needs more than the archive. obj/include/bits holds alltypes.h
+# A .gaia.o needs more than the archive. obj/include/bits holds alltypes.h
 # and syscall.h, which musl generates at configure time and which have no
 # counterpart in the source tree, so compiling against an unbuilt musl
 # fails on a missing include rather than on a missing library. Hanging the
 # dependency on libc.a covers both, and rebuilds these objects whenever
 # musl is rebuilt, which is what a change to those headers should do.
-$(LIBTOS_COBJS): %.tos.o: %.c $(MUSL_LIBC)
+$(LIBGAIA_COBJS): %.gaia.o: %.c $(MUSL_LIBC)
 	$(USER_ELF_CC) $(MUSL_CFLAGS) $(CCDB) -c $< -o $@
 
-$(LIBTOS): $(LIBTOS_OBJS)
+$(LIBGAIA): $(LIBGAIA_OBJS)
 	rm -f $@ && x86_64-elf-ar rcs $@ $^
 
-$(filter-out $(HEIMDALL_ELF),$(MUSL_BIN_ELFS)): bin/%.elf: bin/%.c $(MUSL_LIBC) $(LIBTOS) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
-	CC=$(USER_ELF_CC) "$(SHELL)" $(MUSL_LINK) $@ $< $(LIBTOS)
+$(filter-out $(HEIMDALL_ELF),$(MUSL_BIN_ELFS)): bin/%.elf: bin/%.c $(MUSL_LIBC) $(LIBGAIA) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
+	CC=$(USER_ELF_CC) "$(SHELL)" $(MUSL_LINK) $@ $< $(LIBGAIA)
 
-$(HEIMDALL_OBJS): %.tos.o: %.c $(MUSL_LIBC)
+$(HEIMDALL_OBJS): %.gaia.o: %.c $(MUSL_LIBC)
 	$(USER_ELF_CC) $(MUSL_CFLAGS) $(CCDB) -MMD -MP -c $< -o $@
 
-$(HEIMDALL_ELF): $(HEIMDALL_OBJS) $(MUSL_LIBC) $(LIBTOS) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
-	CC=$(USER_ELF_CC) "$(SHELL)" $(MUSL_LINK) $@ $(HEIMDALL_OBJS) $(LIBTOS)
+$(HEIMDALL_ELF): $(HEIMDALL_OBJS) $(MUSL_LIBC) $(LIBGAIA) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
+	CC=$(USER_ELF_CC) "$(SHELL)" $(MUSL_LINK) $@ $(HEIMDALL_OBJS) $(LIBGAIA)
 
 # --- holyd rules ---------------------------------------------------------
 
 # HolyD headers use paths rooted at bin/holyd (for example, lexer/lexer.h).
-$(HOLYD_OBJS): %.tos.o: %.c $(MUSL_LIBC)
+$(HOLYD_OBJS): %.gaia.o: %.c $(MUSL_LIBC)
 	$(USER_ELF_CC) $(HOLYD_CFLAGS) $(CCDB) -c $< -o $@
 
-# Link holyd.elf. Objects, not a source, so link_tos_musl.sh gets them
+# Link holyd.elf. Objects, not a source, so link_gaia_musl.sh gets them
 # straight through , it passes anything after the output name to the
 # compiler driver unchanged.
 #
 # The binary lands beside the submodule rather than inside it: bin/holyd is
 # a checkout of another repository and build output there would show up as
-# local changes to it. The .tos.o and .tos.d files still land next to their
+# local changes to it. The .gaia.o and .gaia.d files still land next to their
 # sources, which is fine only because HolyD's .gitignore covers *.o and *.d.
-bin/holyd.elf: $(HOLYD_OBJS) $(MUSL_LIBC) $(LIBTOS) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
-	CC=$(USER_ELF_CC) "$(SHELL)" $(MUSL_LINK) $@ $(HOLYD_OBJS) $(LIBTOS)
+bin/holyd.elf: $(HOLYD_OBJS) $(MUSL_LIBC) $(LIBGAIA) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
+	CC=$(USER_ELF_CC) "$(SHELL)" $(MUSL_LINK) $@ $(HOLYD_OBJS) $(LIBGAIA)
 
 # --- netsurf rules ---------------------------------------------------------
 
@@ -369,7 +369,7 @@ NETSURF_BROWSER_DIRS := \
 	$(NETSURF_SRC_DIR)/netsurf/desktop \
 	$(NETSURF_SRC_DIR)/netsurf/frontends/framebuffer
 
-# NetSurf's own sources are a separate checkout that a plain clone of TOS does
+# NetSurf's own sources are a separate checkout that a plain clone of Gaia does
 # not have. `:=` expands $(shell ...) while the Makefile is read, so an
 # unguarded find runs on every build and prints a screenful of "No such file or
 # directory" even at BUILD_NETSURF=0. Only walk the tree when the port is
@@ -428,7 +428,7 @@ NETSURF_NSFB_SOURCES := \
 NETSURF_SOURCES += $(NETSURF_NSFB_SOURCES)
 NETSURF_SOURCES += netsurf_compat/zlib.c
 NETSURF_SOURCES += netsurf_compat/messages.c
-NETSURF_SOURCES += netsurf_compat/tos_surface.c
+NETSURF_SOURCES += netsurf_compat/gaia_surface.c
 NETSURF_SOURCES += $(NETSURF_SRC_DIR)/libnsfb/src/surface/ram.c
 NETSURF_SOURCES += netsurf_compat/generated/font-ns-sans.c
 NETSURF_GUI := netsurf_compat/generated/framebuffer-gui.c
@@ -447,7 +447,7 @@ NETSURF_IMAGE_SOURCES := $(addprefix netsurf_compat/generated/image-,\
 	$(addsuffix .c,$(NETSURF_IMAGE_NAMES)))
 NETSURF_SOURCES += $(NETSURF_IMAGE_SOURCES)
 
-NETSURF_OBJS := $(NETSURF_SOURCES:.c=.tos.o)
+NETSURF_OBJS := $(NETSURF_SOURCES:.c=.gaia.o)
 
 # Share public headers, then add each component's private headers below.
 NETSURF_CFLAGS := $(MUSL_CFLAGS) \
@@ -494,17 +494,17 @@ $(filter $(NETSURF_SRC_DIR)/libhubbub/%,$(NETSURF_OBJS)): \
 	NETSURF_PRIVATE_CFLAGS := -I $(NETSURF_SRC_DIR)/libhubbub/src
 $(filter $(NETSURF_SRC_DIR)/libnsfb/%,$(NETSURF_OBJS)): \
 	NETSURF_PRIVATE_CFLAGS := -I $(NETSURF_SRC_DIR)/libnsfb/src -I $(NETSURF_SRC_DIR)/netsurf
-netsurf_compat/tos_surface.tos.o: \
+netsurf_compat/gaia_surface.gaia.o: \
 	NETSURF_PRIVATE_CFLAGS := -I $(NETSURF_SRC_DIR)/libnsfb/src -I $(NETSURF_SRC_DIR)/netsurf
-netsurf_compat/messages.tos.o: \
+netsurf_compat/messages.gaia.o: \
 	NETSURF_PRIVATE_CFLAGS := -I $(NETSURF_SRC_DIR)/netsurf
-netsurf_compat/generated/framebuffer-gui.tos.o: \
+netsurf_compat/generated/framebuffer-gui.gaia.o: \
 	NETSURF_PRIVATE_CFLAGS := -I $(NETSURF_SRC_DIR)/netsurf
-netsurf_compat/generated/fbtk-text.tos.o: \
+netsurf_compat/generated/fbtk-text.gaia.o: \
 	NETSURF_PRIVATE_CFLAGS := -I $(NETSURF_SRC_DIR)/netsurf/frontends/framebuffer/fbtk -I $(NETSURF_SRC_DIR)/netsurf
-bin/netsurf/netsurf/utils/messages.tos.o: \
+bin/netsurf/netsurf/utils/messages.gaia.o: \
 	NETSURF_PRIVATE_CFLAGS += -Dmessages_add_from_file=netsurf_messages_add_from_file
-bin/netsurf/netsurf/content/fetchers/file/file.tos.o: \
+bin/netsurf/netsurf/content/fetchers/file/file.gaia.o: \
 	netsurf_compat/utils/config.h
 $(filter $(NETSURF_SRC_DIR)/libnsutils/%,$(NETSURF_OBJS)): \
 	NETSURF_PRIVATE_CFLAGS := -I $(NETSURF_SRC_DIR)/libnsutils/src
@@ -617,26 +617,26 @@ $(eval $(call NETSURF_IMAGE_RULE,throbber6,throbber/throbber6.png))
 $(eval $(call NETSURF_IMAGE_RULE,throbber7,throbber/throbber7.png))
 $(eval $(call NETSURF_IMAGE_RULE,throbber8,throbber/throbber8.png))
 
-bin/netsurf/netsurf/frontends/framebuffer/font_internal.tos.o: \
+bin/netsurf/netsurf/frontends/framebuffer/font_internal.gaia.o: \
 		netsurf_compat/generated/font-ns-sans.h
 
 # Compile after generated sources are ready.
-$(NETSURF_OBJS): %.tos.o: %.c \
+$(NETSURF_OBJS): %.gaia.o: %.c \
 		bin/netsurf/libhubbub/src/tokeniser/entities.inc \
 		bin/netsurf/libhubbub/src/treebuilder/autogenerated-element-type.c
 	$(USER_ELF_CC) $(NETSURF_CFLAGS) $(NETSURF_PRIVATE_CFLAGS) $(CCDB) -c $< -o $@
 
 # Link netsurf.elf
-NETSURF_COMBINED_OBJ := netsurf_compat/generated/netsurf.tos.o
+NETSURF_COMBINED_OBJ := netsurf_compat/generated/netsurf.gaia.o
 NETSURF_OBJECTS_RSP := netsurf_compat/generated/netsurf-objects.rsp
 
 $(NETSURF_COMBINED_OBJ): $(NETSURF_OBJS)
 	$(file >$(NETSURF_OBJECTS_RSP),$(NETSURF_OBJS))
 	$(USER_ELF_LD) -r -o $@ @$(NETSURF_OBJECTS_RSP)
 
-bin/netsurf/netsurf.elf: $(NETSURF_COMBINED_OBJ) $(NETSURF_MESSAGES) $(MUSL_LIBC) $(LIBTOS) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
+bin/netsurf/netsurf.elf: $(NETSURF_COMBINED_OBJ) $(NETSURF_MESSAGES) $(MUSL_LIBC) $(LIBGAIA) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
 	CC=$(USER_ELF_CC) "$(SHELL)" $(MUSL_LINK) $@ \
-		$(NETSURF_COMBINED_OBJ) $(LIBTOS)
+		$(NETSURF_COMBINED_OBJ) $(LIBGAIA)
 
 # --- PE binaries ---------------------------------------------------------
 
@@ -672,5 +672,5 @@ $(PE_VARIANT_EXES): bin/%.exe: bin/%.pe.o $(PE_LIB_OBJS)
 	$(USER_PE_CC) $(PE_LDFLAGS) $^ -o $@
 
 clean:
-	rm -f $(LIBTOS) lib/*.o lib/*.d bin/*/*.o bin/*/*.d bin/*/*/*.o bin/*/*/*.d \
+	rm -f $(LIBGAIA) lib/*.o lib/*.d bin/*/*.o bin/*/*.d bin/*/*/*.o bin/*/*/*.d \
 		bin/*/*.elf bin/*/*.exe

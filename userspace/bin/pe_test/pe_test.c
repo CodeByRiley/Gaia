@@ -10,7 +10,7 @@
  * pulled in from lib/syscall.h.
  *
  * Two ABIs meet here. mingw compiles to the Microsoft x64 convention
- * (args in rcx/rdx/r8/r9) while TOS syscalls follow the SysV/Linux one
+ * (args in rcx/rdx/r8/r9) while Gaia syscalls follow the SysV/Linux one
  * (rdi/rsi/rdx/r10/r8/r9, number in rax). The stubs below pin registers
  * explicitly so the compiler emits the moves; do not "simplify" them into
  * a plain call.

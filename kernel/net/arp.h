@@ -1,6 +1,6 @@
 /* kernel/net/arp.h , ARP cache, resolution, and the pending-frame queue.
  *
- * This is the piece that lets TOS speak first. The old driver-resident ARP
+ * This is the piece that lets Gaia speak first. The old driver-resident ARP
  * only ever answered: it read the requester's MAC out of the request it was
  * replying to, so it never needed a cache and could never originate a
  * packet. Everything above IP depends on the opposite , being handed a
@@ -68,7 +68,7 @@ void arp_request(const u8 ip[IPV4_ALEN]);
  * link-up, and by DHCP once a lease is taken.
  *
  * It is also the cheapest end-to-end proof that transmit works at all,
- * because it is the first frame TOS composes on its own initiative rather
+ * because it is the first frame Gaia composes on its own initiative rather
  * than by turning a received one around. */
 void arp_announce(void);
 
