@@ -16,6 +16,16 @@
 
 static volatile u8 *lapic_mmio = 0;
 
+u32 lapic_read(u32 reg) { return *(volatile u32 *)(lapic_mmio + reg); }
+
+void lapic_write(u32 reg, u32 val) {
+  *(volatile u32 *)(lapic_mmio + reg) = val;
+}
+
+u32 lapic_id(void) { return lapic_read(LAPIC_REG_ID) >> 24; }
+
+void lapic_eoi(void) { lapic_write(LAPIC_REG_EOI, 0); }
+
 void lapic_init(u64 mmio_phys) {
   if (lapic_mmio)
     return;
@@ -34,17 +44,17 @@ void lapic_enable_this_cpu(void) {
    * interrupts to vector 0xFF (a no-op IDT slot we mask in the handler). */
   lapic_write(LAPIC_REG_SVR, LAPIC_SVR_ENABLE | 0xFF);
   lapic_write(LAPIC_REG_TPR, 0); /* accept all interrupt priorities */
+  lapic_timer_prepare_this_cpu();
 }
 
-u32 lapic_read(u32 reg) { return *(volatile u32 *)(lapic_mmio + reg); }
-
-void lapic_write(u32 reg, u32 val) {
-  *(volatile u32 *)(lapic_mmio + reg) = val;
+void lapic_timer_prepare_this_cpu(void) {
+  /* Firmware or a bootloader may have left an LAPIC timer armed.  Reset it
+   * explicitly on every core, but do not generate an interrupt yet: Gaia has
+   * no IDT handler or calibration for LAPIC_TIMER_VECTOR at this stage. */
+  lapic_write(LAPIC_REG_TIMER_DIV, LAPIC_TIMER_DIVIDE_16);
+  lapic_write(LAPIC_REG_LVT_TIMER, LAPIC_LVT_TIMER_MASKED | LAPIC_TIMER_VECTOR);
+  lapic_write(LAPIC_REG_TIMER_INIT, 0);
 }
-
-u32 lapic_id(void) { return lapic_read(LAPIC_REG_ID) >> 24; }
-
-void lapic_eoi(void) { lapic_write(LAPIC_REG_EOI, 0); }
 
 static void icr_wait(void) {
   int timeout = 1000000; // Arbitrary large number

@@ -9,26 +9,37 @@
 #ifndef LAPIC_H
 #define LAPIC_H
 
-#include <utilities/types.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 /* --- LAPIC register offsets ----------------------------------------- */
-#define LAPIC_REG_ID         0x020
-#define LAPIC_REG_VERSION    0x030
-#define LAPIC_REG_TPR        0x080
-#define LAPIC_REG_EOI        0x0B0
-#define LAPIC_REG_LDR        0x0D0
-#define LAPIC_REG_DFR        0x0E0
-#define LAPIC_REG_SVR        0x0F0
-#define LAPIC_REG_ESR        0x280
-#define LAPIC_REG_ICR_LOW    0x300
-#define LAPIC_REG_ICR_HIGH   0x310
-#define LAPIC_REG_LVT_TIMER  0x320
-#define LAPIC_REG_LVT_LINT0  0x350
-#define LAPIC_REG_LVT_LINT1  0x360
+#define LAPIC_REG_ID 0x020
+#define LAPIC_REG_VERSION 0x030
+#define LAPIC_REG_TPR 0x080
+#define LAPIC_REG_EOI 0x0B0
+#define LAPIC_REG_LDR 0x0D0
+#define LAPIC_REG_DFR 0x0E0
+#define LAPIC_REG_SVR 0x0F0
+#define LAPIC_REG_ESR 0x280
+#define LAPIC_REG_ICR_LOW 0x300
+#define LAPIC_REG_ICR_HIGH 0x310
+#define LAPIC_REG_LVT_TIMER 0x320
+#define LAPIC_REG_LVT_LINT0 0x350
+#define LAPIC_REG_LVT_LINT1 0x360
 #define LAPIC_REG_TIMER_INIT 0x380
 #define LAPIC_REG_TIMER_CURR 0x390
-#define LAPIC_REG_TIMER_DIV  0x3E0
+#define LAPIC_REG_TIMER_DIV 0x3E0
+
+/* Local-vector-table timer bits.  The timer is deliberately left masked by
+ * lapic_timer_prepare_this_cpu(): this is only the per-CPU hardware setup.
+ * A future scheduler timer must install an IDT handler before unmasking it. */
+#define LAPIC_TIMER_VECTOR 0xE0
+#define LAPIC_LVT_TIMER_MASKED (1u << 16)
+#define LAPIC_LVT_TIMER_PERIODIC (1u << 17)
+
+/* Divide Configuration Register encodings.  Divide-by-16 is a conservative
+ * calibration-friendly default supported by all local APIC implementations. */
+#define LAPIC_TIMER_DIVIDE_16 0x3
 
 /* Spurious Interrupt Vector Register (SVR, 0x0F0) */
 //
@@ -37,7 +48,7 @@
 // 11-9 | Reserved         |
 // 8    | APIC Enable      | 0 = LAPIC disabled entirely; must be set to use it
 // 7-0  | Spurious Vector  | Vector delivered for a spurious interrupt
-#define LAPIC_SVR_ENABLE     0x100
+#define LAPIC_SVR_ENABLE 0x100
 
 /* Interrupt Command Register, low dword (ICR_LOW, 0x300)
  *
@@ -46,35 +57,40 @@
 //
 // Bits  | Name              | Description
 // 31-20 | Reserved          |
-// 19-18 | Dest Shorthand    | 0 = Use ICR_HIGH, 1 = Self, 2 = All, 3 = All but self
-// 17-16 | Reserved          |
-// 15    | Trigger Mode      | 0 = Edge, 1 = Level
-// 14    | Level             | 1 = Assert, 0 = De-assert (INIT de-assert only)
-// 13    | Reserved          |
-// 12    | Delivery Status   | Read-only: 1 = a previous IPI is still in flight
-// 11    | Dest Mode         | 0 = Physical (APIC id), 1 = Logical
-// 10-8  | Delivery Mode     | 0 = Fixed, 4 = NMI, 5 = INIT, 6 = Startup (SIPI)
-// 7-0   | Vector            | Vector, or the SIPI start page for mode 6
-#define LAPIC_ICR_FIXED       (0u << 8)
-#define LAPIC_ICR_INIT        (5u << 8)
-#define LAPIC_ICR_STARTUP     (6u << 8)
-#define LAPIC_ICR_PHYSICAL    (0u << 11)
-#define LAPIC_ICR_PENDING     (1u << 12)
-#define LAPIC_ICR_ASSERT      (1u << 14)
-#define LAPIC_ICR_DEASSERT    (0u << 14)
-#define LAPIC_ICR_LEVEL_EDGE  (0u << 15)
+// 19-18 | Dest Shorthand    | 0 = Use ICR_HIGH, 1 = Self, 2 = All, 3 = All but
+// self 17-16 | Reserved          | 15    | Trigger Mode      | 0 = Edge, 1 =
+// Level 14    | Level             | 1 = Assert, 0 = De-assert (INIT de-assert
+// only) 13    | Reserved          | 12    | Delivery Status   | Read-only: 1 =
+// a previous IPI is still in flight 11    | Dest Mode         | 0 = Physical
+// (APIC id), 1 = Logical 10-8  | Delivery Mode     | 0 = Fixed, 4 = NMI, 5 =
+// INIT, 6 = Startup (SIPI) 7-0   | Vector            | Vector, or the SIPI
+// start page for mode 6
+#define LAPIC_ICR_FIXED (0u << 8)
+#define LAPIC_ICR_INIT (5u << 8)
+#define LAPIC_ICR_STARTUP (6u << 8)
+#define LAPIC_ICR_PHYSICAL (0u << 11)
+#define LAPIC_ICR_PENDING (1u << 12)
+#define LAPIC_ICR_ASSERT (1u << 14)
+#define LAPIC_ICR_DEASSERT (0u << 14)
+#define LAPIC_ICR_LEVEL_EDGE (0u << 15)
 #define LAPIC_ICR_LEVEL_LEVEL (1u << 15)
 
 /* BSP entry: map MMIO and enable for this CPU. */
-void     lapic_init(u64 mmio_phys);
+void lapic_init(u64 mmio_phys);
 
 /* AP entry: just enable , BSP already mapped the MMIO page. */
-void     lapic_enable_this_cpu(void);
+void lapic_enable_this_cpu(void);
+
+/* Put this CPU's local timer in a known, inert state.  It selects a stable
+ * divider and reserves LAPIC_TIMER_VECTOR, but keeps the LVT entry masked and
+ * initial count at zero.  PIT remains Gaia's timekeeper until a later change
+ * calibrates and explicitly starts this timer. */
+void lapic_timer_prepare_this_cpu(void);
 
 u32 lapic_read(u32 reg);
-void     lapic_write(u32 reg, u32 val);
+void lapic_write(u32 reg, u32 val);
 u32 lapic_id(void);
-void     lapic_eoi(void);
+void lapic_eoi(void);
 
 /* INIT-SIPI-SIPI sequence for AP startup. `vector` is the high byte of
  * the AP's real-mode start address: vec=0x08 → AP starts at 0x8000.
