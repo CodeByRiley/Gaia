@@ -8,18 +8,18 @@
 #ifndef SYSCALL_H
 #define SYSCALL_H
 
-#include <utilities/types.h>
+#include <arch/syscall_abi.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <arch/syscall_abi.h>
+#include <utilities/types.h>
 
 /* Numbers follow Linux x86_64 wherever the call means the same thing. The
  * registry also records whether libgaia exposes a call or only musl issues it
  * directly. Both sides include the same table, so a number cannot drift. */
 enum syscall_number {
-#define SYSCALL_BOTH(name, number) SYS_##name = number,
-#define SYSCALL_KERNEL(name, number) SYS_##name = number,
-#define SYSCALL_ALIAS_BOTH(name, target) SYS_##name = SYS_##target,
+#define SYSCALL_BOTH(name, number) SYS_##name = (number),
+#define SYSCALL_KERNEL(name, number) SYS_##name = (number),
+#define SYSCALL_ALIAS_BOTH(name, target) SYS_##name = (SYS_##target),
 #include <arch/syscalls.def>
 #undef SYSCALL_ALIAS_BOTH
 #undef SYSCALL_KERNEL
@@ -38,29 +38,29 @@ enum syscall_number {
  *     at map time, so there is nothing to represent a reserved-but-absent
  *     page; guard pages need a reservation concept the VMM doesn't have.
  */
-#define PROT_NONE       0x0
-#define PROT_READ       0x1
-#define PROT_WRITE      0x2
-#define PROT_EXEC       0x4
+#define PROT_NONE 0x0
+#define PROT_READ 0x1
+#define PROT_WRITE 0x2
+#define PROT_EXEC 0x4
 
-#define MAP_PRIVATE     0x02
-#define MAP_FIXED       0x10
-#define MAP_ANONYMOUS   0x20
+#define MAP_PRIVATE 0x02
+#define MAP_FIXED 0x10
+#define MAP_ANONYMOUS 0x20
 
 /* Linux x86_64 TLS control. musl uses ARCH_SET_FS during startup. */
-#define ARCH_SET_FS          0x1002
-#define ARCH_GET_FS          0x1003
+#define ARCH_SET_FS 0x1002
+#define ARCH_GET_FS 0x1003
 
 /* Saved register frame produced by SYSCALL entry. Order matches the
  * pushes in syscall.asm , DO NOT reorder without updating both sides.
  * The C dispatcher reads syscall number from rax and args from rdi/rsi/
  * rdx/r10/r8/r9 (SysV minus rcx, which holds the saved RIP). */
 struct syscall_frame {
-    u64 r15, r14, r13, r12;
-    u64 r11, rbx, rbp, r10;
-    u64 r9,  r8,  rcx, rdx;
-    u64 rsi, rdi, rax;
-    u64 rip, cs, rflags, rsp, ss;
+  u64 r15, r14, r13, r12;
+  u64 r11, rbx, rbp, r10;
+  u64 r9, r8, rcx, rdx;
+  u64 rsi, rdi, rax;
+  u64 rip, cs, rflags, rsp, ss;
 };
 
 _Static_assert(sizeof(struct syscall_frame) == 20 * sizeof(u64),

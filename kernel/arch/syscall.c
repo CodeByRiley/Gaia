@@ -643,11 +643,11 @@ static long sys_write(long fd, const void *buf, long n) {
   }
 
   struct task *t = task_current();
-  if (!t || fd < 3 || fd >= TASK_MAX_FDS || !task_fd_file(t, fd) ||
-      task_fd_is_dir(t, fd))
+  if (!t || fd < 3 || fd >= TASK_MAX_FDS || !task_fd_file(t, (int)fd) ||
+      task_fd_is_dir(t, (int)fd))
     return -EBADF;
 
-  return (long)vfs_write(task_fd_file(t, fd), buf, (usize)n);
+  return (long)vfs_write(task_fd_file(t, (int)fd), buf, (usize)n);
 }
 
 // #endregion FILE I/O HANDLERS
@@ -765,7 +765,7 @@ static long sys_audio_open(long sample_rate, long channels, long format) {
 }
 
 static long sys_audio_write(const void *pcm, long bytes) {
-  if (bytes < 0 || bytes > AUDIO_WRITE_MAX ||
+  if (bytes < 0 || bytes > (int)AUDIO_WRITE_MAX ||
       !user_buffer_ok(pcm, (u64)bytes, 0))
     return SB16_STREAM_ERR_INVALID;
   return sb16_stream_write(audio_caller_pid(), pcm, (u32)bytes);
@@ -1327,9 +1327,9 @@ static void linux_stat_from_vfs(const struct vfs_stat *fs,
   out->st_ino = fs->inode ? fs->inode : 1;
   out->st_nlink = 1;
   out->st_mode = fs->mode;
-  out->st_size = fs->type == VFS_NODE_DIRECTORY ? 0 : fs->size;
+  out->st_size = fs->type == VFS_NODE_DIRECTORY ? 0 : (i64)fs->size;
   out->st_blksize = fs->block_size ? fs->block_size : 4096;
-  out->st_blocks = fs->blocks;
+  out->st_blocks = (i64)fs->blocks;
 }
 
 static long sys_stat_raw(const char *path, struct stat_user *out) {
