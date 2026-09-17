@@ -157,6 +157,7 @@ int virtio_negotiate(struct virtio_dev *dev, u64 wanted) {
     u64 dev_feat = (u64)c->device_feature;
     c->device_feature_select = 1;
     dev_feat |= ((u64)c->device_feature) << 32;
+    dev->device_features = dev_feat;
 
     /* Always demand VERSION_1 (modern transport). */
     if (!(dev_feat & VIRTIO_F_VERSION_1)) {

@@ -121,6 +121,11 @@ struct virtio_dev {
     volatile u8  *device_cfg;
 
     u16 num_queues;
+
+    /* Feature bits the device offered, as read during negotiation. A driver
+     * may consult these even for bits it chose not to ack, to learn which
+     * host backend it is talking to. */
+    u64 device_features;
 };
 
 /* One virtqueue + its backing pages. */
