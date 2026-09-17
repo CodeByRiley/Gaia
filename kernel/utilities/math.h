@@ -23,5 +23,8 @@ double tan(double x);
 double atan2(double y, double x);
 double asin(double x);
 double acos(double x);
+double max(double x, double y);
+double min(double x, double y);
+double round(double x);
 
 #endif /* MATH_H */

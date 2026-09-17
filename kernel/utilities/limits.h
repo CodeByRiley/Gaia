@@ -1,0 +1,27 @@
+#ifndef GAIA_LIMITS_H
+#define GAIA_LIMITS_H
+
+/* IEEE-754 binary32 */
+#define F32_EPSILON     1.1920928955078125e-7F
+#define F32_MIN_NORMAL  1.1754943508222875e-38F
+#define F32_MAX         3.4028234663852886e+38F
+
+/* IEEE-754 binary64 */
+#define F64_EPSILON     2.220446049250313080847263336181640625e-16
+#define F64_MIN_NORMAL  2.225073858507201383090232717332404064e-308
+#define F64_MAX         1.797693134862315708145274237317043568e+308
+
+/*
+ * At |x| >= 2^52, a binary64 value cannot contain a fractional part.
+ * Useful for floor()/ceil().
+ */
+#define F64_NO_FRACTION_LIMIT 4503599627370496.0 /* 2^52 */
+
+/*
+ * Safe double -> i64 conversion range:
+ * [-2^63, 2^63)
+ */
+#define I64_DOUBLE_MIN   (-9223372036854775808.0)
+#define I64_DOUBLE_LIMIT   9223372036854775808.0
+
+#endif /* GAIA_LIMITS_H */
