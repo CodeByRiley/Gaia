@@ -541,7 +541,12 @@ static long sys_kbd_poll(int *pressed, u16 *key) {
 }
 
 static long sys_get_ticks(void) {
-  return (long)(pit_ticks() * 10); // 100Hz → ms
+  u64 hz = pit_get_freq();
+  if (hz == 0)
+    hz = 100;
+  /* Userspace names this get_ticks and uses millisecond thresholds.  Convert
+   * the configured PIT rate instead of assuming the old 100 Hz default. */
+  return (long)((pit_ticks() * 1000ULL) / hz);
 }
 
 // #endregion INPUT + TIME
@@ -1028,12 +1033,14 @@ static long sys_tty_read_input(char *out, long max) {
   return (long)tty_read_input_ch(caller_tty(), out, (usize)max);
 }
 
-/* Block-wait `seconds` using PIT ticks (10ms each at 100Hz). */
+/* Block-wait `seconds` using the configured PIT frequency. */
 static void delay_seconds(long seconds) {
   if (seconds <= 0)
     return;
-  extern u64 pit_ticks(void);
-  u64 target = pit_ticks() + (u64)seconds * 100;
+  u64 hz = pit_get_freq();
+  if (hz == 0)
+    hz = 100;
+  u64 target = pit_ticks() + (u64)seconds * hz;
   while (pit_ticks() < target)
     __asm__ volatile("hlt");
 }

@@ -27,6 +27,7 @@
  * PIT tick rate so the (synchronous virtio ACK) flush is decoupled from
  * whoever marked damage.
  */
+#include "devices/pit.h"
 #include <boot/multiboot2.h>
 #include <boot/uefi.h>
 #include <display/framebuffer.h>
@@ -82,6 +83,9 @@ struct fb_backend {
   const char *name;
   /* Push one damaged rectangle. Returns 0 on success. */
   int (*flush)(u32 x, u32 y, u32 w, u32 h);
+  /* Push several damage regions in one backend operation.  Optional: simple
+   * scanouts continue to use the one-rectangle callback above. */
+  int (*flush_batch)(const struct fb_damage_rect *rects, u32 rect_count);
   /* Poll for a host-side resize. Returns 1 if the framebuffer was rebound. */
   int (*poll_resize)(void);
   /* Release memory this backend owns. The FB_VIRT_BASE mapping belongs to the
@@ -91,6 +95,8 @@ struct fb_backend {
 
 static int mb2_shadow_flush(u32 x, u32 y, u32 w, u32 h);
 static void mb2_shadow_teardown(void);
+static int virtio_flush_batch(const struct fb_damage_rect *rects,
+                              u32 rect_count);
 static int virtio_poll_resize(void);
 static void virtio_teardown(void);
 static int vbox_poll_resize(void);
@@ -112,6 +118,7 @@ static const struct fb_backend mb2_shadow_backend = {
 static const struct fb_backend virtio_backend = {
     .name = "virtio-gpu",
     .flush = virtio_gpu_flush_rect,
+    .flush_batch = virtio_flush_batch,
     .poll_resize = virtio_poll_resize,
     .teardown = virtio_teardown,
 };
@@ -1009,14 +1016,17 @@ static u32 resource_dimension(u32 value, u32 minimum) {
 }
 
 /* Reserve power-of-two headroom so a normal drag changes only SET_SCANOUT.
- * If rounding would exceed the 64 MiB pool, use the exact dimensions. */
+ * If rounding would exceed the 64 MiB pool, use the exact dimensions. Hosts
+ * that present the whole resource rather than the scanout rectangle get the
+ * exact dimensions too, or the image arrives stretched. */
 static int choose_resource_size(u32 w, u32 h, u32 *resource_w,
                                 u32 *resource_h) {
   if (w == 0 || h == 0 || (u64)w * (u64)h * 4 > FB_MAX_BYTES)
     return -1;
   u32 rounded_w = resource_dimension(w, FB_MIN_RESOURCE_W);
   u32 rounded_h = resource_dimension(h, FB_MIN_RESOURCE_H);
-  if (rounded_w < w || rounded_h < h ||
+  if (virtio_gpu_scanout_needs_exact_resource() || rounded_w < w ||
+      rounded_h < h ||
       (u64)rounded_w * (u64)rounded_h * 4 > FB_MAX_BYTES) {
     *resource_w = w;
     *resource_h = h;
@@ -1036,7 +1046,12 @@ static u32 resource_page_count(u32 w, u32 h) {
 static int do_resize(u32 w, u32 h) {
   u32 resource_w = fb_resource_w;
   u32 resource_h = fb_resource_h;
-  int recreate = w > resource_w || h > resource_h;
+  /* Shrinking normally just moves the scanout rectangle inside the existing
+   * resource. A host that ignores that rectangle needs the resource rebuilt
+   * on every size change instead. */
+  int recreate = virtio_gpu_scanout_needs_exact_resource()
+                     ? (w != resource_w || h != resource_h)
+                     : (w > resource_w || h > resource_h);
   if (recreate && choose_resource_size(w, h, &resource_w, &resource_h) != 0)
     return -1;
 
@@ -1147,17 +1162,39 @@ void framebuffer_present(void) {
 
   spin_lock(&scanout_lock);
   const struct fb_backend *backend = fb_active;
-  for (int i = 0; i < count; i++) {
-    if (backend->flush(pending[i].x, pending[i].y, pending[i].w,
-                       pending[i].h) != 0) {
-      /* One rectangle failing does not make the others undeliverable, and a
-       * dropped frame is not worth wedging the flush thread over. */
-      log_write_string("FB: scanout flush failed for backend", backend->name,
-                       KERNEL, LOG_WARN);
-      break;
+  int flush_failed = 0;
+  if (backend->flush_batch) {
+    flush_failed = backend->flush_batch(pending, (u32)count) != 0;
+  } else {
+    for (int i = 0; i < count; i++) {
+      if (backend->flush(pending[i].x, pending[i].y, pending[i].w,
+                         pending[i].h) != 0) {
+        flush_failed = 1;
+        break;
+      }
     }
   }
+  if (flush_failed)
+    log_write_string("FB: scanout flush failed for backend", backend->name,
+                     KERNEL, LOG_WARN);
   spin_unlock(&scanout_lock);
+}
+
+/* Keep framebuffer damage private to this file, then translate it at the
+ * VirtIO boundary.  The driver sends all regions as one controlq batch. */
+static int virtio_flush_batch(const struct fb_damage_rect *rects,
+                              u32 rect_count) {
+  if (!rects || rect_count == 0 || rect_count > FB_MAX_DAMAGE)
+    return -1;
+
+  struct virtio_gpu_rect gpu_rects[FB_MAX_DAMAGE];
+  for (u32 i = 0; i < rect_count; i++) {
+    gpu_rects[i].x = rects[i].x;
+    gpu_rects[i].y = rects[i].y;
+    gpu_rects[i].width = rects[i].w;
+    gpu_rects[i].height = rects[i].h;
+  }
+  return virtio_gpu_flush_rects(gpu_rects, rect_count);
 }
 
 /* A backend with no flush op draws straight into the scanout, so nothing has
@@ -1169,10 +1206,19 @@ int framebuffer_needs_flush(void) {
 u32 framebuffer_resize_generation(void) { return fb_resize_generation; }
 
 void framebuffer_flush_thread_entry(void) {
+  u32 hz = pit_get_freq();
+  if (hz == 0)
+    hz = 1000;
+
+  /* Round up: never exceed FB_TARGET_HZ. */
+  u32 ticks_per_frame = (hz + FB_TARGET_HZ - 1) / FB_TARGET_HZ;
+  if (ticks_per_frame == 0)
+    ticks_per_frame = 1;
+
   for (;;) {
     framebuffer_check_resize();
     framebuffer_present();
-    task_sleep_ticks(1); /* 100 Hz upper bound on flush rate */
+    task_sleep_ticks(ticks_per_frame);
   }
 }
 

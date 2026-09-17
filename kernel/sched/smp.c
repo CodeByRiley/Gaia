@@ -131,12 +131,14 @@ static void smp_probe_job(void *arg) {
 #define AP_PATCH_HANDOFF_OFF 16
 #define AP_PATCH_TARGET_OFF   8
 
-/* Spin for roughly `us` microseconds using PIT ticks (100 Hz = 10 ms each).
- * Granularity is 10 ms , we round up to at least one tick. Good enough for
+/* Spin for roughly `us` microseconds using the configured PIT frequency.
+ * We round up to at least one tick. Good enough for
  * the Intel-spec 10 ms inter-INIT delay and the 200 µs inter-SIPI delay
- * (which we just round up to one 10 ms PIT tick , well within spec). */
+ * (which is necessarily rounded up to one PIT tick). */
 static void smp_delay_us(u64 us) {
-    u64 ticks = (us + 9999) / 10000;
+    u64 hz = pit_get_freq();
+    if (hz == 0) hz = 100;
+    u64 ticks = (us * hz + 999999) / 1000000;
     if (ticks == 0) ticks = 1;
     u64 start = pit_ticks();
     while (pit_ticks() - start < ticks) {

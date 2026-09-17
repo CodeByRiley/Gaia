@@ -890,24 +890,39 @@ int main(int argc, char **argv) {
      * frame. fb (back buffer) is untouched so the strips we lift from
      * it during erase_ghost are still the right pixels. */
     if (drag.active) {
-      if (drag.have_ghost) {
-        erase_ghost(drag.last_gx, drag.last_gy, drag.last_gw, drag.last_gh);
-      }
       int cursor_moved = have_last && (mx != last_cx || my != last_cy);
-      int cursor_refresh = !have_last || cursor_moved || ((tick & 127) == 0);
-      if (cursor_moved)
-        present_cursor_repair_at(last_cx, last_cy);
+
       int gx, gy, gw, gh;
       compute_ghost((int)mx, (int)my, &gx, &gy, &gw, &gh);
-      draw_ghost(gx, gy, gw, gh);
-      drag.last_gx = gx;
-      drag.last_gy = gy;
-      drag.last_gw = gw;
-      drag.last_gh = gh;
-      drag.have_ghost = 1;
+
+      int ghost_changed = !drag.have_ghost || gx != drag.last_gx ||
+                          gy != drag.last_gy || gw != drag.last_gw ||
+                          gh != drag.last_gh;
+
+      /* Cursor repair can restore pixels over the outline, so redraw on motion.
+       */
+      int repaint_ghost = ghost_changed || cursor_moved;
+
+      if (repaint_ghost && drag.have_ghost)
+        erase_ghost(drag.last_gx, drag.last_gy, drag.last_gw, drag.last_gh);
+
+      int cursor_refresh = !have_last || cursor_moved || ((tick & 127) == 0);
+
+      if (cursor_moved)
+        present_cursor_repair_at(last_cx, last_cy);
+
+      if (repaint_ghost) {
+        draw_ghost(gx, gy, gw, gh);
+        drag.last_gx = gx;
+        drag.last_gy = gy;
+        drag.last_gw = gw;
+        drag.last_gh = gh;
+        drag.have_ghost = 1;
+      }
 
       if (cursor_refresh)
         draw_cursor(mx, my);
+
       last_cx = mx;
       last_cy = my;
       have_last = 1;

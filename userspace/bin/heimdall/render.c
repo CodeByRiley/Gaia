@@ -972,10 +972,40 @@ void present_rect(int x, int y, int w, int h) {
 void erase_ghost(int x, int y, int w, int h) {
   if (w <= 0 || h <= 0)
     return;
-  present_rect(x, y, w, 1);         /* top    */
-  present_rect(x, y + h - 1, w, 1); /* bottom */
-  present_rect(x, y, 1, h);         /* left   */
-  present_rect(x + w - 1, y, 1, h); /* right  */
+
+  /* Restoring a moving outline used to make four separate SYS_FB_PRESENT
+   * calls.  Keep its four thin damage regions, but hand them to the kernel
+   * together so it can copy and flush them as one batch. */
+  const int strips[4][4] = {
+      {x, y, w, 1},
+      {x, y + h - 1, w, 1},
+      {x, y, 1, h},
+      {x + w - 1, y, 1, h},
+  };
+  struct fb_rect rects[4];
+  uint32_t rect_count = 0;
+  for (uint32_t i = 0; i < 4; i++) {
+    int rx = strips[i][0], ry = strips[i][1];
+    int rw = strips[i][2], rh = strips[i][3];
+    if (rx < 0) {
+      rw += rx;
+      rx = 0;
+    }
+    if (ry < 0) {
+      rh += ry;
+      ry = 0;
+    }
+    if (rx + rw > fb_w)
+      rw = fb_w - rx;
+    if (ry + rh > fb_h)
+      rh = fb_h - ry;
+    if (rw > 0 && rh > 0) {
+      rects[rect_count++] = (struct fb_rect){
+          .x = (uint32_t)rx, .y = (uint32_t)ry,
+          .w = (uint32_t)rw, .h = (uint32_t)rh};
+    }
+  }
+  present_backbuffer_rects(rects, rect_count);
 }
 
 /* Draw directly to hardware without changing the backbuffer. */

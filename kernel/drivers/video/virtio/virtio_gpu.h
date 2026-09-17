@@ -21,6 +21,16 @@
 #define VIRTIO_PCI_VENDOR        0x1AF4
 #define VIRTIO_GPU_DEVICE_ID     0x1050
 
+/* Request-header flag: wait until a command has completed in the host
+ * renderer before returning its response on the control queue. */
+#define VIRTIO_GPU_FLAG_FENCE    (1u << 0)
+
+/* Device feature bit 0: the host can render 3D commands. We never use them,
+ * but the bit tells us the host is an accelerated (GL) backend, which
+ * changes how it presents the scanout , see
+ * virtio_gpu_scanout_needs_exact_resource. */
+#define VIRTIO_GPU_F_VIRGL       (1ULL << 0)
+
 /* virtio-gpu spec command types. */
 #define VIRTIO_GPU_CMD_GET_DISPLAY_INFO         0x0100
 #define VIRTIO_GPU_CMD_RESOURCE_CREATE_2D       0x0101
@@ -49,6 +59,9 @@
 #define VIRTIO_GPU_EVENT_DISPLAY                (1u << 0)
 
 #define VIRTIO_GPU_MAX_SCANOUTS                 16
+/* framebuffer.c retains at most this many separate damage regions.  The
+ * driver can send their transfers and flushes together on controlq. */
+#define VIRTIO_GPU_MAX_FLUSH_RECTS               8
 
 struct virtio_gpu_rect {
     u32 x, y, width, height;
@@ -98,6 +111,24 @@ int  virtio_gpu_resize_scanout_2d(u32 w, u32 h);
 /* Push (x, y, w, h) from the kernel-side pixel buffer to the host
  * scanout. Wraps TRANSFER_TO_HOST_2D + RESOURCE_FLUSH. */
 int  virtio_gpu_flush_rect(u32 x, u32 y, u32 w, u32 h);
+
+/* Queue a bounded group of damaged regions before waiting for the final
+ * fenced flush.  This amortises the control-queue doorbell and avoids a host
+ * round trip for every thin cursor/outline strip. */
+int  virtio_gpu_flush_rects(const struct virtio_gpu_rect *rects,
+                            u32 rect_count);
+
+/* Non-zero when the host presents the whole resource texture rather than the
+ * scanout rectangle, so the resource must match the display exactly.
+ *
+ * QEMU's 2D renderer builds a pixman view at the resource stride and honours
+ * the SET_SCANOUT sub-rectangle, so a resource larger than the display is
+ * fine there. The GL path does not: virgl_cmd_set_scanout hands the whole
+ * texture to dpy_gl_scanout_texture, and egl_fb_blit then stretches all
+ * resource_w x resource_h texels over the window, ignoring the rectangle.
+ * A 2048x2048 resource on a 1920x1080 display therefore comes out scaled by
+ * 0.94 across and 0.53 down, with uninitialised texels along two edges. */
+int  virtio_gpu_scanout_needs_exact_resource(void);
 
 /* Poll device events. If VIRTIO_GPU_EVENT_DISPLAY is pending, ack it and
  * return 1; the caller should then call virtio_gpu_get_dims to discover

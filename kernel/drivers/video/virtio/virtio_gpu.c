@@ -24,6 +24,11 @@
 static struct virtio_dev vdev;
 static struct virtq      controlq;
 static struct virtio_gpu gpu_state;
+/* Accelerated QEMU renderers may complete controlq work asynchronously. */
+static u64 gpu_fence_id;
+/* Set when the device offered VIRTIO_GPU_F_VIRGL, i.e. the host is a GL
+ * backend. See virtio_gpu_scanout_needs_exact_resource. */
+static int gpu_is_gl_backend;
 
 /* Scratch request/response buffers. We do all I/O synchronously, so a single
  * page each is plenty , the largest commands are ATTACH_BACKING with a tail
@@ -34,6 +39,20 @@ static u64 scratch_req_phys;
 static u64 scratch_resp_phys;
 static u8 *scratch_req;
 static u8 *scratch_resp;
+
+/* A queued command cannot use the synchronous scratch page: the host may
+ * still be reading it while we prepare the next command.  Framebuffer damage
+ * is bounded to eight regions, so sixteen request/response page pairs cover
+ * one TRANSFER_TO_HOST_2D and one RESOURCE_FLUSH for every region. */
+#define GPU_BATCH_COMMANDS (VIRTIO_GPU_MAX_FLUSH_RECTS * 2)
+struct gpu_batch_buffer {
+    u64 req_phys;
+    u64 resp_phys;
+    u8 *req;
+    u8 *resp;
+};
+static struct gpu_batch_buffer gpu_batch_buffers[GPU_BATCH_COMMANDS];
+static int gpu_batch_ready;
 
 /* virtio-gpu wire structures (subset we use). */
 struct gpu_ctrl_hdr {
@@ -106,6 +125,10 @@ static int submit_two_buf(u32 req_len, u32 resp_len) {
     u16 d0 = virtq_alloc_desc(&controlq);
     u16 d1 = virtq_alloc_desc(&controlq);
     if (d0 == 0xFFFF || d1 == 0xFFFF) {
+        if (d0 != 0xFFFF)
+            virtq_free_desc(&controlq, d0);
+        if (d1 != 0xFFFF)
+            virtq_free_desc(&controlq, d1);
         log_write("gpu: no free descs", KERNEL, LOG_ERROR);
         return -1;
     }
@@ -142,9 +165,116 @@ done:
     return 0;
 }
 
+struct gpu_batch_command {
+    u16 request_desc;
+    u16 response_desc;
+    u8 *response;
+    int complete;
+};
+
+/* Add one request/response descriptor chain to controlq without ringing the
+ * doorbell.  The caller submits all commands first, then kicks once. */
+static int submit_batch_command(struct gpu_batch_command *cmd,
+                                const struct gpu_batch_buffer *buf,
+                                u32 req_len, u32 resp_len) {
+    u16 d0 = virtq_alloc_desc(&controlq);
+    u16 d1 = virtq_alloc_desc(&controlq);
+    if (d0 == 0xFFFF || d1 == 0xFFFF) {
+        if (d0 != 0xFFFF)
+            virtq_free_desc(&controlq, d0);
+        if (d1 != 0xFFFF)
+            virtq_free_desc(&controlq, d1);
+        log_write("gpu: no free batch descs", KERNEL, LOG_ERROR);
+        return -1;
+    }
+
+    controlq.desc[d0].addr = buf->req_phys;
+    controlq.desc[d0].len = req_len;
+    controlq.desc[d0].flags = VIRTQ_DESC_F_NEXT;
+    controlq.desc[d0].next = d1;
+
+    controlq.desc[d1].addr = buf->resp_phys;
+    controlq.desc[d1].len = resp_len;
+    controlq.desc[d1].flags = VIRTQ_DESC_F_WRITE;
+    controlq.desc[d1].next = 0;
+
+    cmd->request_desc = d0;
+    cmd->response_desc = d1;
+    cmd->response = buf->resp;
+    cmd->complete = 0;
+    virtq_submit(&controlq, d0);
+    return 0;
+}
+
+static void finish_batch_command(struct gpu_batch_command *cmd) {
+    virtq_free_desc(&controlq, cmd->request_desc);
+    virtq_free_desc(&controlq, cmd->response_desc);
+    cmd->complete = 1;
+}
+
+/* Wait for every response in a submitted group.  We identify completion by
+ * descriptor-chain head rather than assuming the device reports used entries
+ * in submission order. */
+static int wait_batch_commands(struct gpu_batch_command *cmds, u32 count) {
+    u32 remaining = count;
+    u32 budget = count * 1000000U;
+    int failed = 0;
+    while (remaining && budget--) {
+        u16 got_id;
+        u32 got_len;
+        if (!virtq_reap(&controlq, &got_id, &got_len)) {
+            __asm__ volatile ("pause");
+            continue;
+        }
+
+        int found = -1;
+        for (u32 i = 0; i < count; i++) {
+            if (!cmds[i].complete && cmds[i].request_desc == got_id) {
+                found = (int)i;
+                break;
+            }
+        }
+        if (found < 0) {
+            log_write_hex("gpu: unexpected batch response =", got_id,
+                          KERNEL, LOG_ERROR);
+            failed = 1;
+            continue;
+        }
+
+        struct gpu_ctrl_hdr *resp = (struct gpu_ctrl_hdr *)cmds[found].response;
+        if (resp->type != VIRTIO_GPU_RESP_OK_NODATA) {
+            log_write_hex("gpu: batch command bad resp =", resp->type,
+                          KERNEL, LOG_ERROR);
+            failed = 1;
+        }
+        finish_batch_command(&cmds[found]);
+        remaining--;
+    }
+
+    if (remaining) {
+        /* This matches the existing synchronous timeout policy: do not wedge
+         * the flush worker forever if a broken host never completes a chain. */
+        log_write("gpu: batch command timed out", KERNEL, LOG_ERROR);
+        for (u32 i = 0; i < count; i++) {
+            if (!cmds[i].complete)
+                finish_batch_command(&cmds[i]);
+        }
+        return -1;
+    }
+    return failed ? -1 : 0;
+}
+
 /* Issue a command whose request body lives in scratch_req and whose response
  * goes to scratch_resp. Returns response type, or 0 on failure. */
 static u32 do_cmd(u32 req_len, u32 resp_len) {
+    /* All request types begin with gpu_ctrl_hdr. Without this fence, the GL
+     * backend may reply before a TRANSFER_TO_HOST_2D has reached the host
+     * texture, allowing the following RESOURCE_FLUSH to present stale or
+     * partially updated pixels. */
+    struct gpu_ctrl_hdr *req = (struct gpu_ctrl_hdr*)scratch_req;
+    req->flags |= VIRTIO_GPU_FLAG_FENCE;
+    req->fence_id = ++gpu_fence_id;
+
     if (submit_two_buf(req_len, resp_len) != 0) return 0;
     struct gpu_ctrl_hdr *resp = (struct gpu_ctrl_hdr*)scratch_resp;
     return resp->type;
@@ -297,9 +427,21 @@ int virtio_gpu_init(void) {
      * set (just VERSION_1, which virtio_negotiate ORs in unconditionally). */
     if (virtio_negotiate(&vdev, 0) != 0) return -1;
 
+    /* We do not ack VIRGL, but its presence in the offered set identifies the
+     * host as a GL backend, which presents scanouts differently. */
+    gpu_is_gl_backend = (vdev.device_features & VIRTIO_GPU_F_VIRGL) != 0;
+    log_write_hex("gpu: gl backend =", (u64)gpu_is_gl_backend, KERNEL, LOG_INFO);
+
     if (virtio_queue_setup(&vdev, 0, &controlq) != 0) return -1;
     /* Queue 1 (cursorq) is optional , we leave it unconfigured. */
     virtio_queue_enable(&vdev, &controlq);
+
+    /* The queue is now fully described to the device.  Publish DRIVER_OK
+     * before issuing GET_DISPLAY_INFO: the virtio 1.x lifecycle permits the
+     * device to start consuming queue traffic only after this transition.
+     * QEMU's plain 2D renderer happened to accept early commands, whereas
+     * accelerated backends can initialise lazily on the first request. */
+    virtio_driver_ok(&vdev);
 
     /* Allocate physical scratch pages and access them through the HHDM. */
     scratch_req_phys  = pmm_alloc_frame();
@@ -310,6 +452,22 @@ int virtio_gpu_init(void) {
     }
     scratch_req  = phys_to_virt(scratch_req_phys);
     scratch_resp = phys_to_virt(scratch_resp_phys);
+
+    /* Failure here is non-fatal: the old synchronous flush path is still a
+     * correct (if slower) way to drive the device. */
+    gpu_batch_ready = 1;
+    for (u32 i = 0; i < GPU_BATCH_COMMANDS; i++) {
+        gpu_batch_buffers[i].req_phys = pmm_alloc_frame();
+        gpu_batch_buffers[i].resp_phys = pmm_alloc_frame();
+        if (!gpu_batch_buffers[i].req_phys || !gpu_batch_buffers[i].resp_phys) {
+            gpu_batch_ready = 0;
+            log_write("gpu: batch buffers unavailable; using sync flush",
+                      KERNEL, LOG_WARN);
+            break;
+        }
+        gpu_batch_buffers[i].req = phys_to_virt(gpu_batch_buffers[i].req_phys);
+        gpu_batch_buffers[i].resp = phys_to_virt(gpu_batch_buffers[i].resp_phys);
+    }
 
     virtio_driver_ok(&vdev);
 
@@ -383,7 +541,7 @@ int virtio_gpu_resize_scanout_2d(u32 w, u32 h) {
     return 0;
 }
 
-int virtio_gpu_flush_rect(u32 x, u32 y, u32 w, u32 h) {
+static int virtio_gpu_flush_rect_sync(u32 x, u32 y, u32 w, u32 h) {
     if (!gpu_state.ready || !gpu_state.resource_id) return -1;
 
     /* TRANSFER_TO_HOST_2D: copy guest-side pixels into the host resource. */
@@ -423,6 +581,108 @@ int virtio_gpu_flush_rect(u32 x, u32 y, u32 w, u32 h) {
         }
     }
     return 0;
+}
+
+int virtio_gpu_flush_rects(const struct virtio_gpu_rect *rects,
+                           u32 rect_count) {
+    if (!gpu_state.ready || !gpu_state.resource_id || !rects ||
+        rect_count == 0 || rect_count > VIRTIO_GPU_MAX_FLUSH_RECTS)
+        return -1;
+
+    for (u32 i = 0; i < rect_count; i++) {
+        if (rects[i].width == 0 || rects[i].height == 0)
+            return -1;
+    }
+
+    if (!gpu_batch_ready) {
+        for (u32 i = 0; i < rect_count; i++) {
+            if (virtio_gpu_flush_rect_sync(rects[i].x, rects[i].y,
+                                           rects[i].width, rects[i].height) != 0)
+                return -1;
+        }
+        return 0;
+    }
+
+    u32 first = 0;
+    while (first < rect_count) {
+        /* Each region needs two chains of two descriptors.  Respect smaller
+         * device queues by splitting only as far as necessary. */
+        u32 max_regions = controlq.num_free / 4;
+        if (max_regions == 0) {
+            log_write("gpu: controlq has no batch capacity", KERNEL, LOG_ERROR);
+            return -1;
+        }
+        u32 count = rect_count - first;
+        if (count > max_regions)
+            count = max_regions;
+
+        struct gpu_batch_command cmds[GPU_BATCH_COMMANDS];
+        u32 command_count = 0;
+        int submit_failed = 0;
+
+        /* Queue every transfer before every flush.  A single fence on the
+         * last flush orders the entire group on accelerated host renderers. */
+        for (u32 i = 0; i < count; i++) {
+            const struct virtio_gpu_rect *r = &rects[first + i];
+            struct gpu_batch_buffer *buf = &gpu_batch_buffers[command_count];
+            memset(buf->req, 0, sizeof(struct gpu_transfer_to_host_2d));
+            memset(buf->resp, 0, sizeof(struct gpu_ctrl_hdr));
+            struct gpu_transfer_to_host_2d *q =
+                (struct gpu_transfer_to_host_2d *)buf->req;
+            q->hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
+            q->r = *r;
+            q->offset = (u64)r->y * (u64)gpu_state.resource_w * 4 +
+                        (u64)r->x * 4;
+            q->resource_id = gpu_state.resource_id;
+            if (submit_batch_command(&cmds[command_count], buf, sizeof(*q),
+                                     sizeof(struct gpu_ctrl_hdr)) != 0) {
+                submit_failed = 1;
+                break;
+            }
+            command_count++;
+        }
+        for (u32 i = 0; !submit_failed && i < count; i++) {
+            const struct virtio_gpu_rect *r = &rects[first + i];
+            struct gpu_batch_buffer *buf = &gpu_batch_buffers[command_count];
+            memset(buf->req, 0, sizeof(struct gpu_resource_flush));
+            memset(buf->resp, 0, sizeof(struct gpu_ctrl_hdr));
+            struct gpu_resource_flush *q = (struct gpu_resource_flush *)buf->req;
+            q->hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
+            q->r = *r;
+            q->resource_id = gpu_state.resource_id;
+            if (i + 1 == count) {
+                q->hdr.flags = VIRTIO_GPU_FLAG_FENCE;
+                q->hdr.fence_id = ++gpu_fence_id;
+            }
+            if (submit_batch_command(&cmds[command_count], buf, sizeof(*q),
+                                     sizeof(struct gpu_ctrl_hdr)) != 0) {
+                submit_failed = 1;
+                break;
+            }
+            command_count++;
+        }
+
+        if (command_count) {
+            virtio_queue_notify(&vdev, &controlq);
+            if (wait_batch_commands(cmds, command_count) != 0)
+                return -1;
+        }
+        if (submit_failed)
+            return -1;
+        first += count;
+    }
+    return 0;
+}
+
+int virtio_gpu_flush_rect(u32 x, u32 y, u32 w, u32 h) {
+    const struct virtio_gpu_rect rect = {
+        .x = x, .y = y, .width = w, .height = h,
+    };
+    return virtio_gpu_flush_rects(&rect, 1);
+}
+
+int virtio_gpu_scanout_needs_exact_resource(void) {
+    return gpu_is_gl_backend;
 }
 
 int virtio_gpu_poll_display_event(void) {
