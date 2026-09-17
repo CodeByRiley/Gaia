@@ -24,18 +24,33 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Priority levels. NORMAL is 0 so a zeroed task slot defaults to it , no
- * path can accidentally inherit HIGH by forgetting to initialise.
+/* Priority levels, numbered low to high. The ordering is load-bearing twice
+ * over: ready_head[] is indexed by it, and ready_push compares levels
+ * numerically to decide whether a wake-up should cut the running task's
+ * slice short.
  *
  * HIGH exists for the display critical path only: the window manager and
  * the framebuffer flush thread. Every client's pixels reach the screen
  * through those two, so leaving them to compete round-robin with their own
  * clients means one busy app decides the whole desktop's frame rate.
  * Scheduling is weighted, not strict , see SCHED_HIGH_BURST , so a spinning
- * HIGH task slows the system down instead of wedging it. */
-#define SCHED_PRIO_NORMAL 0
-#define SCHED_PRIO_HIGH 1
-#define SCHED_PRIO_LEVELS 2
+ * HIGH task slows the system down instead of wedging it.
+ *
+ * LOW is background work: it runs only when both other levels are empty, and
+ * otherwise waits for the anti-starvation floor in SCHED_LOW_FLOOR to hand it
+ * a turn. The zombie reaper is its only member. It needs the floor rather
+ * than a share , heimdall sits in the HIGH queue permanently, so without one
+ * ready_pop's LOW arm is simply unreachable on a live desktop and every reap
+ * falls to alloc_slot's inline reclaim on a full table.
+ *
+ * NORMAL is deliberately no longer 0. The old numbering let a task-creating
+ * path inherit NORMAL from the zeroed slot without saying so; now every such
+ * path sets prio explicitly, and ready_push clamps anything out of range
+ * back to NORMAL rather than trusting the field. */
+#define SCHED_PRIO_LOW 0
+#define SCHED_PRIO_NORMAL 1
+#define SCHED_PRIO_HIGH 2
+#define SCHED_PRIO_LEVELS 3
 
 /* BSP scheduler with a fixed-size task table and a singly-linked ready
  * queue. APs service the separate SMP-safe kernel work queue; userspace stays

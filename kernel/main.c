@@ -153,7 +153,13 @@ static void late_init(void) {
   task_spawn(udp_echo_thread);
   log_write("udp: echo server thread spawned", KERNEL, LOG_INFO);
 
-  task_spawn(task_reaper_thread_entry);
+  /* Reaping is background work: alloc_slot reclaims unclaimed zombies inline
+   * when the table is actually full, so this thread only saves that path the
+   * trouble. Nothing waits on it, which makes it the one task that can sit at
+   * the starvable level without costing anyone latency. */
+  struct task *reaper = task_spawn(task_reaper_thread_entry);
+  if (reaper)
+    sched_set_priority(reaper, SCHED_PRIO_LOW);
   log_write("sched: zombie reaper thread spawned", KERNEL, LOG_INFO);
 }
 
@@ -181,7 +187,8 @@ static void late_init(void) {
  * can exit without consequence. */
 static void init_task_entry(void) {
   char *heimdall_argv[] = {(char *)"heimdall", NULL};
-  long heimdall_pid = process_spawn_async("/system/bin/heimdall.elf", heimdall_argv);
+  long heimdall_pid =
+      process_spawn_async("/system/bin/heimdall.elf", heimdall_argv);
   if (heimdall_pid < 0)
     log_write("heimdall: launch failed , TTY-only mode", USER, LOG_INFO);
   else

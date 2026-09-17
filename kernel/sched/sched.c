@@ -142,6 +142,26 @@ static u32 slice_ticks = 0;
  * every tick when nothing is asleep , which is the common case. */
 static int n_sleeping = 0;
 
+/* Set when a task becomes runnable that outranks the one on the CPU.
+ *
+ * Kernel mode is non-preemptible, so this cannot switch on the spot , it is
+ * a note for the next safe preemption point, which is sched_preempt_tick on
+ * the way out of IRQ0 back to ring 3. Without it a woken task waits out the
+ * running task's entire remaining quantum before it is even considered:
+ * sched_wake_sleepers only pushed it onto a ready queue, and nothing
+ * re-examined that queue until the slice expired. At the 10 ms quantum this
+ * scheduler asks for, that is a frame of display latency handed to whatever
+ * happened to be running when the flush thread woke up. */
+static int need_resched = 0;
+
+/* Called from the paths that are about to context_switch. The switch is the
+ * reschedule, so it satisfies any pending note and restarts slice accounting
+ * for the incoming task. */
+static void sched_reschedule_done(void) {
+  slice_ticks = 0;
+  need_resched = 0;
+}
+
 /* --- per-task side allocations ----------------------------------------
  *
  * struct task holds pointers to these rather than the structures inline.
@@ -309,10 +329,30 @@ static void irq_restore(u64 rflags) {
  * wake-ups that keeps the desktop responsive. */
 #define SCHED_HIGH_BURST 4
 
+/* Dispatches served from the two upper levels before a runnable LOW task is
+ * given one. This is a floor, not a share: LOW gets under 2% of dispatches at
+ * 64, which is orders of magnitude more than the reaper needs to keep the
+ * zombie list drained and far too little for the display path to notice.
+ *
+ * It exists because the LOW arm of ready_pop is otherwise dead code. heimdall
+ * never blocks , it yields at the bottom of its loop and is immediately
+ * runnable again , so the HIGH queue is never empty while the desktop is up,
+ * and the arm below it is never reached. Without the floor, moving the reaper
+ * to LOW would not deprioritise it, it would switch it off, and every reap
+ * would land on the spawn that finds the task table full. */
+#define SCHED_LOW_FLOOR 64
+
 static int high_streak = 0;
 
+/* Dispatches since a LOW task last ran, clamped at the floor , the question
+ * it answers is "has LOW waited long enough", so it never needs to count
+ * past that and never overflows. */
+static int low_starve = 0;
+
 static void ready_push(struct task *t) {
-  int p = (t->prio == SCHED_PRIO_HIGH) ? SCHED_PRIO_HIGH : SCHED_PRIO_NORMAL;
+  int p = t->prio;
+  if (p < SCHED_PRIO_LOW || p > SCHED_PRIO_HIGH)
+    p = SCHED_PRIO_NORMAL;
   t->next = 0;
   if (!ready_tail[p])
     ready_head[p] = ready_tail[p] = t;
@@ -320,6 +360,20 @@ static void ready_push(struct task *t) {
     ready_tail[p]->next = t;
     ready_tail[p] = t;
   }
+
+  /* Every wake path funnels through here , sleep expiry, IPC unblock, futex,
+   * a waiter released by task_exit , so this is the one place that can see
+   * "someone better than the running task just became runnable". See
+   * need_resched for why the switch is deferred rather than taken now.
+   *
+   * t == current on the yield path, which re-queues the outgoing task before
+   * switching away from it; that is not a reason to preempt anybody. Idle
+   * loses to any real task regardless of level: it carries a NORMAL prio from
+   * the spawn path it was created through, so a numeric compare alone would
+   * miss a woken NORMAL task and leave idle halting against a non-empty
+   * queue. */
+  if (current && t != current && (current == idle_task || p > current->prio))
+    need_resched = 1;
 }
 
 /* Any runnable task at any level? Callers use this to decide whether
@@ -334,13 +388,22 @@ static int ready_any(void) {
 static struct task *ready_pop(void) {
   int level = -1;
 
-  if (ready_head[SCHED_PRIO_HIGH] &&
-      (high_streak < SCHED_HIGH_BURST || !ready_head[SCHED_PRIO_NORMAL]))
+  /* The floor is tested first so it can override both upper levels: the
+   * point is to break out of a HIGH/NORMAL cycle that would otherwise never
+   * reach the LOW arm at all. */
+  if (ready_head[SCHED_PRIO_LOW] && low_starve >= SCHED_LOW_FLOOR)
+    level = SCHED_PRIO_LOW;
+  else if (ready_head[SCHED_PRIO_HIGH] &&
+           (high_streak < SCHED_HIGH_BURST || !ready_head[SCHED_PRIO_NORMAL]))
     level = SCHED_PRIO_HIGH;
   else if (ready_head[SCHED_PRIO_NORMAL])
     level = SCHED_PRIO_NORMAL;
   else if (ready_head[SCHED_PRIO_HIGH])
     level = SCHED_PRIO_HIGH;
+  /* Below both upper levels: reached only when neither has anything runnable.
+   * The floor above is what gets LOW a turn when they do. */
+  else if (ready_head[SCHED_PRIO_LOW])
+    level = SCHED_PRIO_LOW;
 
   if (level < 0) {
     /* Idle is a fallback, not a normal queue member. Returning it only when
@@ -356,6 +419,11 @@ static struct task *ready_pop(void) {
     high_streak++;
   else
     high_streak = 0;
+
+  if (level == SCHED_PRIO_LOW)
+    low_starve = 0;
+  else if (low_starve < SCHED_LOW_FLOOR)
+    low_starve++;
 
   struct task *t = ready_head[level];
   ready_head[level] = t->next;
@@ -387,7 +455,7 @@ static int ready_remove(struct task *target) {
 }
 
 int sched_set_priority(struct task *t, int prio) {
-  if (!t || (prio != SCHED_PRIO_NORMAL && prio != SCHED_PRIO_HIGH))
+  if (!t || prio < SCHED_PRIO_LOW || prio > SCHED_PRIO_HIGH)
     return -1;
 
   u64 rflags = irq_save();
@@ -461,6 +529,7 @@ void sched_init(void) {
   struct task *t = alloc_slot();
   t->pid = next_pid++;
   t->state = TASK_RUNNING;
+  t->prio = SCHED_PRIO_NORMAL;
   t->cr3 = virt_to_phys(kernel_pml4);
   t->kstack = 0;
   t->kthread_entry = 0;
@@ -667,6 +736,7 @@ struct task *task_reserve_user(int parent_pid) {
   t->cr3 = virt_to_phys(kernel_pml4);
   t->syscall_kstack_top = stack_top;
   t->state = TASK_LOADING;
+  t->prio = SCHED_PRIO_NORMAL;
   t->pid = next_pid++;
   t->parent_pid = parent_pid;
   t->kstack = stack_base;
@@ -808,7 +878,7 @@ static void stage_for(struct task *next, struct task *prev) {
 
 void task_yield(void) {
   u64 rflags = irq_save();
-  slice_ticks = 0;
+  sched_reschedule_done();
   struct task *next = ready_pop();
 
   /* ready_pop is guaranteed to return idle_task if nothing else is ready.
@@ -838,6 +908,18 @@ void sched_preempt_tick(void) {
     return;
   }
 
+  /* A task that outranks this one became runnable mid-slice. Hand the CPU
+   * over now instead of at quantum expiry , that wait is the entire latency
+   * need_resched exists to remove. Clear the note even when the queues turn
+   * out to be empty, or a stale flag re-tests them on every later tick. */
+  if (need_resched) {
+    need_resched = 0;
+    if (ready_any()) {
+      task_yield();
+      return;
+    }
+  }
+
   u32 frequency = pit_get_freq();
   u32 quantum = (frequency * SCHED_QUANTUM_MS + 999U) / 1000U;
   if (quantum == 0)
@@ -856,7 +938,7 @@ void sched_preempt_tick(void) {
 
 void task_block(int waiting_for_pid) {
   u64 rflags = irq_save();
-  slice_ticks = 0;
+  sched_reschedule_done();
   struct task *next = ready_pop();
 
   /* REMOVED: The entire !next fallback block.
@@ -903,7 +985,7 @@ void task_sleep_ticks(u64 ticks) {
     return;
 
   u64 rflags = irq_save();
-  slice_ticks = 0;
+  sched_reschedule_done();
   current->wake_tick = pit_ticks() + ticks;
   current->state = TASK_SLEEPING;
   n_sleeping++;
@@ -991,8 +1073,15 @@ static void idle_thread(void) {
     /* sti; hlt guarantees interrupts are enabled before halting,
        preventing a deadlock since context_switch doesn't save RFLAGS. */
     __asm__ volatile("sti; hlt");
-    /* REMOVED: No need to call task_yield() here: if we reach here, no other
-       task woke up, so just loop back and halt again. */
+    /* Yield rather than halting straight back. The interrupt that ended the
+       hlt may well have made someone runnable , sched_wake_sleepers pushes
+       from the IRQ0 handler , and nothing else will switch away from here:
+       idt.c only calls sched_preempt_tick when the interrupted context was
+       ring 3, and idle is a ring-0 kthread, so the preemption path never
+       looks at it. Yielding costs nothing when the queues are empty:
+       ready_pop returns NULL for the idle task, task_yield returns
+       immediately, and we halt again. */
+    task_yield();
   }
 }
 
@@ -1091,7 +1180,7 @@ int task_kill(int pid, long code) {
 
 void task_exit(long code) {
   irq_save();
-  slice_ticks = 0;
+  sched_reschedule_done();
 
   struct task *prev = current;
 
@@ -1144,7 +1233,7 @@ void task_exit_thread(void) {
   irq_save();
   if (current->vfs_active)
     panic("task_exit_thread: active VFS operation");
-  slice_ticks = 0;
+  sched_reschedule_done();
   sb16_stream_release(current->pid);
   current->state = TASK_ZOMBIE;
   current->unclaimed = 1; /* nobody joins a bare thread; idle reaps it */
