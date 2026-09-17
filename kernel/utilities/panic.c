@@ -110,7 +110,7 @@ static struct panic_machine_state panic_read_machine(void) {
   __asm__ volatile("mov %%cr2, %0" : "=r"(s.cr2));
   __asm__ volatile("mov %%cr3, %0" : "=r"(s.cr3));
   __asm__ volatile("mov %%cr4, %0" : "=r"(s.cr4));
-  __asm__ volatile("pushfq; popq %0" : "=r"(s.rflags));
+  s.rflags = irq_flags_read();
   return s;
 }
 

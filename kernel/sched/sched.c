@@ -21,6 +21,7 @@
  */
 
 #include <arch/gdt.h>
+#include <arch/irq.h>
 #include <arch/percpu.h>
 #include <devices/pit.h>
 #include <display/framebuffer.h>
@@ -308,17 +309,6 @@ static void user_task_trampoline(void);
 static void idle_thread(void);
 static void mark_task_exited(struct task *task, long code);
 extern void arch_enter_user(u64 entry, u64 user_rsp, u64 arg) NORETURN;
-
-static u64 irq_save(void) {
-  u64 rflags;
-  __asm__ volatile("pushfq; popq %0; cli" : "=r"(rflags)::"memory");
-  return rflags;
-}
-
-static void irq_restore(u64 rflags) {
-  if (rflags & (1ULL << 9))
-    __asm__ volatile("sti" ::: "memory");
-}
 
 /* Consecutive dispatches served from HIGH before a runnable NORMAL task is
  * guaranteed a turn. This is what keeps the scheduling weighted instead of

@@ -11,10 +11,11 @@
 #include <sched/sched.h>
 
 #define PIT_CH0 0x40
+#define PIT_CH1 0x41
 #define PIT_CH2 0x42
 #define PIT_CMD 0x43
-#define PIT_GATE2                                                              \
-  0x61 /* NMI/keyboard ctrl port: bit0 = ch2 gate, bit5 = OUT2 */
+/* NMI/keyboard ctrl port: bit0 = ch2 gate, bit5 = OUT2 */
+#define PIT_GATE2 0x61
 #define PIT_FREQ 1193182 /* 8254 input clock , divides down */
 
 static volatile u64 ticks = 0;

@@ -12,6 +12,7 @@
 #ifndef SPINLOCK_H
 #define SPINLOCK_H
 
+#include <arch/irq.h>
 #include <stdint.h>
 #include <utilities/types.h>
 
@@ -43,16 +44,14 @@ SINLINE void spin_unlock(struct spinlock *l) {
  * in reverse. The returned u64 is opaque , pass it straight to
  * spin_unlock_irqrestore. */
 SINLINE u64 spin_lock_irqsave(struct spinlock *l) {
-  u64 rflags;
-  __asm__ volatile("pushfq; popq %0; cli" : "=r"(rflags)::"memory");
+  u64 rflags = irq_save();
   spin_lock(l);
   return rflags;
 }
 
 SINLINE void spin_unlock_irqrestore(struct spinlock *l, u64 rflags) {
   spin_unlock(l);
-  if (rflags & (1ULL << 9))
-    __asm__ volatile("sti" ::: "memory");
+  irq_restore(rflags);
 }
 
 #endif

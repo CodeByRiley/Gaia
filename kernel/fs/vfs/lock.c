@@ -2,6 +2,7 @@
  * IRQ exclusion protects ONLY the queue, never filesystem or disk operations.
  * AP/IRQ callers must dispatch filesystem work to a BSP task instead. */
 #include "lock.h"
+#include <arch/irq.h>
 #include <arch/percpu.h>
 #include <interrupts/idt.h>
 #include <sched/sched.h>
@@ -14,14 +15,8 @@ void vfs_test_irq_restore(u64 flags);
 #define gate_irq_save vfs_test_irq_save
 #define gate_irq_restore vfs_test_irq_restore
 #else
-static u64 gate_irq_save(void) {
-    u64 flags;
-    __asm__ volatile("pushfq; popq %0; cli" : "=r"(flags) :: "memory");
-    return flags;
-}
-static void gate_irq_restore(u64 flags) {
-    if (flags & (1ull << 9)) __asm__ volatile("sti" ::: "memory");
-}
+#define gate_irq_save irq_save
+#define gate_irq_restore irq_restore
 #endif
 
 struct vfs_waiter {

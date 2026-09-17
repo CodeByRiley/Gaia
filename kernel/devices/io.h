@@ -7,6 +7,7 @@
 #ifndef IO_H
 #define IO_H
 
+#include <arch/irq.h>
 #include <stdint.h>
 #include <utilities/types.h>
 
@@ -38,15 +39,6 @@ SINLINE u32 inl(u16 port) {
   u32 ret;
   __asm__ volatile("inl %1, %0" : "=a"(ret) : "Nd"(port) : "memory");
   return ret;
-}
-
-/* Read RFLAGS and test the Interrupt Flag (bit 9). Anything that waits on the
- * PIT tick counter, blocks, or yields needs this to be true: with IF clear,
- * IRQ0 never fires, the tick never advances, and the wait never ends. */
-SINLINE int interrupts_enabled(void) {
-  u64 flags;
-  __asm__ volatile("pushfq; popq %0" : "=r"(flags));
-  return (flags & (1ULL << 9)) != 0;
 }
 
 /* "Wait one ISA bus cycle" , write to BIOS POST diagnostic port 0x80,
