@@ -4,7 +4,8 @@ Gaia is an experimental x86_64 operating system built from scratch. It boots wit
 
 Most user programs are statically linked with musl. Gaia-specific features—windows, graphics, audio, IPC, and process inspection—are provided by `libgaia`.
 
-Gaia is mainly intended for QEMU and OS-development experiments. It is not a general-purpose or security-hardened operating system.
+Gaia is mainly developed inside a QEMU development experiment. It has not been tested on bare metal hardware.
+Gaia is also not built for general-purpose or security-hardened systems.
 
 ## What works
 
