@@ -563,12 +563,6 @@ static int builtin_export(int argc, char **argv) {
   return 0;
 }
 
-#ifdef DEBUG
-#warning "DEBUG is enabled"
-#else
-#warning "DEBUG is disabled"
-#endif
-
 static int builtin_fault(int argc, char **argv) {
   (void)argc;
   (void)argv;
