@@ -11,97 +11,102 @@
  * before any C code dereferences gs-relative state.
  */
 #include <arch/percpu.h>
+#include <stdint.h>
 #include <utilities/log.h>
 #include <utilities/string.h>
-#include <stdint.h>
 
-#define MSR_GS_BASE         0xC0000101u
-#define MSR_KERNEL_GS_BASE  0xC0000102u
+#define MSR_GS_BASE 0xC0000101u
+#define MSR_KERNEL_GS_BASE 0xC0000102u //
 
 static struct cpu_local cpus[MAX_CPUS] ALIGNED(64);
-static int              cpu_count = 1;
+static int cpu_count = 1;
 
 SINLINE void wrmsr(u32 msr, u64 val) {
-    u32 lo = (u32)val;
-    u32 hi = (u32)(val >> 32);
-    __asm__ volatile ("wrmsr" :: "c"(msr), "a"(lo), "d"(hi) : "memory");
+  u32 lo = (u32)val;
+  u32 hi = (u32)(val >> 32);
+  __asm__ volatile("wrmsr" ::"c"(msr), "a"(lo), "d"(hi) : "memory");
 }
 
 SINLINE u64 rdmsr(u32 msr) {
-    u32 lo, hi;
-    __asm__ volatile ("rdmsr" : "=a"(lo), "=d"(hi) : "c"(msr));
-    return ((u64)hi << 32) | lo;
+  u32 lo, hi;
+  __asm__ volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(msr));
+  return ((u64)hi << 32) | lo;
 }
 
 static void arm_kernel_gs(struct cpu_local *c) {
-    /* Kernel state: ordinary GS references address cpu_local. SWAPGS moves
-     * that pointer into KERNEL_GS_BASE while ring 3 runs and installs the
-     * staged user value (zero until user GS is exposed) as the visible base. */
-    wrmsr(MSR_GS_BASE,        (u64)c);
-    wrmsr(MSR_KERNEL_GS_BASE, 0);
+  /* Kernel state: ordinary GS references address cpu_local. SWAPGS moves
+   * that pointer into KERNEL_GS_BASE while ring 3 runs and installs the
+   * staged user value (zero until user GS is exposed) as the visible base. */
+  wrmsr(MSR_GS_BASE, (u64)c);
+  wrmsr(MSR_KERNEL_GS_BASE, 0);
 }
 
 void percpu_init_bsp(u8 bsp_lapic_id) {
-    memset(cpus, 0, sizeof(cpus));
-    struct cpu_local *c = &cpus[0];
-    c->self            = c;
-    c->cpu_id          = 0;
-    c->lapic_id        = bsp_lapic_id;
-    c->kernel_rsp_top  = 0;
-    c->user_rsp_save   = 0;
-    c->current         = 0;
-    c->idle_task       = 0;
-    c->tss             = 0;
-    c->online          = 1;
-    arm_kernel_gs(c);
-    log_write_hex("PERCPU: bsp gs_base   =", (u64)c, KERNEL, LOG_INFO);
-    log_write_hex("PERCPU: bsp lapic_id  =", bsp_lapic_id, KERNEL, LOG_INFO);
+  memset(cpus, 0, sizeof(cpus));
+  struct cpu_local *c = &cpus[0];
+  c->self = c;
+  c->cpu_id = 0;
+  c->lapic_id = bsp_lapic_id;
+  c->kernel_rsp_top = 0;
+  c->user_rsp_save = 0;
+  c->current = 0;
+  c->idle_task = 0;
+  c->tss = 0;
+  c->online = 1;
+  arm_kernel_gs(c);
+  log_write_hex("PERCPU: bsp gs_base   =", (u64)c, KERNEL, LOG_INFO);
+  log_write_hex("PERCPU: bsp lapic_id  =", bsp_lapic_id, KERNEL, LOG_INFO);
 }
 
 void percpu_init_ap(int cpu_id, u8 lapic_id) {
-    /* Called from the BSP while staging AP boot. Fills the AP's cpu_local
-     * slot but DOES NOT write GS_BASE , that MSR is per-CPU and must be
-     * armed by the AP itself once it lands in long mode. */
-    if (cpu_id <= 0 || cpu_id >= MAX_CPUS) return;
-    struct cpu_local *c = &cpus[cpu_id];
-    memset(c, 0, sizeof(*c));
-    c->self     = c;
-    c->cpu_id   = cpu_id;
-    c->lapic_id = lapic_id;
-    c->online   = 0;
+  /* Called from the BSP while staging AP boot. Fills the AP's cpu_local
+   * slot but DOES NOT write GS_BASE , that MSR is per-CPU and must be
+   * armed by the AP itself once it lands in long mode. */
+  if (cpu_id <= 0 || cpu_id >= MAX_CPUS)
+    return;
+  struct cpu_local *c = &cpus[cpu_id];
+  memset(c, 0, sizeof(*c));
+  c->self = c;
+  c->cpu_id = cpu_id;
+  c->lapic_id = lapic_id;
+  c->online = 0;
 }
 
 void percpu_arm_gs_this(int cpu_id) {
-    /* Called from the AP itself, very early in ap_main, BEFORE anything
-     * uses gs-relative addressing. */
-    if (cpu_id < 0 || cpu_id >= MAX_CPUS) return;
-    arm_kernel_gs(&cpus[cpu_id]);
+  /* Called from the AP itself, very early in ap_main, BEFORE anything
+   * uses gs-relative addressing. */
+  if (cpu_id < 0 || cpu_id >= MAX_CPUS)
+    return;
+  arm_kernel_gs(&cpus[cpu_id]);
 }
 
 struct cpu_local *percpu_get(int cpu_id) {
-    if (cpu_id < 0 || cpu_id >= MAX_CPUS) return 0;
-    return &cpus[cpu_id];
+  if (cpu_id < 0 || cpu_id >= MAX_CPUS)
+    return 0;
+  return &cpus[cpu_id];
 }
 
 struct cpu_local *percpu_this(void) {
-    struct cpu_local *c;
-    __asm__ volatile ("movq %%gs:0, %0" : "=r"(c));
-    return c;
+  struct cpu_local *c;
+  __asm__ volatile("movq %%gs:0, %0" : "=r"(c));
+  return c;
 }
 
 int percpu_current_id(void) {
-    u64 base = rdmsr(MSR_GS_BASE);
-    for (int i = 0; i < MAX_CPUS; i++) {
-        if (base == (u64)(uintptr_t)&cpus[i])
-            return i;
-    }
-    return 0;
+  u64 base = rdmsr(MSR_GS_BASE);
+  for (int i = 0; i < MAX_CPUS; i++) {
+    if (base == (u64)(uintptr_t)&cpus[i])
+      return i;
+  }
+  return 0;
 }
 
 int percpu_cpu_count(void) { return cpu_count; }
 
 void percpu_set_count(int n) {
-    if (n < 1) n = 1;
-    if (n > MAX_CPUS) n = MAX_CPUS;
-    cpu_count = n;
+  if (n < 1)
+    n = 1;
+  if (n > MAX_CPUS)
+    n = MAX_CPUS;
+  cpu_count = n;
 }

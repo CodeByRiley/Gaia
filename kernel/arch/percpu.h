@@ -20,9 +20,9 @@
 #ifndef PERCPU_H
 #define PERCPU_H
 
-#include <utilities/types.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 #define MAX_CPUS 8
 
@@ -30,46 +30,45 @@ struct task;
 struct tss;
 
 struct cpu_local {
-  struct cpu_local  *self;            /* gs:0 , for C-level read of base   */
-  int               cpu_id;           /* logical id, 0..MAX_CPUS-1         */
-  u8                lapic_id;         /* hardware APIC id                  */
-  u8                _pad0[3];
-  u64               kernel_rsp_top;   /* SYSCALL entry: pop here           */
-  u64               user_rsp_save;    /* entry-only user-rsp scratch       */
-  struct task       *current;         /* running task on this CPU          */
-  struct task       *idle_task;       /* per-CPU idle thread               */
-  struct tss        *tss;             /* points into per-CPU TSS array     */
-  volatile int       online;           /* 1 once AP has reached scheduler   */
-  u8                _pad1[4];         /* Explicitly pad to 64 bytes        */
+  struct cpu_local *self; /* gs:0 , for C-level read of base   */
+  int cpu_id;             /* logical id, 0..MAX_CPUS-1         */
+  u8 lapic_id;            /* hardware APIC id                  */
+  u8 _pad0[3];
+  u64 kernel_rsp_top;     /* SYSCALL entry: pop here           */
+  u64 user_rsp_save;      /* entry-only user-rsp scratch       */
+  struct task *current;   /* running task on this CPU          */
+  struct task *idle_task; /* per-CPU idle thread               */
+  struct tss *tss;        /* points into per-CPU TSS array     */
+  volatile int online;    /* 1 once AP has reached scheduler   */
+  u8 _pad1[4];            /* Explicitly pad to 64 bytes        */
 };
 
 /* Asm-visible offsets. Must stay in lockstep with the struct above ,
  * SYSCALL entry uses these literally with no symbol lookup. */
-#define CPU_LOCAL_KERNEL_RSP_TOP_OFF  16
-#define CPU_LOCAL_USER_RSP_SAVE_OFF   24
-#define CPU_LOCAL_CURRENT_OFF         32
+#define CPU_LOCAL_KERNEL_RSP_TOP_OFF 16
+#define CPU_LOCAL_USER_RSP_SAVE_OFF 24
+#define CPU_LOCAL_CURRENT_OFF 32
 
 _Static_assert(offsetof(struct cpu_local, kernel_rsp_top) ==
-               CPU_LOCAL_KERNEL_RSP_TOP_OFF,
+                   CPU_LOCAL_KERNEL_RSP_TOP_OFF,
                "cpu_local.kernel_rsp_top offset is asm-visible");
 _Static_assert(offsetof(struct cpu_local, user_rsp_save) ==
-               CPU_LOCAL_USER_RSP_SAVE_OFF,
+                   CPU_LOCAL_USER_RSP_SAVE_OFF,
                "cpu_local.user_rsp_save offset is asm-visible");
-_Static_assert(offsetof(struct cpu_local, current) ==
-               CPU_LOCAL_CURRENT_OFF,
+_Static_assert(offsetof(struct cpu_local, current) == CPU_LOCAL_CURRENT_OFF,
                "cpu_local.current offset is asm-visible");
 _Static_assert(sizeof(struct cpu_local) == 64,
                "cpu_local should fit in one cache line");
 
 /* BSP entry: set up the cpu0 slot and wire GS_BASE. */
-void              percpu_init_bsp(u8 bsp_lapic_id);
+void percpu_init_bsp(u8 bsp_lapic_id);
 
 /* AP entry: same for an AP slot. */
-void              percpu_init_ap(int cpu_id, u8 lapic_id);
+void percpu_init_ap(int cpu_id, u8 lapic_id);
 
 /* Enter the kernel GS state on the calling CPU: GS_BASE points at the selected
  * cpu_local and KERNEL_GS_BASE contains the initial user value (zero). */
-void              percpu_arm_gs_this(int cpu_id);
+void percpu_arm_gs_this(int cpu_id);
 
 /* Lookup by id / current. */
 struct cpu_local *percpu_get(int cpu_id);
@@ -77,10 +76,10 @@ struct cpu_local *percpu_this(void);
 
 /* Read IA32_GS_BASE and identify the calling CPU without dereferencing GS.
  * Safe for panic reporting even if GS has not been armed yet. */
-int               percpu_current_id(void);
+int percpu_current_id(void);
 
 /* Active CPU count and BSP-only setter (called once after acpi_init). */
-int               percpu_cpu_count(void);
-void              percpu_set_count(int n);
+int percpu_cpu_count(void);
+void percpu_set_count(int n);
 
 #endif
