@@ -1,5 +1,17 @@
 {
-	"file_scan_exclusions": ["**/build/**", "**/dist/**"],
+	"file_scan_exclusions": [
+		"**/build/**",
+		"**/dist/**",
+		"**/.cache/**",
+		"**/.claude/**",
+		"**/.git/**",
+		".editorconfig",
+		".gitattributes",
+		".gitmodules",
+		".cloc-ignore",
+		"**.log",
+		"**.pcap"
+	],
 	"lsp": {
 		"clangd": {
 			// Omit "binary" entirely to let the extension manage clangd, or pin one:
@@ -19,5 +31,5 @@
 	},
 	"file_types": {
 		"C": ["C", "H", "c", "h"],
-	}
+	},
 }
