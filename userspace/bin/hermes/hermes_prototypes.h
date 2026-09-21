@@ -20,6 +20,7 @@
 #define MODAL_NONE 0
 #define MODAL_MKDIR 1
 #define MODAL_DELETE 2
+#define MODAL_OPEN_WITH 3
 
 #define UI_ID_UP 1
 #define UI_ID_OPEN 2
@@ -28,6 +29,9 @@
 #define UI_ID_QUIT 5
 #define UI_ID_CONFIRM 6
 #define UI_ID_CANCEL 7
+#define UI_ID_OPEN_WITH_NOTEPAD 8
+#define UI_ID_OPEN_WITH_CAT 9
+#define UI_ID_OPEN_WITH_CANCEL 10
 #define UI_ID_ENTRY_BASE 100
 #define UI_ID_TREE_BASE 300
 
@@ -41,6 +45,7 @@
 #define MENU_NEW 102
 #define MENU_DELETE 103
 #define MENU_EXIT 104
+#define MENU_OPEN_WITH 105
 #define MENU_UP 201
 #define MENU_REFRESH 202
 #define MENU_DETAILS 301
@@ -51,6 +56,7 @@
 #define CONTEXT_NEW 502
 #define CONTEXT_DELETE 503
 #define CONTEXT_UP 504
+#define CONTEXT_OPEN_WITH 505
 
 #define WIN98_BLUE 0x00000080u
 #define WIN98_WHITE 0x00FFFFFFu
@@ -88,6 +94,8 @@ int selected_valid(void);
 void enter_selected_directory(void);
 void execute_selected(void);
 void activate_selected(void);
+void open_with_selected(void);
+void launch_selected_with(const char *program, const char *label);
 void open_mkdir_modal(void);
 void open_delete_modal(void);
 void cancel_modal(void);

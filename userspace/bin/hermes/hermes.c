@@ -207,6 +207,11 @@ void execute_selected(void) {
         return;
     }
 
+    if (!is_program_name(entries[selected].name)) {
+        open_with_selected();
+        return;
+    }
+
     char *argv[] = {entries[selected].name, 0};
     if (spawn(path, argv) < 0)
         set_status("Could not launch the selected file");
@@ -226,11 +231,47 @@ void activate_selected(void) {
 void open_mkdir_modal(void);
 void open_delete_modal(void);
 
+void open_with_selected(void) {
+    if (!selected_valid() || selected == 0 || entries[selected].is_dir)
+        return;
+    modal_action = MODAL_OPEN_WITH;
+}
+
+void launch_selected_with(const char *program, const char *label) {
+    if (!program || !selected_valid() || selected == 0 ||
+        entries[selected].is_dir) {
+        cancel_modal();
+        return;
+    }
+
+    char path[MAX_PATH];
+    if (join_path(path, sizeof(path), cwd, entries[selected].name) != 0) {
+        set_status("Path is too long");
+        cancel_modal();
+        return;
+    }
+
+    char *argv[] = {(char *)program, path, 0};
+    if (spawn(program, argv) < 0) {
+        set_status("Could not launch the selected file");
+    } else {
+        char message[STATUS_CAP];
+        snprintf(message, sizeof(message), "Opened with %s",
+                 label ? label : program);
+        set_status(message);
+    }
+    cancel_modal();
+}
+
 void run_menu_action(int action) {
     switch (action) {
     case MENU_OPEN:
     case CONTEXT_OPEN:
         activate_selected();
+        break;
+    case MENU_OPEN_WITH:
+    case CONTEXT_OPEN_WITH:
+        open_with_selected();
         break;
     case MENU_NEW:
     case CONTEXT_NEW:
@@ -323,10 +364,17 @@ void go_to_tree_depth(int depth) {
 
 int is_program_name(const char *name) {
     size_t length = bounded_strlen(name, MAX_NAME);
-    return length > 4 && name[length - 4] == '.' &&
-           (name[length - 3] == 'e' || name[length - 3] == 'E') &&
-           (name[length - 2] == 'l' || name[length - 2] == 'L') &&
-           (name[length - 1] == 'f' || name[length - 1] == 'F');
+    if (length <= 4 || name[length - 4] != '.')
+        return 0;
+
+    char a = name[length - 3];
+    char b = name[length - 2];
+    char c = name[length - 1];
+    int elf = (a == 'e' || a == 'E') && (b == 'l' || b == 'L') &&
+              (c == 'f' || c == 'F');
+    int exe = (a == 'e' || a == 'E') && (b == 'x' || b == 'X') &&
+              (c == 'e' || c == 'E');
+    return elf || exe;
 }
 
 void open_mkdir_modal(void) {
@@ -357,6 +405,10 @@ void cancel_modal(void) {
 void confirm_modal(void) {
     if (modal_action == MODAL_NONE)
         return;
+    if (modal_action == MODAL_OPEN_WITH) {
+        cancel_modal();
+        return;
+    }
     text_input[text_input_len] = 0;
     if (text_input_len == 0) {
         set_status("A name is required");
@@ -408,6 +460,8 @@ int handle_key(int key, int pressed, int *running) {
             cancel_modal();
             return 1;
         }
+        if (modal_action == MODAL_OPEN_WITH)
+            return 0;
         if (key == KEY_ENTER || key == KEY_KPENTER) {
             confirm_modal();
             return 1;

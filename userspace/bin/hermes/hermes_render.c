@@ -5,6 +5,7 @@
 
 static const struct ui_menu_item file_menu_items[] = {
     {"Open", MENU_OPEN, 1},
+    {"Open With...", MENU_OPEN_WITH, 1},
     {"New Folder", MENU_NEW, 1},
     {"Delete", MENU_DELETE, 1},
     {"Exit", MENU_EXIT, 1},
@@ -24,6 +25,7 @@ static const struct ui_menu_item help_menu_items[] = {
 };
 static const struct ui_menu_item context_menu_items[] = {
     {"Open", CONTEXT_OPEN, 1},
+    {"Open With...", CONTEXT_OPEN_WITH, 1},
     {"New Folder", CONTEXT_NEW, 1},
     {"Delete", CONTEXT_DELETE, 1},
     {"Go Up", CONTEXT_UP, 1},
@@ -68,6 +70,43 @@ static int draw_modal(struct ui_context *ui, struct gfx_surface *surface) {
         width = 320;
     if (width < 120)
         width = 120;
+    if (modal_action == MODAL_OPEN_WITH) {
+        int height = 136;
+        int x = (surface->w - width) / 2;
+        int y = (surface->h - height) / 2;
+        struct gfx_rect modal = gfx_rect_make(x, y, width, height);
+        ui_panel(ui, modal);
+        ui_label(ui, gfx_rect_make(x + 10, y + 6, width - 20, 18),
+                 "Open with");
+        ui_label_muted(ui, gfx_rect_make(x + 10, y + 27, width - 20, 16),
+                       "Choose a program for:");
+        ui_label(ui, gfx_rect_make(x + 10, y + 43, width - 20, 16),
+                 selected_valid() ? entries[selected].name : "(no file)");
+
+        struct gfx_rect buttons =
+            gfx_rect_make(x + 10, y + 66, width - 20, 22);
+        int changed = 0;
+        if (ui_button_id(ui, UI_ID_OPEN_WITH_NOTEPAD,
+                         ui_layout_column(buttons, 3, 0, 6), "Notepad")) {
+            launch_selected_with("/system/bin/notepad.elf", "Notepad");
+            changed = 1;
+        }
+        if (ui_button_id(ui, UI_ID_OPEN_WITH_CAT,
+                         ui_layout_column(buttons, 3, 1, 6),
+                         "Cat")) {
+            launch_selected_with("/system/bin/cat.elf", "Cat");
+            changed = 1;
+        }
+        if (ui_button_id(ui, UI_ID_OPEN_WITH_CANCEL,
+                         ui_layout_column(buttons, 3, 2, 6), "Cancel")) {
+            cancel_modal();
+            changed = 1;
+        }
+        ui_label_muted(ui, gfx_rect_make(x + 10, y + 108, width - 20, 14),
+                       "Esc cancels");
+        return changed;
+    }
+
     int height = 104;
     int x = (surface->w - width) / 2;
     int y = (surface->h - height) / 2;
