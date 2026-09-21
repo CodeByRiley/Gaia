@@ -103,6 +103,12 @@ HEIMDALL_SRCS := bin/heimdall/heimdall.c bin/heimdall/state.c bin/heimdall/deskt
 HEIMDALL_OBJS := $(HEIMDALL_SRCS:.c=.gaia.o)
 HEIMDALL_ELF  := bin/heimdall/heimdall.elf
 
+# Hermes keeps filesystem/event behavior separate from its Explorer renderer,
+# while sharing this private header exactly like Heimdall's module split.
+HERMES_SRCS := bin/hermes/hermes.c bin/hermes/hermes_render.c
+HERMES_OBJS := $(HERMES_SRCS:.c=.gaia.o)
+HERMES_ELF  := bin/hermes/hermes.elf
+
 # libgaia.a , the parts of lib/ that musl does not provide: heimdall IPC, the
 # framebuffer, the console, audio, Gaia-only syscalls, and the drawing and
 # font helpers. Everything here is Gaia-specific and collides with nothing in
@@ -278,6 +284,7 @@ $(SIMPLE_BIN_OBJS): %.o: %.c
 # were being generated and then ignored.
 USER_DEP_FILES := $(patsubst %.o,%.d,$(LIB_C_OBJS) $(SIMPLE_BIN_OBJS) $(HOLYD_OBJS) $(NETSURF_OBJS)) \
                   $(HEIMDALL_OBJS:.gaia.o=.gaia.d) \
+                  $(HERMES_OBJS:.gaia.o=.gaia.d) \
                   $(LIBGAIA_COBJS:.gaia.o=.gaia.d) \
                   $(MUSL_BIN_ELFS:.elf=.d)
 -include $(USER_DEP_FILES)
@@ -323,7 +330,7 @@ $(LIBGAIA_COBJS): %.gaia.o: %.c $(MUSL_LIBC)
 $(LIBGAIA): $(LIBGAIA_OBJS)
 	rm -f $@ && x86_64-elf-ar rcs $@ $^
 
-$(filter-out $(HEIMDALL_ELF),$(MUSL_BIN_ELFS)): bin/%.elf: bin/%.c $(MUSL_LIBC) $(LIBGAIA) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
+$(filter-out $(HEIMDALL_ELF) $(HERMES_ELF),$(MUSL_BIN_ELFS)): bin/%.elf: bin/%.c $(MUSL_LIBC) $(LIBGAIA) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
 	CC=$(USER_ELF_CC) "$(SHELL)" $(MUSL_LINK) $@ $< $(LIBGAIA)
 
 $(HEIMDALL_OBJS): %.gaia.o: %.c $(MUSL_LIBC)
@@ -331,6 +338,12 @@ $(HEIMDALL_OBJS): %.gaia.o: %.c $(MUSL_LIBC)
 
 $(HEIMDALL_ELF): $(HEIMDALL_OBJS) $(MUSL_LIBC) $(LIBGAIA) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
 	CC=$(USER_ELF_CC) "$(SHELL)" $(MUSL_LINK) $@ $(HEIMDALL_OBJS) $(LIBGAIA)
+
+$(HERMES_OBJS): %.gaia.o: %.c $(MUSL_LIBC)
+	$(USER_ELF_CC) $(MUSL_CFLAGS) $(CCDB) -MMD -MP -c $< -o $@
+
+$(HERMES_ELF): $(HERMES_OBJS) $(MUSL_LIBC) $(LIBGAIA) $(MUSL_LINK) $(MUSL_LINKER_SCRIPT)
+	CC=$(USER_ELF_CC) "$(SHELL)" $(MUSL_LINK) $@ $(HERMES_OBJS) $(LIBGAIA)
 
 # --- holyd rules ---------------------------------------------------------
 
