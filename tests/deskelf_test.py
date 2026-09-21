@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Boot Gaia and smoke-test Deskelf's libwm event loop."""
+"""Boot Gaia and smoke-test Hermes' libwm event loop."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from kernel_panic_test import Qmp, available_port, read_ppm, wait_for_text
 from path_lookup_test import send_text
 
 
-def deskelf_pixels_present(path: Path) -> bool:
+def hermes_pixels_present(path: Path) -> bool:
     width, height, pixels = read_ppm(path)
     if width < 560 or height < 380:
         return False
@@ -40,9 +40,9 @@ def main() -> int:
         print(f"missing ISO: {iso}", file=sys.stderr)
         return 2
 
-    log_path = Path("build/qemu-deskelf.log").resolve()
-    screenshot = Path("build/deskelf.ppm").resolve()
-    moved_screenshot = Path("build/deskelf-selection-moved.ppm").resolve()
+    log_path = Path("build/qemu-hermes.log").resolve()
+    screenshot = Path("build/hermes.ppm").resolve()
+    moved_screenshot = Path("build/hermes-selection-moved.ppm").resolve()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_bytes(b"")
     screenshot.unlink(missing_ok=True)
@@ -70,16 +70,16 @@ def main() -> int:
             return 1
 
         qmp = Qmp(qmp_port, deadline)
-        send_text(qmp, "deskelf\n")
-        if not wait_for_text(log_path, "deskelf: ready handle=", deadline):
+        send_text(qmp, "hermes\n")
+        if not wait_for_text(log_path, "hermes: ready handle=", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("Deskelf did not enter its window event loop", file=sys.stderr)
+            print("Hermes did not enter its window event loop", file=sys.stderr)
             return 1
 
         time.sleep(0.2)
         qmp.command("screendump", {"filename": screenshot.as_posix()})
-        if not screenshot.exists() or not deskelf_pixels_present(screenshot):
-            print("Deskelf's rendered libui surface was not detected",
+        if not screenshot.exists() or not hermes_pixels_present(screenshot):
+            print("Hermes' rendered Explorer surface was not detected",
                   file=sys.stderr)
             return 1
 
@@ -89,7 +89,7 @@ def main() -> int:
         time.sleep(0.2)
         qmp.command("screendump", {"filename": moved_screenshot.as_posix()})
         if screenshot.read_bytes() == moved_screenshot.read_bytes():
-            print("Deskelf selection did not react to translated input",
+            print("Hermes selection did not react to translated input",
                   file=sys.stderr)
             return 1
 
@@ -103,24 +103,24 @@ def main() -> int:
         time.sleep(0.1)
         qmp.command("human-monitor-command",
                     {"command-line": "mouse_button 0"})
-        if not wait_for_text(log_path, "deskelf: exit", deadline):
+        if not wait_for_text(log_path, "hermes: exit", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("Heimdall close did not reach Deskelf", file=sys.stderr)
+            print("Heimdall close did not reach Hermes", file=sys.stderr)
             return 1
         if not wait_for_text(log_path, "heimdall: destroy handle=", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
-            print("Heimdall did not finish Deskelf teardown", file=sys.stderr)
+            print("Heimdall did not finish Hermes teardown", file=sys.stderr)
             return 1
 
         log = log_path.read_text(encoding="utf-8", errors="replace")
         if ("heimdall: close button -> request handle=" not in log or
                 "PANIC" in log or
-                "deskelf: could not create window" in log):
+                "hermes: could not create window" in log):
             print(log)
-            print("Deskelf smoke test detected a guest failure", file=sys.stderr)
+            print("Hermes smoke test detected a guest failure", file=sys.stderr)
             return 1
 
-        print("Deskelf rendered, handled input, and honored Heimdall's close")
+        print("Hermes rendered, handled input, and honored Heimdall's close")
         return 0
     finally:
         if qmp is not None:

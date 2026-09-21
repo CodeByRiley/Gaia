@@ -79,7 +79,7 @@ HEIMDALL_STATE int wallpaper_loaded HEIMDALL_STATE_INIT(0);
 #ifndef HEIMDALL_DECLARE_STATE
 const struct program start_menu_defaults[] = {
     {"Skald (Shell)", "system/bin/sh.elf"},
-    {"Desk Elf", "system/bin/deskelf.elf"},
+    {"Hermes File Explorer", "system/bin/hermes.elf"},
     {"Text Editor", "system/bin/notepad.elf"},
     {"About", "system/bin/about.elf"}};
 

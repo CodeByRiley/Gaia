@@ -37,8 +37,10 @@ void ui_begin(struct ui_context *c, struct gfx_surface *s,
     c->theme    = theme ? theme : &ui_theme_default;
     c->mx       = mouse_x;
     c->my       = mouse_y;
-    c->was_down = c->down;
-    c->down     = (buttons & MOUSE_BTN_LEFT) ? 1 : 0;
+    c->was_buttons = c->buttons;
+    c->buttons     = buttons;
+    c->was_down    = c->down;
+    c->down        = (buttons & MOUSE_BTN_LEFT) ? 1 : 0;
     c->hot      = 0;
     c->next_id  = 0;
 }
@@ -48,6 +50,164 @@ void ui_end(struct ui_context *c) {
      * Clearing here rather than in the widget means a release over empty
      * space still cancels a pending press. */
     if (!c->down) c->active = 0;
+}
+
+static int menu_item_width(struct ui_context *c,
+                           const struct ui_menu_item *items, int count) {
+    int width = 72;
+    const struct ui_theme *t = c->theme;
+    for (int i = 0; items && i < count; i++) {
+        int item_width = 0;
+        int item_height = 0;
+        gfx_text_size(items[i].label ? items[i].label : "", t->scale,
+                      &item_width, &item_height);
+        if (item_width + t->pad * 2 + 12 > width)
+            width = item_width + t->pad * 2 + 12;
+    }
+    if (width > c->s->w - 8)
+        width = c->s->w - 8;
+    if (width < 32)
+        width = 32;
+    return width;
+}
+
+static int menu_height(int count) {
+    if (count < 1)
+        count = 1;
+    return count * 18 + 4;
+}
+
+static struct gfx_rect menu_rect(struct ui_context *c, int x, int y,
+                                 const struct ui_menu_item *items,
+                                 int count) {
+    int width = menu_item_width(c, items, count);
+    int height = menu_height(count);
+    if (x + width > c->s->w - 2)
+        x = c->s->w - width - 2;
+    if (x < 2)
+        x = 2;
+    if (y + height > c->s->h - 2)
+        y = c->s->h - height - 2;
+    if (y < 2)
+        y = 2;
+    return gfx_rect_make(x, y, width, height);
+}
+
+static int draw_menu_popup(struct ui_context *c,
+                           const struct ui_menu_item *items, int count,
+                           int x, int y, int id_base) {
+    if (!items || count <= 0)
+        return 0;
+    const struct ui_theme *t = c->theme;
+    struct gfx_rect popup = menu_rect(c, x, y, items, count);
+    gfx_fill(c->s, popup, t->face);
+    gfx_bevel(c->s, popup, t->light, t->dark, t->border);
+
+    int result = 0;
+    /* The popup is painted after the caller's content widgets.  Claim a new
+     * primary press here so a row underneath the popup cannot also activate. */
+    if (c->down && !c->was_down)
+        c->active = 0;
+    for (int i = 0; i < count; i++) {
+        struct gfx_rect row = gfx_rect_make(popup.x + 2, popup.y + 2 + i * 18,
+                                            popup.w - 4, 18);
+        int row_id = id_base + i;
+        if (c->down && !c->was_down && items[i].enabled &&
+            gfx_rect_contains(row, c->mx, c->my))
+            c->active = row_id;
+        int clicked = ui_button_id(c, row_id, row, "");
+        int hover = gfx_rect_contains(row, c->mx, c->my);
+        uint32_t background = hover && items[i].enabled ? t->accent :
+                              t->face;
+        uint32_t foreground = hover && items[i].enabled ? t->accent_text :
+                              (items[i].enabled ? t->text : t->text_muted);
+        gfx_fill(c->s, row, background);
+        gfx_text_box(c->s, row, items[i].label ? items[i].label : "",
+                     foreground, t->scale, t->pad, GFX_TEXT_LEFT);
+        if (clicked && items[i].enabled)
+            result = items[i].id;
+    }
+    return result;
+}
+
+int ui_menu_bar_item(struct ui_context *c, struct ui_menu_state *state,
+                     int menu_id, struct gfx_rect title,
+                     const char *label,
+                     const struct ui_menu_item *items, int item_count) {
+    if (!c || !state)
+        return 0;
+
+    /* A release outside the currently open popup dismisses it.  This check
+     * happens before the current title is drawn so clicking another title
+     * still opens that title's menu in the same frame. */
+    int title_press_active = c->active >= 0x4000 && c->active < 0x4100;
+    if (state->open && !title_press_active && !c->down && c->was_down) {
+        struct gfx_rect popup = gfx_rect_make(state->x, state->y,
+                                              state->w, state->h);
+        if (!gfx_rect_contains(popup, c->mx, c->my) &&
+            !gfx_rect_contains(title, c->mx, c->my))
+            state->open = 0;
+    }
+
+    int clicked_title = ui_button_id(c, 0x4000 + menu_id, title, label);
+    if (clicked_title) {
+        state->open = 1;
+        state->menu_id = menu_id;
+        state->x = title.x;
+        state->y = title.y + title.h;
+        struct gfx_rect popup = menu_rect(c, state->x, state->y,
+                                          items, item_count);
+        state->x = popup.x;
+        state->y = popup.y;
+        state->w = popup.w;
+        state->h = popup.h;
+    }
+
+    if (!state->open || state->menu_id != menu_id)
+        return 0;
+    int result = draw_menu_popup(c, items, item_count, state->x, state->y,
+                                 0x4100 + menu_id * 32);
+    if (result)
+        state->open = 0;
+    return result;
+}
+
+int ui_context_menu(struct ui_context *c, struct ui_menu_state *state,
+                    struct gfx_rect anchor,
+                    const struct ui_menu_item *items, int item_count) {
+    if (!c || !state || !items || item_count <= 0)
+        return 0;
+
+    int right_pressed = (c->buttons & MOUSE_BTN_RIGHT) &&
+                        !(c->was_buttons & MOUSE_BTN_RIGHT);
+    if (right_pressed && gfx_rect_contains(anchor, c->mx, c->my)) {
+        state->open = 1;
+        state->x = c->mx;
+        state->y = c->my;
+        struct gfx_rect popup = menu_rect(c, state->x, state->y,
+                                          items, item_count);
+        state->x = popup.x;
+        state->y = popup.y;
+        state->w = popup.w;
+        state->h = popup.h;
+    } else if (state->open && right_pressed &&
+               !gfx_rect_contains(anchor, c->mx, c->my)) {
+        state->open = 0;
+    }
+
+    if (!state->open)
+        return 0;
+    struct gfx_rect popup = menu_rect(c, state->x, state->y, items, item_count);
+    int result = draw_menu_popup(c, items, item_count, state->x, state->y,
+                                 0x5000);
+    if (result) {
+        state->open = 0;
+        return result;
+    }
+    if (!c->down && c->was_down &&
+        !gfx_rect_contains(popup, c->mx, c->my))
+        state->open = 0;
+    return 0;
 }
 
 static int ui_next_id(struct ui_context *c) {

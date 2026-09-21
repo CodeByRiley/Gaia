@@ -51,7 +51,7 @@ payloads=(
 	"userspace/bin/heimdall/heimdall.elf::system/bin/heimdall.elf"
 	"userspace/bin/diskinfo/diskinfo.elf::system/bin/diskinfo.elf"
 	"userspace/bin/notepad/notepad.elf::system/bin/notepad.elf"
-	"userspace/bin/deskelf/deskelf.elf::system/bin/deskelf.elf"
+	"userspace/bin/hermes/hermes.elf::system/bin/hermes.elf"
 	"userspace/bin/umount/umount.elf::system/bin/umount.elf"
 	"userspace/bin/lsdisk/lsdisk.elf::system/bin/lsdisk.elf"
 	"userspace/bin/reboot/reboot.elf::system/bin/reboot.elf"

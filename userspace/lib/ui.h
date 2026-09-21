@@ -61,12 +61,30 @@ struct ui_context {
     const struct ui_theme *theme;
 
     int mx, my;             /* pointer, in surface coordinates            */
+    int buttons;            /* complete MOUSE_BTN_* mask                  */
+    int was_buttons;        /* previous frame's complete button mask      */
     int down;               /* primary button held this frame             */
     int was_down;           /* ...and last frame, for edge detection      */
 
     int hot;                /* widget under the pointer                   */
     int active;             /* widget that took the press                 */
     int next_id;
+};
+
+/* Menus are immediate-mode too: the caller owns one small state object and
+ * supplies the visible items every frame.  A menu item with enabled == 0 is
+ * drawn disabled and cannot be selected. */
+struct ui_menu_item {
+    const char *label;
+    int id;
+    int enabled;
+};
+
+struct ui_menu_state {
+    int open;
+    int menu_id;
+    int x, y;
+    int w, h;               /* last popup bounds, for outside-click close */
 };
 
 /* Start a frame. `buttons` is a MOUSE_BTN_* mask; only the left button
@@ -80,6 +98,21 @@ void ui_begin(struct ui_context *c, struct gfx_surface *s,
 /* Finish a frame. Releases the active widget once the button comes up, so
  * a press that ends outside its widget cancels rather than clicking. */
 void ui_end(struct ui_context *c);
+
+/* Draw one action-menu title.  Clicking the title opens its dropdown below
+ * `title`; a clicked item returns that item's caller-provided id, otherwise
+ * zero.  Multiple calls form a menu bar and share one ui_menu_state. */
+int ui_menu_bar_item(struct ui_context *c, struct ui_menu_state *state,
+                     int menu_id, struct gfx_rect title,
+                     const char *label,
+                     const struct ui_menu_item *items, int item_count);
+
+/* Open a popup menu when the secondary mouse button is pressed in `anchor`.
+ * While open, a primary click selects an item and a click outside dismisses
+ * it.  Returns the selected caller-provided item id, or zero. */
+int ui_context_menu(struct ui_context *c, struct ui_menu_state *state,
+                    struct gfx_rect anchor,
+                    const struct ui_menu_item *items, int item_count);
 
 /* Layout */
 

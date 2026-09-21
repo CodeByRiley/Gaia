@@ -76,8 +76,8 @@ def main() -> int:
         # Let the foreground exec return and its parent reap the client PML4.
         # With an owning framebuffer PTE, this freed the live scanout pool.
         time.sleep(0.5)
-        send_text(qmp, "deskelf\n")
-        if not wait_for_text(log_path, "deskelf: ready handle=", deadline):
+        send_text(qmp, "hermes\n")
+        if not wait_for_text(log_path, "hermes: ready handle=", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
             print("post-framebuffer process did not become ready",
                   file=sys.stderr)
@@ -100,7 +100,7 @@ def main() -> int:
             return 1
 
         send_text(qmp, "q")
-        if not wait_for_text(log_path, "deskelf: exit", deadline):
+        if not wait_for_text(log_path, "hermes: exit", deadline):
             print(log_path.read_text(encoding="utf-8", errors="replace"))
             print("guest stopped responding after resize", file=sys.stderr)
             return 1

@@ -349,7 +349,7 @@ It runs fifteen scripts covering:
 - Muse liveness
 - framebuffer mapping lifetime
 - virtio-gpu resizing
-- Deskelf
+- Hermes
 - Netmon
 - ARP
 - ping
