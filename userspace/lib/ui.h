@@ -33,6 +33,9 @@
 
 #include <lib/gfx.h>
 
+#define UI_DOUBLE_CLICK_TICKS 185u
+#define UI_DOUBLE_CLICK_SLOP 4
+
 /* Theme */
 
 struct ui_theme {
@@ -69,6 +72,9 @@ struct ui_context {
     int hot;                /* widget under the pointer                   */
     int active;             /* widget that took the press                 */
     int next_id;
+    int last_click_id;
+    int last_click_x, last_click_y;
+    uint32_t last_click_tick;
 };
 
 /* Menus are immediate-mode too: the caller owns one small state object and
@@ -151,6 +157,11 @@ void ui_label_muted(struct ui_context *c, struct gfx_rect r,
 int  ui_button(struct ui_context *c, struct gfx_rect r, const char *label);
 int  ui_button_id(struct ui_context *c, int id, struct gfx_rect r,
                   const char *label);
+
+/* As ui_button_id, also reporting whether this release completed a second
+ * click on the same widget within the standard double-click interval. */
+int  ui_button_id_double(struct ui_context *c, int id, struct gfx_rect r,
+                         const char *label, int *double_clicked);
 
 /* Beveled button with a centered mask icon. Every non-zero mask byte draws
  * `icon_color`; dimensions are in source mask bytes before scaling. */

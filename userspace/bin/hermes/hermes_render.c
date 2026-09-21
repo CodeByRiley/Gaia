@@ -224,7 +224,9 @@ static int draw_details(struct ui_context *ui, struct gfx_surface *surface,
         int index = scroll + row_index;
         struct gfx_rect row = gfx_rect_make(inside.x, inside.y + header_h +
                                             row_index * row_h, inside.w, row_h);
-        int clicked = ui_button_id(ui, UI_ID_ENTRY_BASE + index, row, "");
+        int double_clicked = 0;
+        int clicked = ui_button_id_double(
+            ui, UI_ID_ENTRY_BASE + index, row, "", &double_clicked);
         gfx_fill(surface, row, index == selected ? WIN98_SELECT : WIN98_WHITE);
         if (entries[index].is_dir)
             draw_folder_icon(surface, row.x + 4, row.y + 2, index == selected);
@@ -246,6 +248,10 @@ static int draw_details(struct ui_context *ui, struct gfx_surface *surface,
                                             "--", text, 1, 3, GFX_TEXT_RIGHT);
         if (clicked) {
             selected = index;
+            changed = 1;
+        }
+        if (double_clicked) {
+            activate_selected();
             changed = 1;
         }
     }

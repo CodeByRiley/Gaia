@@ -341,8 +341,28 @@ static int button_box(struct ui_context *c, int id, struct gfx_rect r,
     return clicked;
 }
 
-int ui_button_id(struct ui_context *c, int id, struct gfx_rect r,
-                 const char *label) {
+static int note_button_click(struct ui_context *c, int id,
+                             struct gfx_rect r) {
+    uint32_t now = (uint32_t)get_ticks();
+    int dx = c->mx - c->last_click_x;
+    int dy = c->my - c->last_click_y;
+    if (dx < 0)
+        dx = -dx;
+    if (dy < 0)
+        dy = -dy;
+    int doubled = c->last_click_id == id &&
+                  now - c->last_click_tick < UI_DOUBLE_CLICK_TICKS &&
+                  dx <= UI_DOUBLE_CLICK_SLOP && dy <= UI_DOUBLE_CLICK_SLOP;
+    c->last_click_id = id;
+    c->last_click_x = c->mx;
+    c->last_click_y = c->my;
+    c->last_click_tick = now;
+    (void)r;
+    return doubled;
+}
+
+int ui_button_id_double(struct ui_context *c, int id, struct gfx_rect r,
+                        const char *label, int *double_clicked) {
     const struct ui_theme *t = c->theme;
     int held = 0;
     int clicked = button_box(c, id, r, &held);
@@ -351,7 +371,14 @@ int ui_button_id(struct ui_context *c, int id, struct gfx_rect r,
     if (held) { lr.x += 1; lr.y += 1; }
     text_in(c, lr, label, t->text, 1);
 
+    if (double_clicked)
+        *double_clicked = clicked ? note_button_click(c, id, r) : 0;
     return clicked;
+}
+
+int ui_button_id(struct ui_context *c, int id, struct gfx_rect r,
+                 const char *label) {
+    return ui_button_id_double(c, id, r, label, 0);
 }
 
 int ui_icon_button(struct ui_context *c, struct gfx_rect r,
