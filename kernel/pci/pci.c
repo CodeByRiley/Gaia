@@ -484,7 +484,7 @@ int pci_enable_memory(struct pci_device *d) {
 }
 
 void pci_enable(struct pci_device *d) {
-    u16 cmd = pci_read16(d->addr, PCI_CFG_COMMAND);
+    u16 cmd = pci_read_word(d->addr, PCI_CFG_COMMAND);
     /* I/O as well as memory: plenty of devices (UHCI, IDE, legacy NICs) put
      * their entire register set behind an I/O BAR, and leaving IO decoding
      * off means every inb/outb to it reads back 0xFF and drops writes. We got
@@ -492,5 +492,17 @@ void pci_enable(struct pci_device *d) {
     cmd |= PCI_CMD_IO | PCI_CMD_MEM | PCI_CMD_BUS_MASTER;
     /* Keep INTx enabled (clear INT_DISABLE) for legacy IRQ delivery. */
     cmd &= ~PCI_CMD_INT_DISABLE;
-    pci_write16(d->addr, PCI_CFG_COMMAND, cmd);
+    pci_write_word(d->addr, PCI_CFG_COMMAND, cmd);
+}
+
+void pci_disable(struct pci_device *d) {
+	u16 cmd;
+	if (d == 0)
+		return;
+
+	cmd = pci_read_word(d->addr, PCI_CFG_COMMAND);
+	cmd &= ~(PCI_CMD_IO | PCI_CMD_MEM | PCI_CMD_BUS_MASTER);
+	cmd |= PCI_CMD_INT_DISABLE;
+
+	pci_write_word(d->addr, PCI_CFG_COMMAND, cmd);
 }
