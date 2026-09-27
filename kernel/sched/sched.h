@@ -168,8 +168,19 @@ struct task_context {
 
   /*
    * x87/SSE state. Must remain 16-byte aligned for fxsave/fxrstor.
+   *
+   * fxstate is what context_switch saves and restores: whatever the
+   * registers held when the task last gave up the CPU, which inside a
+   * syscall is kernel state.
+   *
+   * user_fx is the ring-3 state, saved on every entry from user mode
+   * (syscall.asm, isr_common) and restored on every return. The kernel is
+   * built with SSE, and plenty of it , IPC, framebuffer present, printf ,
+   * compiles to xmm code, so without this a syscall silently rewrote the
+   * caller's vector registers. Signal frames copy from and into it.
    */
   u8 fxstate[512] ALIGNED(16);
+  u8 user_fx[512] ALIGNED(16);
 };
 
 /// Task control block

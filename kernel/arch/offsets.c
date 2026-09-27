@@ -21,6 +21,7 @@
 #include <arch/percpu.h>
 #include <arch/syscall.h>
 #include <interrupts/idt.h>
+#include <sched/sched.h>
 
 #include <stddef.h>
 
@@ -88,4 +89,9 @@ void asm_offsets(void) {
   ASM_DEFINE(GDT_KERNEL_DATA_SEL, GDT_KERNEL_DATA);
   ASM_DEFINE(GDT_USER_CODE_RPL3, GDT_USER_CODE | 3);
   ASM_DEFINE(GDT_USER_DATA_RPL3, GDT_USER_DATA | 3);
+
+  /* The ring-3 FPU image, reached as current->context->user_fx on every
+   * entry from and return to user mode. */
+  ASM_DEFINE(TASK_CONTEXT_OFF, offsetof(struct task, context));
+  ASM_DEFINE(TASK_CONTEXT_USER_FX_OFF, offsetof(struct task_context, user_fx));
 }
