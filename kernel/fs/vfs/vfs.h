@@ -86,6 +86,10 @@ struct vfs_file {
     /* Compatibility snapshots; vfs_file_stat refreshes from the inode. */
     uint64_t size, inode;
     uint8_t type, attributes;
+    /* Descriptors sharing this file after dup() or stdio inheritance. The
+     * fd layer owns it: the last release closes the file. Zero for files
+     * the kernel opens for itself. */
+    uint32_t fd_refs;
 };
 /* Backend-only reference helpers: caller must already hold the VFS gate. */
 struct vfs_inode *vfs_inode_get(struct vfs_superblock *super, uint64_t number,

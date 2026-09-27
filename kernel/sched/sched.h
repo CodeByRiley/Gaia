@@ -69,6 +69,7 @@
 struct socket;
 struct vfs_file;
 struct wq_entry;
+struct pipe;
 
 
 /* Scheduler and VM types */
@@ -83,11 +84,18 @@ enum task_state {
 };
 
 /* File descriptor state */
+/* An unused slot 0, 1 or 2 means the task's console, which is what every
+ * task had before stdio could be redirected. TASK_FD_TTY names the console
+ * explicitly, for when dup() copies it somewhere else , a shell saving its
+ * stdout before pointing fd 1 at a pipe. */
 enum task_fd_type {
   TASK_FD_UNUSED = 0,
   TASK_FD_FILE,
   TASK_FD_DIRECTORY,
   TASK_FD_SOCKET,
+  TASK_FD_TTY,
+  TASK_FD_PIPE_READ,
+  TASK_FD_PIPE_WRITE,
 };
 
 struct task_fd {
@@ -98,6 +106,7 @@ struct task_fd {
   union {
     struct vfs_file *file;
     struct socket *socket;
+    struct pipe *pipe;
     void *object;
   };
 
@@ -190,6 +199,9 @@ struct task {
    * still has to read exit_code. */
   int unclaimed;
   long exit_code;
+  /* Created by task_spawn_thread. A thread is not a child process: wait4
+   * does not count it, and its exit leaves no exit record. */
+  int is_thread;
 
 
   // Kernel execution.
@@ -271,6 +283,29 @@ static inline int task_fd_is_dir(struct task *t, int fd) {
   return s != NULL && s->type == TASK_FD_DIRECTORY;
 }
 
+/* The pipe behind a pipe fd, NULL for anything else. `write_end` reports
+ * which end it is. */
+static inline struct pipe *task_fd_pipe(struct task *t, int fd, int *write_end) {
+  struct task_fd *s = task_fd_slot(t, fd);
+  if (s == NULL ||
+      (s->type != TASK_FD_PIPE_READ && s->type != TASK_FD_PIPE_WRITE))
+    return NULL;
+  if (write_end)
+    *write_end = s->type == TASK_FD_PIPE_WRITE;
+  return s->pipe;
+}
+
+/* Does fd reach the console? True for the explicit TTY type and for an
+ * unused standard slot. Tasks with no descriptor table are all console. */
+static inline int task_fd_is_console(struct task *t, int fd) {
+  if (fd < 0 || fd >= TASK_MAX_FDS)
+    return 0;
+  if (t == NULL || t->files == NULL)
+    return fd < 3;
+  enum task_fd_type type = t->files->fd[fd].type;
+  return type == TASK_FD_TTY || (fd < 3 && type == TASK_FD_UNUSED);
+}
+
 
 /* Address-space accessor                                                     */
 /*
@@ -288,6 +323,17 @@ static inline u64 *task_pml4(struct task *t) {
  * file or socket , the caller owns that , but it does free the directory
  * path, which is the one thing the slot allocated for itself. */
 void task_fd_clear(struct task_fd *slot);
+
+/* Drop the slot's reference to its object , closing the file, socket or
+ * pipe end when it was the last , and clear it. What close() does. Safe on
+ * an unused slot. May sleep in the VFS for a file's last reference. */
+void task_fd_release(struct task_fd *slot);
+
+/* Make `dst` a second reference to what `src` holds, as dup() does. `dst`
+ * must be unused. An unused standard slot copies as TASK_FD_TTY when
+ * `src_is_console` is set. Returns -1 if a directory path copy fails. */
+int task_fd_dup(struct task_fd *dst, const struct task_fd *src,
+                int src_is_console);
 
 /* Point a directory slot at `path`, allocating its copy. Returns -1 if the
  * copy cannot be allocated, leaving the slot's path unset. */
@@ -372,8 +418,26 @@ void task_inherit_cwd(struct task *child, struct task *parent);
  * no parent, which is what a kthread wants. */
 void task_inherit_tty(struct task *child, struct task *parent);
 
+/* Give the child references to the parent's fds 0-2, so a shell can point
+ * its own stdout at a pipe, spawn, and have the child write into it. Only
+ * the standard three: inheriting everything would hand every child a copy
+ * of every pipe end its parent holds, and a reader never sees EOF while a
+ * stray copy of the write end is alive somewhere. */
+void task_inherit_stdio(struct task *child, struct task *parent);
+
 void task_sleep_ticks(u64 ticks);
 void sched_wake_sleepers(void);
+
+/* Wait for a child of the calling task to exit, as wait4 does. `pid` > 0
+ * names one child, -1 accepts any. Returns the child's pid and stores its
+ * exit code; returns 0 when `nohang` and no child has exited yet, and
+ * -ECHILD when there is no such child to wait for.
+ *
+ * A child that exits while nobody is blocked on it leaves an exit record ,
+ * pid, parent and code , and its slot is reaped as before. This is what
+ * reads it back. Records are bounded (TASK_EXIT_RECORDS); when full the
+ * oldest is dropped, and a parent's records go when the parent exits. */
+long task_wait_child(int pid, long *code, int nohang);
 
 void task_reap(struct task *t);
 int task_reap_unclaimed(void);

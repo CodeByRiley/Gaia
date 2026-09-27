@@ -31,6 +31,7 @@
 #include <memory/heap.h>
 #include <memory/hhdm.h>
 #include <msg/msg.h>
+#include <msg/pipe.h>
 #include <net/ksocket.h>
 #include <sched/sched.h>
 #include <sync/waitqueue.h>
@@ -150,6 +151,47 @@ static int n_sleeping = 0;
  * sched_wake_sleepers walks the table only when one of the two is non-zero.
  * Every path that ends a timed block goes through block_clear_deadline. */
 static int n_timed_blocked = 0;
+
+/* Exit codes of children nobody was blocked on when they exited, kept so a
+ * later wait4 can still collect them after the reaper frees the slot. See
+ * task_wait_child. pid 0 marks a free record. */
+#define TASK_EXIT_RECORDS 32
+struct exit_record {
+  int pid;
+  int parent_pid;
+  long code;
+  u64 seq;
+};
+static struct exit_record exit_records[TASK_EXIT_RECORDS];
+static u64 exit_record_seq;
+/* Woken on every process exit; wait4 callers re-scan. */
+static struct wait_queue child_exit_wq = WAIT_QUEUE_INIT;
+
+static void exit_record_add(int pid, int parent_pid, long code) {
+  struct exit_record *slot = &exit_records[0];
+  for (int i = 0; i < TASK_EXIT_RECORDS; i++) {
+    if (exit_records[i].pid == 0) {
+      slot = &exit_records[i];
+      break;
+    }
+    if (exit_records[i].seq < slot->seq)
+      slot = &exit_records[i];
+  }
+  if (slot->pid != 0)
+    log_write_hex("sched: exit records full, dropped pid", (u64)slot->pid,
+                  KERNEL, LOG_WARN);
+  slot->pid = pid;
+  slot->parent_pid = parent_pid;
+  slot->code = code;
+  slot->seq = ++exit_record_seq;
+}
+
+/* A parent that exits can never collect its children's codes. */
+static void exit_records_drop_parent(int parent_pid) {
+  for (int i = 0; i < TASK_EXIT_RECORDS; i++)
+    if (exit_records[i].pid && exit_records[i].parent_pid == parent_pid)
+      exit_records[i].pid = 0;
+}
 
 static void block_clear_deadline(struct task *t) {
   if (t->block_deadline) {
@@ -294,6 +336,93 @@ void task_fd_clear(struct task_fd *slot) {
   slot->object = 0;
   slot->dir_index = 0;
   slot->flags = 0;
+}
+
+void task_fd_release(struct task_fd *slot) {
+  if (!slot)
+    return;
+  switch (slot->type) {
+  case TASK_FD_FILE:
+  case TASK_FD_DIRECTORY:
+    if (slot->file) {
+      if (slot->file->fd_refs > 1) {
+        slot->file->fd_refs--;
+      } else {
+        vfs_close(slot->file);
+        kfree(slot->file);
+      }
+    }
+    break;
+  case TASK_FD_SOCKET:
+    if (slot->socket) {
+      if (slot->socket->fd_refs > 1)
+        slot->socket->fd_refs--;
+      else
+        socket_close(slot->socket);
+    }
+    break;
+  case TASK_FD_PIPE_READ:
+  case TASK_FD_PIPE_WRITE:
+    if (slot->pipe)
+      pipe_unref(slot->pipe, slot->type == TASK_FD_PIPE_WRITE);
+    break;
+  case TASK_FD_UNUSED:
+  case TASK_FD_TTY:
+    break;
+  }
+  task_fd_clear(slot);
+}
+
+int task_fd_dup(struct task_fd *dst, const struct task_fd *src,
+                int src_is_console) {
+  if (!dst || !src)
+    return -1;
+  task_fd_clear(dst);
+  if (src->type == TASK_FD_UNUSED) {
+    if (src_is_console)
+      dst->type = TASK_FD_TTY;
+    return 0;
+  }
+
+  if (src->type == TASK_FD_DIRECTORY &&
+      task_fd_set_dir_path(dst, src->dir_path) != 0)
+    return -1;
+
+  switch (src->type) {
+  case TASK_FD_FILE:
+  case TASK_FD_DIRECTORY:
+    src->file->fd_refs++;
+    break;
+  case TASK_FD_SOCKET:
+    src->socket->fd_refs++;
+    break;
+  case TASK_FD_PIPE_READ:
+  case TASK_FD_PIPE_WRITE:
+    pipe_ref(src->pipe, src->type == TASK_FD_PIPE_WRITE);
+    break;
+  case TASK_FD_UNUSED:
+  case TASK_FD_TTY:
+    break;
+  }
+
+  /* The copy shares the open file, so it shares its status flags too. */
+  dst->type = src->type;
+  dst->object = src->object;
+  dst->flags = src->flags;
+  dst->dir_index = src->dir_index;
+  return 0;
+}
+
+void task_inherit_stdio(struct task *child, struct task *parent) {
+  if (!child || !child->files || !parent || !parent->files)
+    return;
+  for (int fd = 0; fd < 3; fd++) {
+    /* An unused parent slot is the console, and so is an unused child slot:
+     * leaving it unused keeps the child on its own inherited TTY channel. */
+    if (parent->files->fd[fd].type == TASK_FD_UNUSED)
+      continue;
+    task_fd_dup(&child->files->fd[fd], &parent->files->fd[fd], 0);
+  }
 }
 
 int task_fd_set_dir_path(struct task_fd *slot, const char *path) {
@@ -716,6 +845,7 @@ struct task *task_spawn_user(u64 *user_pml4, u64 entry, u64 user_rsp,
 
   task_inherit_cwd(t, task_current());
   task_inherit_tty(t, task_current());
+  task_inherit_stdio(t, task_current());
   fxstate_init(t->context->fxstate);
 
   ready_push(t);
@@ -758,6 +888,7 @@ struct task *task_reserve_user(int parent_pid) {
   }
   task_inherit_cwd(t, task_current());
   task_inherit_tty(t, task_current());
+  task_inherit_stdio(t, task_current());
   fxstate_init(t->context->fxstate);
   return t;
 }
@@ -826,6 +957,7 @@ struct task *task_spawn_thread(u64 entry, u64 user_stack) {
   t->kstack = stack_base;
   t->kthread_entry = 0;
   t->next = 0;
+  t->is_thread = 1;
 
   if (task_state_alloc(t, 1) != 0) {
     kfree(stack_base);
@@ -1159,6 +1291,19 @@ static void mark_task_exited(struct task *task, long code) {
   wq_remove_all(task);
   block_clear_deadline(task);
 
+  /* Pipe ends go now rather than at reap. Reaping can lag exit by a reaper
+   * interval, and the reader on the far side sees EOF only once the last
+   * write end is gone , a pipeline would stall waiting for a dead writer.
+   * Releasing a pipe end never sleeps, so this is safe with IRQs off;
+   * files and sockets still wait for task_close_fds. */
+  if (task->files) {
+    for (int i = 0; i < TASK_MAX_FDS; i++) {
+      struct task_fd *slot = &task->files->fd[i];
+      if (slot->type == TASK_FD_PIPE_READ || slot->type == TASK_FD_PIPE_WRITE)
+        task_fd_release(slot);
+    }
+  }
+
   task->state = TASK_ZOMBIE;
   task->exit_code = code;
 
@@ -1182,6 +1327,67 @@ static void mark_task_exited(struct task *task, long code) {
     }
   }
   task->unclaimed = !claimed;
+
+  /* Nobody took the code now, so keep it for a later wait4 by the parent.
+   * Kernel-spawned tasks have no parent to ask. */
+  exit_records_drop_parent(task->pid);
+  struct task *parent = task_find(task->parent_pid);
+  if (!claimed && task->parent_pid > 0 && parent &&
+      parent->state != TASK_ZOMBIE && parent->state != TASK_DEAD)
+    exit_record_add(task->pid, task->parent_pid, code);
+  wq_wake_all(&child_exit_wq);
+}
+
+/* A live child of `parent` matching `pid` (-1 = any)? Zombies do not count:
+ * an unclaimed one already left its exit record, and a claimed one belongs
+ * to whoever is blocked on it. */
+static int has_live_child(int parent, int pid) {
+  for (int i = 0; i < MAX_TASKS; i++) {
+    struct task *t = &tasks[i];
+    if (t->pid == 0 || t->parent_pid != parent || t->is_thread)
+      continue;
+    if (pid != -1 && t->pid != pid)
+      continue;
+    if (t->state != TASK_ZOMBIE && t->state != TASK_DEAD)
+      return 1;
+  }
+  return 0;
+}
+
+long task_wait_child(int pid, long *code, int nohang) {
+  struct task *me = current;
+  if (!me || (pid != -1 && pid <= 0))
+    return -EINVAL;
+
+  u64 flags = irq_save();
+  long rc;
+  for (;;) {
+    struct exit_record *found = 0;
+    for (int i = 0; i < TASK_EXIT_RECORDS; i++) {
+      struct exit_record *r = &exit_records[i];
+      if (r->pid && r->parent_pid == me->pid && (pid == -1 || r->pid == pid) &&
+          (!found || r->seq < found->seq))
+        found = r;
+    }
+    if (found) {
+      rc = found->pid;
+      if (code)
+        *code = found->code;
+      found->pid = 0;
+      break;
+    }
+    if (!has_live_child(me->pid, pid)) {
+      rc = -ECHILD;
+      break;
+    }
+    if (nohang) {
+      rc = 0;
+      break;
+    }
+    wq_wait(&child_exit_wq, 0);
+  }
+  irq_restore(flags);
+  return rc;
 }
 
 int task_kill(int pid, long code) {
@@ -1294,26 +1500,14 @@ void task_exit_thread(void) {
   context_enter(next->saved_rsp, next->cr3, next->context->fxstate);
 }
 
-/* fd 0-2 are the standard streams and were never backed by an allocation.
- * Files, directories and sockets each release their object, as close()
- * would; a socket left open here stayed bound to its port for the life of
- * the kernel. task_fd_clear then drops the slot's own directory-path
- * allocation. */
+/* Every slot, the standard three included: stdio can hold a pipe or a file
+ * now, inherited or dup'd there. task_fd_release drops one reference each,
+ * as close() would, so an object shared with another task stays open. */
 static void task_close_fds(struct task *t) {
   if (!t || !t->files)
     return;
-  for (int i = 3; i < TASK_MAX_FDS; i++) {
-    struct task_fd *slot = &t->files->fd[i];
-    if (slot->type == TASK_FD_FILE || slot->type == TASK_FD_DIRECTORY) {
-      if (slot->file) {
-        vfs_close(slot->file);
-        kfree(slot->file);
-      }
-    } else if (slot->type == TASK_FD_SOCKET) {
-      socket_close(slot->socket);
-    }
-    task_fd_clear(slot);
-  }
+  for (int i = 0; i < TASK_MAX_FDS; i++)
+    task_fd_release(&t->files->fd[i]);
 }
 
 static void task_release_address_space(struct task *t) {

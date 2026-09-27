@@ -83,6 +83,8 @@ struct socket {
     struct wait_queue readers;
 
     struct spinlock lock;
+    /* Descriptors referring to this socket; the last close frees it. */
+    u32 fd_refs;
     struct socket *next;    // Linked list for the global socket table
 };
 

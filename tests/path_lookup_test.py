@@ -33,6 +33,7 @@ QEMU_KEYS = {
     ".": "dot",
     "-": "minus",
     ",": "comma",
+    "|": "shift-backslash",
 }
 
 

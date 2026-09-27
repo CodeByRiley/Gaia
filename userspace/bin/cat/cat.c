@@ -1,4 +1,4 @@
-/* userspace/bin/cat/cat.c , dump one or more files to stdout.
+/* userspace/bin/cat/cat.c , dump one or more files, or stdin, to stdout.
  *
  * The first binary that was built against musl rather than userspace/lib,
  * and still the smallest one that touches startup, stdio and the syscall
@@ -30,8 +30,25 @@ static int cat_one(const char *path) {
     return 0;
 }
 
+/* No files: copy stdin, which is what makes cat the end of a pipeline. A
+ * terminal on stdin still gets the usage line , console reads do not
+ * block, so cat there would just exit silently. */
+static int cat_stdin(void) {
+    char buf[256];
+    long n;
+    while ((n = read(0, buf, sizeof(buf))) > 0) {
+        if (write(1, buf, (size_t)n) < 0) {
+            perror("cat: write");
+            return 1;
+        }
+    }
+    return n < 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
+        if (!isatty(0))
+            return cat_stdin();
         printf("usage: cat FILE...\n");
         return 1;
     }

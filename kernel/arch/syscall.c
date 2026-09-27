@@ -50,6 +50,7 @@
 #include <memory/uvm.h>
 #include <memory/vmm.h>
 #include <msg/msg.h>
+#include <msg/pipe.h>
 #include <net/icmp.h>
 #include <net/ksocket.h>
 #include <net/netmon.h>
@@ -156,7 +157,13 @@ _Static_assert(SYSRET_STAR_BASE + 16 == (GDT_USER_CODE | GDT_RPL_USER),
 #define POLLIN 0x0001
 #define POLLOUT 0x0004
 #define POLLERR 0x0008
+#define POLLHUP 0x0010
 #define POLLNVAL 0x0020
+
+#define F_DUPFD_CLOEXEC 1030
+#define WNOHANG 1
+#define S_IFIFO 0010000
+#define S_IFCHR 0020000
 
 struct linux_iovec {
   void *base;
@@ -302,6 +309,7 @@ static int fd_alloc_for(struct task *t, struct vfs_file *f) {
     task_fd_clear(slot); /* drops any directory path left by the last owner */
     slot->type = TASK_FD_FILE;
     slot->file = f;
+    f->fd_refs = 1;
     return i;
   }
   return -1;
@@ -635,11 +643,20 @@ static int caller_tty(void) {
   return t ? t->tty : TTY_KERNEL;
 }
 
+static int fd_nonblocking(struct task *t, int fd);
+
+/* fd 1 and 2 reach the console unless something was put there , a pipe a
+ * shell set up, or one inherited from it , so the question is always what
+ * the slot holds, never what the number is. */
 static long sys_write(long fd, const void *buf, long n) {
   if (!buf || n < 0 || !user_buffer_ok(buf, (u64)n, 0))
     return -EFAULT;
 
-  if (fd == 1 || fd == 2) {
+  struct task *t = task_current();
+  if (fd < 0 || fd >= TASK_MAX_FDS)
+    return -EBADF;
+
+  if (task_fd_is_console(t, (int)fd)) {
     tty_write_ch(caller_tty(), (const char *)buf, (usize)n);
 
     const char *p = (const char *)buf;
@@ -649,9 +666,15 @@ static long sys_write(long fd, const void *buf, long n) {
     return n;
   }
 
-  struct task *t = task_current();
-  if (!t || fd < 3 || fd >= TASK_MAX_FDS || !task_fd_file(t, (int)fd) ||
-      task_fd_is_dir(t, (int)fd))
+  int write_end = 0;
+  struct pipe *pipe = task_fd_pipe(t, (int)fd, &write_end);
+  if (pipe) {
+    if (!write_end)
+      return -EBADF;
+    return pipe_write(pipe, buf, (usize)n, fd_nonblocking(t, (int)fd));
+  }
+
+  if (!task_fd_file(t, (int)fd) || task_fd_is_dir(t, (int)fd))
     return -EBADF;
 
   return (long)vfs_write(task_fd_file(t, (int)fd), buf, (usize)n);
@@ -1286,17 +1309,35 @@ static long sys_rmdir(const char *path) {
 
 static long sys_read(int fd, void *buf, usize n) {
   struct task *t = task_current();
+  if (fd < 0 || fd >= TASK_MAX_FDS)
+    return -EBADF;
 
-  /* Handle standard input (fd 0) */
-  if (fd == 0) {
+  /* The console, when nothing has been put in the slot. */
+  if (task_fd_is_console(t, fd)) {
     if (!t || !buf || n <= 0 || !user_buffer_ok(buf, n, 1))
       return -EFAULT;
     return sys_tty_read_input((char *)buf, (long)n);
   }
 
-  /* Handle normal files (fd >= 3) */
-  if (!t || fd < 3 || fd >= TASK_MAX_FDS || !task_fd_file(t, fd) ||
-      task_fd_is_dir(t, fd))
+  int write_end = 0;
+  struct pipe *pipe = task_fd_pipe(t, fd, &write_end);
+  if (pipe) {
+    if (write_end)
+      return -EBADF;
+    if (!buf || !user_buffer_ok(buf, n, 1))
+      return -EFAULT;
+    return pipe_read(pipe, buf, n, fd_nonblocking(t, fd));
+  }
+
+  struct socket *sock = task_fd_socket(t, fd);
+  if (sock) {
+    if (!buf || !user_buffer_ok(buf, n, 1))
+      return -EFAULT;
+    return socket_recvfrom(sock, buf, n, NULL,
+                           fd_nonblocking(t, fd) ? SOCKET_RECV_NONBLOCK : 0);
+  }
+
+  if (!t || !task_fd_file(t, fd) || task_fd_is_dir(t, fd))
     return -EBADF;
 
   struct vfs_file *file = task_fd_file(t, fd);
@@ -1405,10 +1446,23 @@ static long sys_fstat(int fd, struct linux_kstat *out) {
   struct task *t = task_current();
   if (!out)
     return -EFAULT;
-  if (!t || fd < 3 || fd >= TASK_MAX_FDS || !task_fd_file(t, fd))
+  if (!t || fd < 0 || fd >= TASK_MAX_FDS)
     return -EBADF;
   if (!user_buffer_ok(out, sizeof(*out), 1))
     return -EFAULT;
+
+  /* Pipes and the console have no inode; report the type so isatty-style
+   * probes and S_ISFIFO answer correctly. */
+  if (task_fd_is_console(t, fd) || task_fd_pipe(t, fd, NULL)) {
+    int console = task_fd_is_console(t, fd);
+    memset(out, 0, sizeof(*out));
+    out->st_nlink = 1;
+    out->st_mode = console ? (S_IFCHR | 0620) : (S_IFIFO | 0600);
+    out->st_blksize = console ? 1024 : PIPE_CAPACITY;
+    return 0;
+  }
+  if (!task_fd_file(t, fd))
+    return -EBADF;
 
   struct vfs_stat fs;
   if (task_fd_is_dir(t, fd)) {
@@ -1426,7 +1480,10 @@ static long sys_fstat(int fd, struct linux_kstat *out) {
 
 static long sys_lseek(int fd, long off, int whence) {
   struct task *t = task_current();
-  if (!t || fd < 3 || fd >= TASK_MAX_FDS || !task_fd_file(t, fd) ||
+  if (task_fd_is_console(t, fd) || task_fd_pipe(t, fd, NULL) ||
+      task_fd_socket(t, fd))
+    return -ESPIPE;
+  if (!t || fd < 0 || fd >= TASK_MAX_FDS || !task_fd_file(t, fd) ||
       task_fd_is_dir(t, fd))
     return -EBADF;
   struct vfs_file *f = task_fd_file(t, fd);
@@ -1456,31 +1513,145 @@ static long sys_lseek(int fd, long off, int whence) {
   return (long)target;
 }
 
+/* Closing a standard fd that still means the console succeeds and changes
+ * nothing: the slot was already "unused", which is how the console is
+ * spelled. Every allocation starts at fd 3, so it could not be reused by
+ * open() anyway. */
 static long sys_close(int fd) {
   struct task *t = task_current();
-  if (!t || fd < 3 || fd >= TASK_MAX_FDS)
-    return -EBADF;
-
   struct task_fd *slot = task_fd_slot(t, fd);
   if (!slot)
     return -EBADF;
-
-  /* Sockets share this fd space, so close() has to release them or every
-   * socket a program opens outlives it. */
-  if (slot->type == TASK_FD_SOCKET) {
-    socket_close(slot->socket);
-    task_fd_clear(slot);
-    return 0;
-  }
-
-  if (slot->type != TASK_FD_FILE && slot->type != TASK_FD_DIRECTORY)
-    return -EBADF;
-  if (slot->file) {
-    vfs_close(slot->file);
-    kfree(slot->file);
-  }
-  task_fd_clear(slot);
+  if (slot->type == TASK_FD_UNUSED)
+    return fd < 3 ? 0 : -EBADF;
+  task_fd_release(slot);
   return 0;
+}
+
+static int fd_is_known(struct task *t, int fd);
+
+/* Lowest unused slot at or above `from`. Standard slots are never handed
+ * out: unused there already means the console. */
+static int fd_lowest_free(struct task *t, int from) {
+  if (from < 3)
+    from = 3;
+  for (int fd = from; fd < TASK_MAX_FDS; fd++) {
+    struct task_fd *slot = task_fd_slot(t, fd);
+    if (slot && slot->type == TASK_FD_UNUSED)
+      return fd;
+  }
+  return -1;
+}
+
+static long fd_dup_into(struct task *t, int oldfd, int newfd) {
+  struct task_fd *src = task_fd_slot(t, oldfd);
+  struct task_fd *dst = task_fd_slot(t, newfd);
+  if (!src || !dst)
+    return -EBADF;
+  if (oldfd == newfd)
+    return newfd;
+  /* Take the new reference before dropping the old one, so dup2 onto a
+   * slot that holds the same object never closes it in between. */
+  struct task_fd copy = {0};
+  if (task_fd_dup(&copy, src, task_fd_is_console(t, oldfd)) != 0)
+    return -ENOMEM;
+  task_fd_release(dst);
+  *dst = copy;
+  return newfd;
+}
+
+static long sys_dup(int oldfd) {
+  struct task *t = task_current();
+  if (!fd_is_known(t, oldfd))
+    return -EBADF;
+  int fd = fd_lowest_free(t, 0);
+  if (fd < 0)
+    return -EMFILE;
+  return fd_dup_into(t, oldfd, fd);
+}
+
+static long sys_dup3(int oldfd, int newfd, int flags) {
+  struct task *t = task_current();
+  if (!fd_is_known(t, oldfd))
+    return -EBADF;
+  if (newfd < 0 || newfd >= TASK_MAX_FDS)
+    return -EBADF;
+  if (oldfd == newfd)
+    return -EINVAL;
+  (void)flags; /* O_CLOEXEC: there is no exec that keeps descriptors. */
+  return fd_dup_into(t, oldfd, newfd);
+}
+
+static long sys_dup2(int oldfd, int newfd) {
+  struct task *t = task_current();
+  if (oldfd == newfd)
+    return fd_is_known(t, oldfd) ? newfd : -EBADF;
+  return sys_dup3(oldfd, newfd, 0);
+}
+
+static long sys_pipe2(int *fds, int flags) {
+  struct task *t = task_current();
+  if (!fds || !user_buffer_ok(fds, 2 * sizeof(int), 1))
+    return -EFAULT;
+  if (!t || !t->files)
+    return -EBADF;
+
+  int rfd = fd_lowest_free(t, 0);
+  if (rfd < 0)
+    return -EMFILE;
+  int wfd = fd_lowest_free(t, rfd + 1);
+  if (wfd < 0)
+    return -EMFILE;
+
+  struct pipe *p = pipe_create();
+  if (!p)
+    return -ENOMEM;
+
+  struct task_fd *r = task_fd_slot(t, rfd);
+  struct task_fd *w = task_fd_slot(t, wfd);
+  task_fd_clear(r);
+  task_fd_clear(w);
+  r->type = TASK_FD_PIPE_READ;
+  r->pipe = p;
+  w->type = TASK_FD_PIPE_WRITE;
+  w->pipe = p;
+  if (flags & O_NONBLOCK) {
+    r->flags |= TASK_FD_NONBLOCK;
+    w->flags |= TASK_FD_NONBLOCK;
+  }
+
+  fds[0] = rfd;
+  fds[1] = wfd;
+  return 0;
+}
+
+/* Linux wait4 status word: exit code in bits 8-15. A negative code is a
+ * fault the kernel killed the task for , -11 from the #PF path , and is
+ * reported as death by that signal. task_kill's 128+N reads as an exit
+ * status of 128+N, which is what a shell would print anyway. */
+#define LINUX_RUSAGE_BYTES 144
+
+static long sys_wait4(int pid, int *status, int options, void *rusage) {
+  if (status && !user_buffer_ok(status, sizeof(*status), 1))
+    return -EFAULT;
+  if (rusage && !user_buffer_ok(rusage, LINUX_RUSAGE_BYTES, 1))
+    return -EFAULT;
+  if (options & ~WNOHANG)
+    return -EINVAL;
+
+  long code = 0;
+  long rc = task_wait_child(pid, &code, (options & WNOHANG) != 0);
+  if (rc > 0) {
+    if (status) {
+      if (code < 0 && code > -64)
+        *status = (int)(-code) & 0x7f;
+      else
+        *status = (int)((code & 0xff) << 8);
+    }
+    if (rusage)
+      memset(rusage, 0, LINUX_RUSAGE_BYTES);
+  }
+  return rc;
 }
 
 static long sys_readdir(u32 *index, char *buf, usize n) {
@@ -1605,7 +1776,10 @@ static long sys_writev(int fd, const struct linux_iovec *iov, long iovcnt) {
 static int fd_is_known(struct task *t, int fd) {
   if (!t || fd < 0 || fd >= TASK_MAX_FDS)
     return 0;
-  return fd < 3 || task_fd_file(t, fd) != 0 || task_fd_socket(t, fd) != 0;
+  if (task_fd_is_console(t, fd))
+    return 1;
+  struct task_fd *slot = task_fd_slot(t, fd);
+  return slot != NULL && slot->type != TASK_FD_UNUSED;
 }
 
 static int fd_nonblocking(struct task *t, int fd) {
@@ -1638,8 +1812,14 @@ static long sys_fcntl(int fd, int cmd, long arg) {
     return ((fd >= 3 && task_fd_is_dir(t, fd)) ? O_DIRECTORY : 0) |
            (fd_nonblocking(t, fd) ? O_NONBLOCK : 0);
   case F_DUPFD:
-    (void)arg;
-    return -ENOSYS;
+  case F_DUPFD_CLOEXEC: {
+    if (arg < 0 || arg >= TASK_MAX_FDS)
+      return -EINVAL;
+    int newfd = fd_lowest_free(t, (int)arg);
+    if (newfd < 0)
+      return -EMFILE;
+    return fd_dup_into(t, fd, newfd);
+  }
   default:
     return -EINVAL;
   }
@@ -1654,9 +1834,11 @@ static u64 ms_to_ticks(long ms) {
 
 /* One pass over the set, filling revents. Returns the ready count.
  *
- * Sockets report POLLIN only when a datagram is queued. Files and
- * directories are always readable. The console is writable but never
- * readable here: fd 0 has no wait queue yet, so reporting it would be a
+ * Sockets report POLLIN only when a datagram is queued, pipes when bytes
+ * are buffered; a pipe whose far end is gone reports POLLHUP (read end) or
+ * POLLERR (write end) whatever was asked, as POSIX has it. Files and
+ * directories are always ready. The console is writable but never
+ * readable here: it has no wait queue yet, so reporting input would be a
  * guess either way, and this keeps the old answer. */
 static long poll_scan(struct task *t, struct linux_pollfd *fds, long nfds) {
   long ready = 0;
@@ -1670,13 +1852,31 @@ static long poll_scan(struct task *t, struct linux_pollfd *fds, long nfds) {
       ready++;
       continue;
     }
-    if ((fds[i].events & POLLOUT) && fd != 0)
-      fds[i].revents |= POLLOUT;
-    if (fds[i].events & POLLIN) {
-      struct socket *sock = task_fd_socket(t, fd);
-      if (sock ? socket_readable(sock) : fd >= 3)
-        fds[i].revents |= POLLIN;
+    short want = fds[i].events;
+    short got = 0;
+    int write_end = 0;
+    struct pipe *pipe = task_fd_pipe(t, fd, &write_end);
+    struct socket *sock = task_fd_socket(t, fd);
+    if (pipe && !write_end) {
+      if ((want & POLLIN) && pipe->count)
+        got |= POLLIN;
+      if (pipe->writers == 0)
+        got |= POLLHUP;
+    } else if (pipe) {
+      if ((want & POLLOUT) && pipe->count < PIPE_CAPACITY && pipe->readers)
+        got |= POLLOUT;
+      if (pipe->readers == 0)
+        got |= POLLERR;
+    } else if (task_fd_is_console(t, fd)) {
+      if (want & POLLOUT)
+        got |= POLLOUT;
+    } else {
+      if (want & POLLOUT)
+        got |= POLLOUT;
+      if ((want & POLLIN) && (!sock || socket_readable(sock)))
+        got |= POLLIN;
     }
+    fds[i].revents = got;
     if (fds[i].revents)
       ready++;
   }
@@ -1713,9 +1913,17 @@ static long sys_poll(struct linux_pollfd *fds, long nfds, long timeout_ms) {
 
     int waiting = 0;
     for (long i = 0; i < nfds; i++) {
-      struct socket *sock =
-          fds[i].fd >= 0 ? task_fd_socket(t, fds[i].fd) : NULL;
-      if (sock && (fds[i].events & POLLIN))
+      int fd = fds[i].fd;
+      if (fd < 0)
+        continue;
+      int write_end = 0;
+      struct pipe *pipe = task_fd_pipe(t, fd, &write_end);
+      struct socket *sock = task_fd_socket(t, fd);
+      if (pipe && !write_end && (fds[i].events & POLLIN))
+        wq_add(&pipe->readable, &entries[waiting++]);
+      else if (pipe && write_end && (fds[i].events & POLLOUT))
+        wq_add(&pipe->writable, &entries[waiting++]);
+      else if (sock && (fds[i].events & POLLIN))
         wq_add(&sock->readers, &entries[waiting++]);
     }
 
@@ -1750,7 +1958,7 @@ static long sys_ioctl(int fd, long request, void *arg) {
     return -EBADF;
 
   if (request == TIOCGWINSZ) {
-    if (fd > 2)
+    if (!task_fd_is_console(t, fd))
       return -ENOTTY;
     if (!user_buffer_ok(arg, sizeof(struct linux_winsize), 1))
       return -EFAULT;
@@ -1763,7 +1971,7 @@ static long sys_ioctl(int fd, long request, void *arg) {
   }
 
   if (request == TCGETS) {
-    if (fd > 2)
+    if (!task_fd_is_console(t, fd))
       return -ENOTTY;
     if (!user_buffer_ok(arg, 64, 1))
       return -EFAULT;
@@ -1772,7 +1980,7 @@ static long sys_ioctl(int fd, long request, void *arg) {
   }
 
   if (request == TCSETS || request == TCSETSW || request == TCSETSF)
-    return fd <= 2 ? 0 : -ENOTTY;
+    return task_fd_is_console(t, fd) ? 0 : -ENOTTY;
 
   return -ENOTTY;
 }
@@ -2233,6 +2441,7 @@ static int sock_fd_alloc(struct task *t, struct socket *sock) {
     task_fd_clear(slot);
     slot->type = TASK_FD_SOCKET;
     slot->socket = sock;
+    sock->fd_refs = 1;
     return fd;
   }
   return -1;
@@ -2516,6 +2725,25 @@ long syscall_dispatch(struct syscall_frame *f) {
     break;
   case SYS_CLOSE:
     ret = sys_close((uintptr_t)a1);
+    break;
+  case SYS_PIPE:
+    ret = sys_pipe2((int *)(uintptr_t)a1, 0);
+    break;
+  case SYS_PIPE2:
+    ret = sys_pipe2((int *)(uintptr_t)a1, (int)a2);
+    break;
+  case SYS_DUP:
+    ret = sys_dup((int)a1);
+    break;
+  case SYS_DUP2:
+    ret = sys_dup2((int)a1, (int)a2);
+    break;
+  case SYS_DUP3:
+    ret = sys_dup3((int)a1, (int)a2, (int)a3);
+    break;
+  case SYS_WAIT4:
+    ret = sys_wait4((int)a1, (int *)(uintptr_t)a2, (int)a3,
+                    (void *)(uintptr_t)a4);
     break;
   case SYS_LSEEK:
     ret = sys_lseek((uintptr_t)a1, (uintptr_t)a2, (uintptr_t)a3);
