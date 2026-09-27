@@ -14,6 +14,13 @@ void netif_register(const struct netif *nif) {
   registered = 1;
 }
 
+void netif_unregister(const void *driver_data) {
+  if (registered && interface.driver_data == driver_data) {
+    registered = 0;
+    memset(&interface, 0, sizeof(interface));
+  }
+}
+
 struct netif *netif_get(void) { return registered ? &interface : (void *)0; }
 
 void netif_set_ipv4(const u8 ipv4[IPV4_ALEN],

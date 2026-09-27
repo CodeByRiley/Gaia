@@ -39,14 +39,17 @@ struct netif {
 
   /* Put one complete Ethernet frame on the wire. Returns 0 when the frame
    * was queued to hardware, -1 when it was not. Must not block: it is
-   * called from the driver poll task and, once the e1000 IRQ path lands,
-   * from interrupt context. */
+   * called from the driver poll task and from syscalls. */
   int (*tx)(void *driver_data, const void *frame, u16 len);
 };
 
 /* Take a copy of *nif as the bound interface. Safe to call again when the
  * address changes , DHCP will do exactly that. */
 void netif_register(const struct netif *nif);
+
+/* Withdraw the interface registered with this driver_data, if it is the
+ * live one. After this the stack has no interface and netif_tx fails. */
+void netif_unregister(const void *driver_data);
 
 /* NULL until a driver has registered. Every protocol path checks this
  * rather than assuming a NIC exists, because the socket layer is reachable

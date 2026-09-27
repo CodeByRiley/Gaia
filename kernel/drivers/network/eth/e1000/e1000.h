@@ -148,6 +148,11 @@ struct e1000_dev {
   u32 tx_current;
 
   u8 mac_addr[6];
+
+  /* INTx line the IRQ handler is installed on, 0 when RX is polled. */
+  u8 irq_line;
+  /* Where the register window is mapped, for e1000_remove to unmap. */
+  u64 mmio_virt;
 };
 
 struct e1000_rx_desc {

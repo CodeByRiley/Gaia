@@ -11,6 +11,7 @@
  * framebuffer probe path).
  */
 #include <arch/cpu.h>
+#include <arch/irq.h>
 #include <arch/percpu.h>
 #include <devices/lapic.h>
 #include <devices/serial.h>
@@ -107,6 +108,23 @@ void irq_install(u8 irq, irq_fn fn) {
     }
   }
   log_write_int("IDT: no free handler slot on IRQ", irq, KERNEL, LOG_ERROR);
+}
+
+int irq_uninstall(u8 irq, irq_fn fn) {
+  if (irq >= MAX_IRQ_LINES)
+    return 0;
+  /* IRQs off: the dispatch loop stops at the first empty slot, so the
+   * compaction below must not be observed half-done. */
+  u64 flags = irq_save();
+  int n = 0;
+  for (int i = 0; i < MAX_IRQ_SHARED; i++) {
+    irq_fn h = irq_handlers[irq][i];
+    irq_handlers[irq][i] = 0;
+    if (h && h != fn)
+      irq_handlers[irq][n++] = h;
+  }
+  irq_restore(flags);
+  return n;
 }
 
 struct exception_recovery_state {

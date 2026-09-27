@@ -43,6 +43,12 @@ struct driver {
      * reports work will spin the CPU exactly as the loop used to. Report
      * honestly: routine bookkeeping that happens every pass is not work. */
     int (*poll)(struct device *device);
+
+    /* Optional. Undo probe: stop the hardware so no DMA is in flight, give
+     * back its IRQ, withdraw anything it published, free driver_data and
+     * set it to NULL. Afterwards the device is inert and safe to hand to
+     * pci_disable. The driver core must not call poll once this returns. */
+    void (*remove)(struct device *device);
 };
 
 struct device {

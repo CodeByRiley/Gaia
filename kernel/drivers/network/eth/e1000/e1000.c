@@ -1,3 +1,4 @@
+#include <arch/irq.h>
 #include <drivers/driver.h>
 #include <drivers/network/eth/e1000/e1000.h>
 #include <drivers/base/vendors/pci_ids.h>
@@ -408,6 +409,7 @@ static void e1000_enable_irq(struct e1000_dev *nic, struct pci_device *pci) {
   }
 
   e1000_irq_nics[e1000_irq_nic_count++] = nic;
+  nic->irq_line = line;
   irq_install(line, e1000_irq_handler);
 
   u16 cmd = pci_read16(pci->addr, PCI_CFG_COMMAND);
@@ -451,6 +453,7 @@ static int e1000_probe(struct device *dev) {
   }
 
   nic->mmio_base = (volatile u8 *)mmio_virt;
+  nic->mmio_virt = mmio_virt;
   nic->bus = dev->bus_info.pci.addr.bus;
   nic->device = dev->bus_info.pci.addr.dev;
   nic->function = dev->bus_info.pci.addr.fn;
@@ -468,8 +471,83 @@ static int e1000_probe(struct device *dev) {
   return 0;
 }
 
+/* Take the NIC out of the handler's list, and release the line when it was
+ * the last e1000 on it. The PIC line is masked only when nothing else is
+ * installed there , USB shares it under QEMU. */
+static void e1000_disable_irq(struct e1000_dev *nic) {
+  E1000_WRITE(nic, REG_IMC, 0xFFFFFFFF);
+  (void)E1000_READ(nic, REG_ICR);
+  if (!nic->irq_line)
+    return;
+
+  u64 flags = irq_save();
+  int still_on_line = 0;
+  for (int i = 0; i < e1000_irq_nic_count; i++) {
+    if (e1000_irq_nics[i] == nic) {
+      e1000_irq_nics[i] = e1000_irq_nics[--e1000_irq_nic_count];
+      e1000_irq_nics[e1000_irq_nic_count] = 0;
+      i--;
+    } else if (e1000_irq_nics[i]->irq_line == nic->irq_line) {
+      still_on_line = 1;
+    }
+  }
+  irq_restore(flags);
+
+  if (!still_on_line && irq_uninstall(nic->irq_line, e1000_irq_handler) == 0)
+    pic_set_mask(nic->irq_line);
+  nic->irq_line = 0;
+}
+
+static void e1000_free_rings(struct e1000_dev *nic) {
+  for (int i = 0; i < E1000_NUM_RX_DESC; i++)
+    if (nic->rx_buffer_phys[i])
+      pmm_free_frame(nic->rx_buffer_phys[i]);
+  for (int i = 0; i < E1000_NUM_TX_DESC; i++)
+    if (nic->tx_buffer_phys[i])
+      pmm_free_frame(nic->tx_buffer_phys[i]);
+  if (nic->rx_ring_phys)
+    pmm_free_frame(nic->rx_ring_phys);
+  if (nic->tx_ring_phys)
+    pmm_free_frame(nic->tx_ring_phys);
+}
+
+/* Undo e1000_probe. Order matters: withdraw the interface so nothing new
+ * is transmitted, silence the IRQ so the handler stops touching registers,
+ * then reset , which stops both DMA engines , before the rings go back to
+ * the PMM. Bus mastering and decoding are left for pci_disable, the step
+ * after this one; the register window must still decode for the reset.
+ *
+ * The MMIO window is unmapped but its virtual range is not reused:
+ * next_mmio_virt only grows. */
+static void e1000_remove(struct device *dev) {
+  struct e1000_dev *nic = (struct e1000_dev *)dev->driver_data;
+  if (!nic)
+    return;
+
+  netif_unregister(nic);
+  e1000_disable_irq(nic);
+
+  E1000_WRITE(nic, REG_RCTL, 0);
+  E1000_WRITE(nic, REG_TCTRL, 0);
+  E1000_WRITE(nic, REG_CTRL, E1000_READ(nic, REG_CTRL) | CTRL_RST);
+  if (e1000_wait_clear(nic, REG_CTRL, CTRL_RST) != 0)
+    log_write("e1000: reset timed out during remove", KERNEL, LOG_WARN);
+  E1000_WRITE(nic, REG_IMC, 0xFFFFFFFF);
+
+  netmon_set_link(0, 0);
+  e1000_free_rings(nic);
+
+  for (u64 off = 0; off < E1000_MMIO_SIZE; off += 0x1000)
+    vmm_unmap(nic->mmio_virt + off);
+
+  dev->driver_data = 0;
+  kfree(nic);
+  log_write("e1000: removed", KERNEL, LOG_INFO);
+}
+
 const struct driver e1000_driver = {.name = "e1000 Ethernet",
                                     .bus = DEVICE_BUS_PCI,
                                     .match = e1000_match,
                                     .probe = e1000_probe,
-                                    .poll = e1000_poll_rx};
+                                    .poll = e1000_poll_rx,
+                                    .remove = e1000_remove};
