@@ -1,4 +1,5 @@
 /* kernel/net/ipv4.c , see ipv4.h. */
+#include "net/tcp.h"
 #include "net/udp.h"
 #include "utilities/log.h"
 #include <net/arp.h>
@@ -148,9 +149,11 @@ void ipv4_input(const struct eth_hdr *eth, const u8 *packet,
 //     );
 //     break;
 //   }
-  case IPPROTO_TCP:
-    log_write("net: UDP packet received", KERNEL, LOG_INFO);
+  case IPPROTO_TCP: {
+    log_write("net: TCP packet received", KERNEL, LOG_INFO);
+    tcp_input(ip, payload, payload_len);
     break;
+  }
   default:
     /* UDP and TCP land here once the socket layer is honest. */
     break;
