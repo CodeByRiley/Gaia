@@ -20,83 +20,83 @@
 #define KERNEL_ERRNO_H
 
 /* Permission and process errors */
-#define EPERM            1  /* Operation not permitted */
-#define ESRCH            3  /* No such process */
-#define EINTR            4  /* Interrupted system call */
-#define ECHILD          10  /* No child processes */
-#define EACCES          13  /* Permission denied */
+#define EPERM           1     /* Operation not permitted */
+#define ESRCH           3     /* No such process */
+#define EINTR           4     /* Interrupted system call */
+#define ECHILD          10    /* No child processes */
+#define EACCES          13    /* Permission denied */
 
 /* File descriptor errors */
-#define EBADF            9  /* Bad file descriptor */
-#define EMFILE           24  /* Too many open files for this process */
-#define ENFILE           23  /* Too many open files in the system */
+#define EBADF            9    /* Bad file descriptor */
+#define EMFILE           24   /* Too many open files for this process */
+#define ENFILE           23   /* Too many open files in the system */
 
 /* File and directory lookup errors */
-#define ENOENT            2  /* No such file or directory */
-#define EEXIST           17  /* File already exists */
-#define ENOTDIR          20  /* Not a directory */
-#define EISDIR           21  /* Is a directory */
-#define ENAMETOOLONG     36  /* Filename too long */
-#define ENOTEMPTY        39  /* Directory not empty */
-#define ELOOP            40  /* Too many symbolic links */
+#define ENOENT           2    /* No such file or directory */
+#define EEXIST           17   /* File already exists */
+#define ENOTDIR          20   /* Not a directory */
+#define EISDIR           21   /* Is a directory */
+#define ENAMETOOLONG     36   /* Filename too long */
+#define ENOTEMPTY        39   /* Directory not empty */
+#define ELOOP            40   /* Too many symbolic links */
 
 /* File position, size, and link errors */
-#define ETXTBSY          26  /* Text file busy */
-#define EFBIG            27  /* File too large */
-#define ESPIPE           29  /* Illegal seek */
-#define EMLINK           31  /* Too many links */
+#define ETXTBSY          26   /* Text file busy */
+#define EFBIG            27   /* File too large */
+#define ESPIPE           29   /* Illegal seek */
+#define EMLINK           31   /* Too many links */
 
 /* File locking errors */
-#define EDEADLK          35  /* Resource deadlock avoided */
-#define ENOLCK           37  /* No locks available */
+#define EDEADLK          35   /* Resource deadlock avoided */
+#define ENOLCK           37   /* No locks available */
 
 /* Filesystem and device errors */
-#define EIO               5  /* Input/output error */
-#define ENXIO             6  /* No such device or address */
-#define ENODEV           19  /* No such device */
-#define ENOSPC           28  /* No space left on device */
-#define EROFS            30  /* Read-only filesystem */
+#define EIO              5    /* Input/output error */
+#define ENXIO            6    /* No such device or address */
+#define ENODEV           19   /* No such device */
+#define ENOSPC           28   /* No space left on device */
+#define EROFS            30   /* Read-only filesystem */
 
 /* Memory and address errors */
-#define ENOMEM           12  /* Out of memory */
-#define EFAULT           14  /* Bad address supplied by userspace */
+#define ENOMEM           12   /* Out of memory */
+#define EFAULT           14   /* Bad address supplied by userspace */
 
 /* Argument and range errors */
-#define EINVAL           22  /* Invalid argument */
-#define ERANGE           34  /* Result too large for the caller's buffer */
-#define EOVERFLOW        75  /* Value too large for the defined data type */
+#define EINVAL           22   /* Invalid argument */
+#define ERANGE           34   /* Result too large for the caller's buffer */
+#define EOVERFLOW        75   /* Value too large for the defined data type */
 
 /* Resource and synchronization errors */
-#define EAGAIN           11  /* Try again */
-#define EBUSY            16  /* Device or resource busy */
+#define EAGAIN           11   /* Try again */
+#define EBUSY            16   /* Device or resource busy */
 
 /* Pipe and stream errors */
-#define EPIPE            32  /* Broken pipe */
+#define EPIPE            32   /* Broken pipe */
 
 /* Interface and implementation errors */
-#define ENOTTY           25  /* Inappropriate ioctl for this device */
-#define ENOSYS           38  /* Function not implemented */
+#define ENOTTY           25   /* Inappropriate ioctl for this device */
+#define ENOSYS           38   /* Function not implemented */
 
 /* Socket and network errors */
-#define ENOTSOCK         88  /* Descriptor is not a socket */
-#define EDESTADDRREQ     89  /* Destination address required */
-#define EMSGSIZE         90  /* Message too large */
-#define EPROTOTYPE       91  /* Protocol wrong type for socket */
-#define EPROTONOSUPPORT  93  /* Protocol or socket type not supported */
-#define EAFNOSUPPORT     97  /* Address family not supported */
-#define EADDRINUSE       98  /* Address or port already in use */
-#define EADDRNOTAVAIL    99  /* Cannot assign requested address */
-#define ENETDOWN        100  /* Network is down */
-#define ENETUNREACH     101  /* Network is unreachable */
-#define ECONNABORTED    103  /* Connection aborted */
-#define ECONNRESET      104  /* Connection reset by peer */
-#define ENOBUFS         105  /* No buffer space available */
-#define EISCONN         106  /* Transport endpoint is already connected */
-#define ENOTCONN        107  /* Transport endpoint is not connected */
-#define ESHUTDOWN       108  /* Cannot send after transport endpoint shutdown */
-#define ETIMEDOUT       110  /* Connection timed out */
-#define ECONNREFUSED    111  /* Connection refused */
-#define EHOSTUNREACH    113  /* No route to host */
+#define ENOTSOCK         88   /* Descriptor is not a socket */
+#define EDESTADDRREQ     89   /* Destination address required */
+#define EMSGSIZE         90   /* Message too large */
+#define EPROTOTYPE       91   /* Protocol wrong type for socket */
+#define EPROTONOSUPPORT  93   /* Protocol or socket type not supported */
+#define EAFNOSUPPORT     97   /* Address family not supported */
+#define EADDRINUSE       98   /* Address or port already in use */
+#define EADDRNOTAVAIL    99   /* Cannot assign requested address */
+#define ENETDOWN         100  /* Network is down */
+#define ENETUNREACH      101  /* Network is unreachable */
+#define ECONNABORTED     103  /* Connection aborted */
+#define ECONNRESET       104  /* Connection reset by peer */
+#define ENOBUFS          105  /* No buffer space available */
+#define EISCONN          106  /* Transport endpoint is already connected */
+#define ENOTCONN         107  /* Transport endpoint is not connected */
+#define ESHUTDOWN        108  /* Cannot send after transport endpoint shutdown */
+#define ETIMEDOUT        110  /* Connection timed out */
+#define ECONNREFUSED     111  /* Connection refused */
+#define EHOSTUNREACH     113  /* No route to host */
 
 /* Kernel callers store errors as negative errno values, while diagnostic
  * APIs normally receive the positive number.  Keeping this here prevents
