@@ -125,26 +125,29 @@ void ipv4_input(const struct eth_hdr *eth, const u8 *packet,
   case IPPROTO_ICMP:
     icmp_input(ip, payload, payload_len);
     break;
-  case IPPROTO_UDP: {
-    log_write("net: UDP packet received", KERNEL, LOG_INFO);
-
-    const struct udp_header *udp = (const struct udp_header *)payload;
-    const u8 *udp_payload = payload + UDP_HEADER_SIZE;
-    u16 udp_payload_len = payload_len - UDP_HEADER_SIZE;
-
-    struct ipv4_addr src = *(struct ipv4_addr *)ip->src;
-    struct ipv4_addr dst = *(struct ipv4_addr *)ip->dst;
-
-    socket_handle_incoming(src,                 // src_ip
-                           udp->src_port,       // src_port
-                           dst,                 // dest_ip
-                           udp->dst_port,       // dest_port
-                           IPPROTO_UDP,         // protocol
-                           (void *)udp_payload, // payload
-                           udp_payload_len      // length
-    );
+  case IPPROTO_UDP:
+    udp_input(ip, payload, payload_len);
     break;
-  }
+//   case IPPROTO_UDP: {
+//     log_write("net: UDP packet received", KERNEL, LOG_INFO);
+//
+//     const struct udp_header *udp = (const struct udp_header *)payload;
+//     const u8 *udp_payload = payload + UDP_HEADER_SIZE;
+//     u16 udp_payload_len = payload_len - UDP_HEADER_SIZE;
+//
+//     struct ipv4_addr src = *(struct ipv4_addr *)ip->src;
+//     struct ipv4_addr dst = *(struct ipv4_addr *)ip->dst;
+//
+//     socket_handle_incoming(src,                 // src_ip
+//                            udp->src_port,       // src_port
+//                            dst,                 // dest_ip
+//                            udp->dst_port,       // dest_port
+//                            IPPROTO_UDP,         // protocol
+//                            (void *)udp_payload, // payload
+//                            udp_payload_len      // length
+//     );
+//     break;
+//   }
   case IPPROTO_TCP:
     log_write("net: UDP packet received", KERNEL, LOG_INFO);
     break;
