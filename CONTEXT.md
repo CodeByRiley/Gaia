@@ -27,6 +27,15 @@ released mmap range goes back to the arena's **hole list** for reuse.
 **Address-space map** , the fixed layout of the user half (image, framebuffer
 window, mmap arena, shmem arena, stack). Constants in `kernel/loader/process.h`.
 
+## Waiting
+
+**Wait queue** , `struct wait_queue` in `kernel/sync/waitqueue.h`: the tasks
+parked on one object until its state changes. The producer calls
+`wq_wake_all`; each woken task re-checks its condition. Exclusion is
+interrupts-off on the BSP, the scheduler's own rule, so check-then-park cannot
+lose a wake. Entries live on the waiter's kernel stack and are unlinked when a
+parked task is killed. Socket receive and `poll` use it today.
+
 ## Storage
 
 **Block device** , the 512-byte sector interface in

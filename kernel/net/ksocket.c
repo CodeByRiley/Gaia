@@ -1,5 +1,8 @@
 #include "sched/sched.h"
 #include "sync/spinlock.h"
+#include "sync/waitqueue.h"
+#include <arch/irq.h>
+#include <utilities/errno.h>
 #include "utilities/log.h"
 #include <utilities/types.h>
 #include <net/ksocket.h>
@@ -43,8 +46,8 @@ void udp_echo_thread(void) {
     struct sockaddr_in src_addr;
 
     while (1) {
-        // Block (or poll) waiting for data
-        int bytes = socket_recvfrom(sock, buf, 512, &src_addr);
+        // Leave room for the terminator the log line below appends.
+        int bytes = socket_recvfrom(sock, buf, sizeof(buf) - 1, &src_addr, 0);
 
         if (bytes > 0) {
             buf[bytes] = '\0'; // Null terminate for printing
@@ -53,9 +56,6 @@ void udp_echo_thread(void) {
             // Return to sender ;p
             socket_sendto(sock, buf, bytes, &src_addr);
         }
-
-        // Yield so we don't lock up the CPU if recvfrom returns immediately
-        task_yield();
     }
 }
 
@@ -78,6 +78,7 @@ struct socket *socket_create(int type, int protocol) {
   sock->protocol = protocol;
 
   spinlock_init(&sock->lock);
+  wq_init(&sock->readers);
 
   return sock;
 }
@@ -121,29 +122,40 @@ int socket_sendto(struct socket *sock, const void *buf, usize len,
     return len;
 }
 
-int socket_recvfrom(struct socket *sock, void *buf, usize len, struct sockaddr_in *src_addr) {
-    if (!sock || !buf) return -1;
+int socket_readable(struct socket *sock) {
+    return sock && sock->rx_queue.head != NULL;
+}
 
-    // TODO: Block until data arrives.
+int socket_recvfrom(struct socket *sock, void *buf, usize len,
+                    struct sockaddr_in *src_addr, int flags) {
+    if (!sock || !buf) return -EINVAL;
 
-    // LOCK THE SOCKET, NOT THE GLOBAL LIST!
-    u64 rflags = spin_lock_irqsave(&sock->lock);
+    /* IRQs stay off from the empty check until wq_wait has parked us, so a
+     * datagram delivered in between cannot slip past without a wake. See
+     * sync/waitqueue.h. */
+    u64 irq_flags = irq_save();
+    struct packet_node *node;
+    for (;;) {
+        spin_lock(&sock->lock);
+        node = sock->rx_queue.head;
+        if (node) {
+            sock->rx_queue.head = node->next;
+            if (!sock->rx_queue.head) {
+                sock->rx_queue.tail = NULL;
+            }
+            sock->rx_queue.count--;
+            spin_unlock(&sock->lock);
+            break;
+        }
+        spin_unlock(&sock->lock);
 
-    if (!sock->rx_queue.head) {
-        spin_unlock_irqrestore(&sock->lock, rflags);
-        return 0; // No data
+        if (flags & SOCKET_RECV_NONBLOCK) {
+            irq_restore(irq_flags);
+            return -EAGAIN;
+        }
+        wq_wait(&sock->readers, 0);
     }
-
-    // Pop the head node
-    struct packet_node *node = sock->rx_queue.head;
-    sock->rx_queue.head = node->next;
-    if (!sock->rx_queue.head) {
-        sock->rx_queue.tail = NULL;
-    }
-    sock->rx_queue.count--;
-
-    // UNLOCK BEFORE COPYING TO USER SPACE
-    spin_unlock_irqrestore(&sock->lock, rflags);
+    irq_restore(irq_flags);
 
     usize to_copy = (len < node->length) ? len : node->length;
     memcpy(buf, node->payload, to_copy);
@@ -276,5 +288,5 @@ void socket_handle_incoming(struct ipv4_addr src_ip, port_t src_port,
   target->remote.port = src_port;
   target->state = SOCKET_ESTABLISHED;
 
-  /* TODO: Wake tasks waiting on this socket. */
+  wq_wake_all(&target->readers);
 }

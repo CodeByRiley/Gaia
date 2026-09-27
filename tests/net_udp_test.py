@@ -140,6 +140,17 @@ def main() -> int:
             if line.startswith("udpecho:"):
                 print("  " + line.strip())
 
+        # udpecho checks the other ways to wait on the socket before it
+        # receives: MSG_DONTWAIT, a poll that times out, a poll a datagram
+        # wakes. A missing line means the program hung before reaching it.
+        for check in ("dontwait", "poll-timeout", "poll-wake"):
+            if f"udpecho: check {check} FAILED" in log:
+                print(f"socket wait check failed: {check}", file=sys.stderr)
+                return 1
+            if f"udpecho: check {check} ok" not in log:
+                print(f"socket wait check never ran: {check}", file=sys.stderr)
+                return 1
+
         print(f"UDP ok: {len(echoed)} bytes echoed intact through musl "
               "socket/bind/recvfrom/sendto")
         return 0

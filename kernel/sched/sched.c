@@ -31,7 +31,10 @@
 #include <memory/heap.h>
 #include <memory/hhdm.h>
 #include <msg/msg.h>
+#include <net/ksocket.h>
 #include <sched/sched.h>
+#include <sync/waitqueue.h>
+#include <utilities/errno.h>
 #include <stdint.h>
 #include <utilities/log.h>
 #include <utilities/panic.h>
@@ -142,6 +145,18 @@ static u32 slice_ticks = 0;
  * sched_wake_sleepers so the PIT IRQ can skip a full task-table walk on
  * every tick when nothing is asleep , which is the common case. */
 static int n_sleeping = 0;
+
+/* Count of TASK_BLOCKED tasks with a block_deadline, for the same reason:
+ * sched_wake_sleepers walks the table only when one of the two is non-zero.
+ * Every path that ends a timed block goes through block_clear_deadline. */
+static int n_timed_blocked = 0;
+
+static void block_clear_deadline(struct task *t) {
+  if (t->block_deadline) {
+    t->block_deadline = 0;
+    n_timed_blocked--;
+  }
+}
 
 /* Set when a task becomes runnable that outranks the one on the CPU.
  *
@@ -950,9 +965,26 @@ void task_block(int waiting_for_pid) {
 void task_wakeup(struct task *t) {
   if (!t || t->state != TASK_BLOCKED)
     return;
+  block_clear_deadline(t);
   t->state = TASK_READY;
   t->waiting_for_pid = 0;
   ready_push(t);
+}
+
+int task_block_until(u64 deadline) {
+  u64 rflags = irq_save();
+  struct task *t = current;
+  t->block_timed_out = 0;
+  if (deadline) {
+    t->block_deadline = deadline;
+    n_timed_blocked++;
+  }
+  /* -1 is not a pid, so no process exit can mistake us for its waiter. */
+  task_block(-1);
+  int rc = t->block_timed_out ? -ETIMEDOUT : 0;
+  t->block_timed_out = 0;
+  irq_restore(rflags);
+  return rc;
 }
 
 int task_wake_futex(u64 phys) {
@@ -1001,7 +1033,7 @@ void task_sleep_ticks(u64 ticks) {
  * case) so the IRQ handler isn't doing an MAX_TASKS-wide table walk on every
  * tick just to find nothing to do. */
 void sched_wake_sleepers(void) {
-  if (n_sleeping == 0)
+  if (n_sleeping == 0 && n_timed_blocked == 0)
     return;
   extern u64 pit_ticks(void);
   u64 now = pit_ticks();
@@ -1013,6 +1045,10 @@ void sched_wake_sleepers(void) {
       t->state = TASK_READY;
       n_sleeping--;
       ready_push(t);
+    } else if (t->state == TASK_BLOCKED && t->block_deadline &&
+               t->block_deadline <= now) {
+      t->block_timed_out = 1;
+      task_wakeup(t);
     }
   }
 }
@@ -1116,6 +1152,12 @@ static void mark_task_exited(struct task *task, long code) {
     if (awaited && awaited->state == TASK_ZOMBIE)
       awaited->unclaimed = 1;
   }
+
+  /* A task killed while parked on a wait queue still has entries linked
+   * into it, and they live on the kernel stack the reaper is about to free.
+   * Unlink them now, while the stack is still valid. */
+  wq_remove_all(task);
+  block_clear_deadline(task);
 
   task->state = TASK_ZOMBIE;
   task->exit_code = code;
@@ -1253,9 +1295,10 @@ void task_exit_thread(void) {
 }
 
 /* fd 0-2 are the standard streams and were never backed by an allocation.
- * Sockets are not freed here either , they are owned by the socket layer ,
- * so only file and directory slots release anything. task_fd_clear then
- * drops the slot's own directory-path allocation. */
+ * Files, directories and sockets each release their object, as close()
+ * would; a socket left open here stayed bound to its port for the life of
+ * the kernel. task_fd_clear then drops the slot's own directory-path
+ * allocation. */
 static void task_close_fds(struct task *t) {
   if (!t || !t->files)
     return;
@@ -1266,6 +1309,8 @@ static void task_close_fds(struct task *t) {
         vfs_close(slot->file);
         kfree(slot->file);
       }
+    } else if (slot->type == TASK_FD_SOCKET) {
+      socket_close(slot->socket);
     }
     task_fd_clear(slot);
   }

@@ -55,6 +55,7 @@
 #include <net/netmon.h>
 #include <sched/sched.h>
 #include <stddef.h>
+#include <sync/waitqueue.h>
 #include <stdint.h>
 #include <utilities/errno.h>
 #include <utilities/log.h>
@@ -110,6 +111,7 @@ _Static_assert(SYSRET_STAR_BASE + 16 == (GDT_USER_CODE | GDT_RPL_USER),
 
 #define O_CREAT 0x40
 #define O_TRUNC 0x200
+#define O_NONBLOCK 04000
 #define O_DIRECTORY 0200000
 
 #define AT_FDCWD (-100)
@@ -135,6 +137,11 @@ _Static_assert(SYSRET_STAR_BASE + 16 == (GDT_USER_CODE | GDT_RPL_USER),
 #define F_SETFD 2
 #define F_GETFL 3
 #define F_SETFL 4
+
+/* task_fd.flags bits. Per-descriptor, like Linux's file status flags. */
+#define TASK_FD_NONBLOCK 0x1
+
+#define MSG_DONTWAIT 0x40
 
 #define TIOCGWINSZ 0x5413
 #define TCGETS 0x5401
@@ -1598,7 +1605,12 @@ static long sys_writev(int fd, const struct linux_iovec *iov, long iovcnt) {
 static int fd_is_known(struct task *t, int fd) {
   if (!t || fd < 0 || fd >= TASK_MAX_FDS)
     return 0;
-  return fd < 3 || task_fd_file(t, fd) != 0;
+  return fd < 3 || task_fd_file(t, fd) != 0 || task_fd_socket(t, fd) != 0;
+}
+
+static int fd_nonblocking(struct task *t, int fd) {
+  struct task_fd *slot = task_fd_slot(t, fd);
+  return slot != NULL && (slot->flags & TASK_FD_NONBLOCK);
 }
 
 static long sys_fcntl(int fd, int cmd, long arg) {
@@ -1609,10 +1621,22 @@ static long sys_fcntl(int fd, int cmd, long arg) {
   switch (cmd) {
   case F_GETFD:
   case F_SETFD:
-  case F_SETFL:
     return 0;
+  case F_SETFL: {
+    /* O_NONBLOCK is the only status flag anything here honours. The rest
+     * are accepted and dropped, as before. */
+    struct task_fd *slot = task_fd_slot(t, fd);
+    if (!slot)
+      return -EBADF;
+    if (arg & O_NONBLOCK)
+      slot->flags |= TASK_FD_NONBLOCK;
+    else
+      slot->flags &= (u8)~TASK_FD_NONBLOCK;
+    return 0;
+  }
   case F_GETFL:
-    return (fd >= 3 && task_fd_is_dir(t, fd)) ? O_DIRECTORY : 0;
+    return ((fd >= 3 && task_fd_is_dir(t, fd)) ? O_DIRECTORY : 0) |
+           (fd_nonblocking(t, fd) ? O_NONBLOCK : 0);
   case F_DUPFD:
     (void)arg;
     return -ENOSYS;
@@ -1621,48 +1645,102 @@ static long sys_fcntl(int fd, int cmd, long arg) {
   }
 }
 
-static long sys_poll(struct linux_pollfd *fds, long nfds, long timeout_ms) {
-  if (nfds < 0 || nfds > 64)
-    return -EINVAL;
-  if (nfds == 0) {
-    if (timeout_ms > 0) {
-      u64 freq = pit_get_freq();
-      if (!freq)
-        freq = 100;
-      u64 ticks = ((u64)timeout_ms * freq + 999) / 1000;
-      if (ticks)
-        task_sleep_ticks(ticks);
-    }
-    return 0;
-  }
-  if (!user_buffer_ok(fds, (u64)nfds * sizeof(*fds), 1))
-    return -EFAULT;
+static u64 ms_to_ticks(long ms) {
+  u64 freq = pit_get_freq();
+  if (!freq)
+    freq = 100;
+  return ((u64)ms * freq + 999) / 1000;
+}
 
-  struct task *t = task_current();
+/* One pass over the set, filling revents. Returns the ready count.
+ *
+ * Sockets report POLLIN only when a datagram is queued. Files and
+ * directories are always readable. The console is writable but never
+ * readable here: fd 0 has no wait queue yet, so reporting it would be a
+ * guess either way, and this keeps the old answer. */
+static long poll_scan(struct task *t, struct linux_pollfd *fds, long nfds) {
   long ready = 0;
   for (long i = 0; i < nfds; i++) {
+    int fd = fds[i].fd;
     fds[i].revents = 0;
-    if (!fd_is_known(t, fds[i].fd)) {
+    if (fd < 0)
+      continue; /* POSIX: negative fds are skipped, not invalid. */
+    if (!fd_is_known(t, fd)) {
       fds[i].revents = POLLNVAL;
       ready++;
       continue;
     }
-    if ((fds[i].events & POLLOUT) && fds[i].fd != 0)
+    if ((fds[i].events & POLLOUT) && fd != 0)
       fds[i].revents |= POLLOUT;
-    if ((fds[i].events & POLLIN) && fds[i].fd >= 3)
-      fds[i].revents |= POLLIN;
+    if (fds[i].events & POLLIN) {
+      struct socket *sock = task_fd_socket(t, fd);
+      if (sock ? socket_readable(sock) : fd >= 3)
+        fds[i].revents |= POLLIN;
+    }
     if (fds[i].revents)
       ready++;
   }
+  return ready;
+}
 
-  if (!ready && timeout_ms > 0) {
-    u64 freq = pit_get_freq();
-    if (!freq)
-      freq = 100;
-    u64 ticks = ((u64)timeout_ms * freq + 999) / 1000;
-    if (ticks)
-      task_sleep_ticks(ticks);
+static long sys_poll(struct linux_pollfd *fds, long nfds, long timeout_ms) {
+  if (nfds < 0 || nfds > 64)
+    return -EINVAL;
+  if (nfds > 0 && !user_buffer_ok(fds, (u64)nfds * sizeof(*fds), 1))
+    return -EFAULT;
+
+  struct task *t = task_current();
+  u64 deadline = 0;
+  if (timeout_ms > 0) {
+    deadline = pit_ticks() + ms_to_ticks(timeout_ms);
+    if (deadline == 0)
+      deadline = 1; /* 0 means "no deadline" to the scheduler. */
   }
+
+  /* One entry per socket descriptor, on this kernel stack. 64 * 40 bytes
+   * is well inside KSTACK_BYTES, and nfds is capped above. */
+  struct wq_entry entries[64];
+
+  /* IRQs stay off from each scan until the block, so a datagram that lands
+   * after the scan finds us already linked on its socket's queue. See
+   * sync/waitqueue.h. */
+  u64 irq_flags = irq_save();
+  long ready;
+  for (;;) {
+    ready = poll_scan(t, fds, nfds);
+    if (ready || timeout_ms == 0)
+      break;
+
+    int waiting = 0;
+    for (long i = 0; i < nfds; i++) {
+      struct socket *sock =
+          fds[i].fd >= 0 ? task_fd_socket(t, fds[i].fd) : NULL;
+      if (sock && (fds[i].events & POLLIN))
+        wq_add(&sock->readers, &entries[waiting++]);
+    }
+
+    int rc;
+    if (waiting) {
+      rc = task_block_until(deadline);
+      wq_remove_all(t);
+    } else if (deadline) {
+      /* Nothing in the set can wake us, so the timeout is all there is. */
+      u64 now = pit_ticks();
+      if (now < deadline)
+        task_sleep_ticks(deadline - now);
+      rc = -ETIMEDOUT;
+    } else {
+      /* Blocking forever on a set nothing can wake would hang the caller;
+       * report nothing ready, which is what poll always did here. */
+      rc = -ETIMEDOUT;
+    }
+
+    if (rc == -ETIMEDOUT) {
+      ready = poll_scan(t, fds, nfds);
+      break;
+    }
+  }
+  irq_restore(irq_flags);
   return ready;
 }
 
@@ -2254,7 +2332,6 @@ static long sys_sendto(int fd, const void *buf, usize len, int flags,
 
 static long sys_recvfrom(int fd, void *buf, usize len, int flags,
                          struct sockaddr_in *src, u32 *addrlen) {
-  (void)flags;
   struct task *t = task_current();
   struct socket *sock = sock_from_fd(t, fd);
   if (!sock)
@@ -2268,8 +2345,10 @@ static long sys_recvfrom(int fd, void *buf, usize len, int flags,
   if (addrlen && !user_buffer_ok(addrlen, sizeof(*addrlen), 1))
     return -EFAULT;
 
-  long n = socket_recvfrom(sock, buf, len, src);
-  if (n > 0 && addrlen)
+  int nonblock = (flags & MSG_DONTWAIT) || fd_nonblocking(t, fd);
+  long n = socket_recvfrom(sock, buf, len, src,
+                           nonblock ? SOCKET_RECV_NONBLOCK : 0);
+  if (n >= 0 && addrlen)
     *addrlen = sizeof(*src);
   return n;
 }

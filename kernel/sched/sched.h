@@ -68,6 +68,7 @@
 
 struct socket;
 struct vfs_file;
+struct wq_entry;
 
 
 /* Scheduler and VM types */
@@ -218,6 +219,14 @@ struct task {
 
   // Futex state.
   u64 futex_addr;
+
+  /* Wait-queue state, see sync/waitqueue.h. wait_entries chains every entry
+   * this task has linked into a queue; block_deadline is the tick a timed
+   * block gives up at (0 = untimed), and block_timed_out records which of
+   * the two ended it. */
+  struct wq_entry *wait_entries;
+  u64 block_deadline;
+  int block_timed_out;
   /* Active or queued VFS operation: its kernel stack/FDs must stay alive. */
   unsigned vfs_active;
 };
@@ -335,6 +344,11 @@ void sched_preempt_tick(void);
 
 void task_block(int waiting_for_pid);
 void task_wakeup(struct task *t);
+
+/* Block with no pid to wait for, until task_wakeup or, when `deadline` is
+ * non-zero, until pit_ticks() reaches it. Returns 0 when woken, -ETIMEDOUT
+ * when the deadline passed. The building block under wq_wait. */
+int task_block_until(u64 deadline);
 int task_wake_futex(u64 phys);
 
 void task_exit(long code) NORETURN;

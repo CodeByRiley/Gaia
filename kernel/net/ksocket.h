@@ -2,6 +2,7 @@
 #define KSOCKET_H
 
 #include "sync/spinlock.h"
+#include "sync/waitqueue.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <utilities/types.h>
@@ -78,6 +79,8 @@ struct socket {
     struct sockaddr_in remote;  // Remote IP and Port
 
     struct packet_queue rx_queue;
+    /* Tasks parked in recvfrom or poll until rx_queue is non-empty. */
+    struct wait_queue readers;
 
     struct spinlock lock;
     struct socket *next;    // Linked list for the global socket table
@@ -87,7 +90,17 @@ struct socket {
 void udp_echo_thread(void);
 struct socket* socket_create(int type, int protocol);
 int socket_bind(struct socket *sock, const struct sockaddr_in *addr);
-int socket_recvfrom(struct socket *sock, void *buf, usize len, struct sockaddr_in *src_addr);
+/* socket_recvfrom flags. */
+#define SOCKET_RECV_NONBLOCK 0x1
+
+/* Pop one datagram into buf, truncating it to len. Blocks until one arrives
+ * unless SOCKET_RECV_NONBLOCK is set, in which case an empty queue returns
+ * -EAGAIN. Returns the byte count copied or a negative errno. */
+int socket_recvfrom(struct socket *sock, void *buf, usize len,
+                    struct sockaddr_in *src_addr, int flags);
+
+/* Non-zero when a datagram is queued, so recvfrom would not block. */
+int socket_readable(struct socket *sock);
 int socket_sendto(struct socket *sock, const void *buf, usize len, const struct sockaddr_in *dest_addr);
 
 /* Unlink from the global table, drain any queued datagrams, and free.
