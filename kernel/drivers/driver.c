@@ -124,6 +124,18 @@ static int bind_device(struct device *device) {
   return 0;
 }
 
+static int unbind_device(struct device *device) {
+	if (!device->driver)
+		return 1; // shit doesn't exist
+
+	for (u32 i = 0; i < driver_count; i++) {
+		const struct driver *drvr = drivers[i];
+
+	}
+
+	return 0;
+}
+
 void driver_core_init(void) {
   driver_count = 0;
   device_count = 0;
@@ -170,6 +182,8 @@ int driver_register_isa_device(u16 io_base, u8 irq) {
   bind_device(device);
   return 0;
 }
+
+int driver_unregister() { return 0; };
 
 int driver_probe_pci_devices(void) {
   u32 count = pci_device_count();
