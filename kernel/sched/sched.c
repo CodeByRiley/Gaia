@@ -34,6 +34,7 @@
 #include <msg/pipe.h>
 #include <net/ksocket.h>
 #include <sched/sched.h>
+#include <sched/signal.h>
 #include <sync/waitqueue.h>
 #include <utilities/errno.h>
 #include <stdint.h>
@@ -1106,17 +1107,38 @@ void task_wakeup(struct task *t) {
 int task_block_until(u64 deadline) {
   u64 rflags = irq_save();
   struct task *t = current;
+  /* A signal already waiting would otherwise sleep until the data it is
+   * meant to interrupt arrives. */
+  if (task_signal_deliverable(t)) {
+    irq_restore(rflags);
+    return -EINTR;
+  }
   t->block_timed_out = 0;
+  t->block_interrupted = 0;
+  t->block_interruptible = 1;
   if (deadline) {
     t->block_deadline = deadline;
     n_timed_blocked++;
   }
   /* -1 is not a pid, so no process exit can mistake us for its waiter. */
   task_block(-1);
-  int rc = t->block_timed_out ? -ETIMEDOUT : 0;
+  int rc = t->block_interrupted ? -EINTR
+           : t->block_timed_out ? -ETIMEDOUT
+                                : 0;
   t->block_timed_out = 0;
+  t->block_interrupted = 0;
+  t->block_interruptible = 0;
   irq_restore(rflags);
   return rc;
+}
+
+void task_interrupt(struct task *t) {
+  u64 rflags = irq_save();
+  if (t && t->state == TASK_BLOCKED && t->block_interruptible) {
+    t->block_interrupted = 1;
+    task_wakeup(t);
+  }
+  irq_restore(rflags);
 }
 
 int task_wake_futex(u64 phys) {
@@ -1336,6 +1358,7 @@ static void mark_task_exited(struct task *task, long code) {
       parent->state != TASK_ZOMBIE && parent->state != TASK_DEAD)
     exit_record_add(task->pid, task->parent_pid, code);
   wq_wake_all(&child_exit_wq);
+  signal_child_exited(parent);
 }
 
 /* A live child of `parent` matching `pid` (-1 = any)? Zombies do not count:
@@ -1384,7 +1407,10 @@ long task_wait_child(int pid, long *code, int nohang) {
       rc = 0;
       break;
     }
-    wq_wait(&child_exit_wq, 0);
+    if (wq_wait(&child_exit_wq, 0) == -EINTR) {
+      rc = -EINTR;
+      break;
+    }
   }
   irq_restore(flags);
   return rc;

@@ -17,6 +17,7 @@
 #include <devices/serial.h>
 #include <interrupts/idt.h>
 #include <interrupts/pic.h>
+#include <sched/signal.h>
 #include <memory/hhdm.h>
 #include <memory/pmm.h>
 #include <memory/uvm.h>
@@ -581,6 +582,11 @@ void isr_handler(struct interrupt_frame *r) {
   } else if (r->int_num == VEC_LAPIC_SPURIOUS) {
     /* Intel specifies that a spurious LAPIC interrupt must not be EOIed. */
   }
+
+  /* The other way back to ring 3. A task preempted by the timer resumes
+   * here, so this is where a signal sent while it was off the CPU runs ,
+   * a program spinning in pure user code never makes a syscall. */
+  signal_deliver_irq(r);
   // if (r->int_num < 32) {
   //     serial_write_str("\n!! exception ");
   //     serial_write_hex(r->int_num);

@@ -153,7 +153,10 @@ int socket_recvfrom(struct socket *sock, void *buf, usize len,
             irq_restore(irq_flags);
             return -EAGAIN;
         }
-        wq_wait(&sock->readers, 0);
+        if (wq_wait(&sock->readers, 0) == -EINTR) {
+            irq_restore(irq_flags);
+            return -EINTR;
+        }
     }
     irq_restore(irq_flags);
 

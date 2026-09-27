@@ -23,6 +23,8 @@
 #include <memory/pmm.h>
 #include <memory/vmm.h>
 #include <sched/sched.h>
+#include <sched/signal.h>
+#include <utilities/errno.h>
 #include <stdint.h>
 #include <utilities/log.h>
 #include <utilities/string.h>
@@ -510,9 +512,12 @@ int process_cancel_async(int pid, long code) {
   return -1;
 }
 
+/* kill(2) semantics now live in sched/signal.c: a handler may catch it, an
+ * ignored signal does nothing, and a default-action kill exits the target
+ * with code -signal, which wait4 reports as death by that signal. */
 long process_kill(long pid, int signal) {
-  if (pid <= 0 || signal <= 0 || signal > 64)
-    return -1;
-  return task_kill((int)pid, 128 + signal);
+  if (pid <= 0)
+    return -EINVAL;
+  return signal_send((int)pid, signal);
 }
 #endif

@@ -55,6 +55,7 @@
 #include <net/ksocket.h>
 #include <net/netmon.h>
 #include <sched/sched.h>
+#include <sched/signal.h>
 #include <stddef.h>
 #include <sync/waitqueue.h>
 #include <stdint.h>
@@ -1625,10 +1626,9 @@ static long sys_pipe2(int *fds, int flags) {
   return 0;
 }
 
-/* Linux wait4 status word: exit code in bits 8-15. A negative code is a
- * fault the kernel killed the task for , -11 from the #PF path , and is
- * reported as death by that signal. task_kill's 128+N reads as an exit
- * status of 128+N, which is what a shell would print anyway. */
+/* Linux wait4 status word: exit code in bits 8-15. A negative code means
+ * the task died by that signal , a default-action kill exits with -sig,
+ * and the #PF path with -11 , and is reported as WIFSIGNALED. */
 #define LINUX_RUSAGE_BYTES 144
 
 static long sys_wait4(int pid, int *status, int options, void *rusage) {
@@ -1945,6 +1945,10 @@ static long sys_poll(struct linux_pollfd *fds, long nfds, long timeout_ms) {
 
     if (rc == -ETIMEDOUT) {
       ready = poll_scan(t, fds, nfds);
+      break;
+    }
+    if (rc == -EINTR) {
+      ready = -EINTR;
       break;
     }
   }
@@ -2998,7 +3002,27 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_spawn((const char *)(uintptr_t)a1, (char *const *)(uintptr_t)a2);
     break;
   case SYS_KILL:
-    ret = sys_kill((uintptr_t)a1, (uintptr_t)a2);
+    ret = sys_kill((long)a1, (int)a2);
+    break;
+  case SYS_TKILL:
+    /* A Gaia tid is a pid, so a thread-directed signal is a kill. */
+    ret = sys_kill((long)a1, (int)a2);
+    break;
+  case SYS_TGKILL:
+    ret = sys_kill((long)a2, (int)a3);
+    break;
+  case SYS_GETTID:
+    ret = sys_get_pid();
+    break;
+  case SYS_RT_SIGPROCMASK:
+    ret = signal_sigprocmask((int)a1, (const u64 *)(uintptr_t)a2,
+                             (u64 *)(uintptr_t)a3, (usize)a4);
+    break;
+  case SYS_RT_SIGPENDING:
+    ret = signal_sigpending((u64 *)(uintptr_t)a1, (usize)a2);
+    break;
+  case SYS_RT_SIGRETURN:
+    ret = signal_sigreturn(f);
     break;
   case SYS_SHUTDOWN:
     ret = sys_shutdown((uintptr_t)a1, (const char *)(uintptr_t)a2);
@@ -3066,6 +3090,9 @@ long syscall_dispatch(struct syscall_frame *f) {
     log_write_hex("unknown syscall =", num, KERNEL, LOG_ERROR);
   }
   f->rax = (u64)ret;
+  /* Before validation: a handler redirect rewrites RIP and RSP, and those
+   * are exactly what syscall_prepare_return checks. */
+  signal_deliver_syscall(f);
   if (syscall_prepare_return(f) != 0) {
     log_write("syscall: rejected invalid ring-3 return frame", KERNEL,
               LOG_ERROR);

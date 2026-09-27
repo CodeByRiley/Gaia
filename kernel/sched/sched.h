@@ -250,6 +250,16 @@ struct task {
   struct wq_entry *wait_entries;
   u64 block_deadline;
   int block_timed_out;
+  /* Set while parked in task_block_until: a signal may cut the wait short
+   * (task_interrupt), which block_interrupted then reports as -EINTR.
+   * Other blocks , the VFS gate, futex, exec's wait for its child , are
+   * not interruptible and never see these set. */
+  int block_interruptible;
+  int block_interrupted;
+
+  /* Signals, see sched/signal.h. Bit (sig - 1) of each. */
+  u64 sig_pending;
+  u64 sig_blocked;
   /* Active or queued VFS operation: its kernel stack/FDs must stay alive. */
   unsigned vfs_active;
 };
@@ -406,6 +416,16 @@ void task_wakeup(struct task *t);
  * non-zero, until pit_ticks() reaches it. Returns 0 when woken, -ETIMEDOUT
  * when the deadline passed. The building block under wq_wait. */
 int task_block_until(u64 deadline);
+
+/* Cut an interruptible block short: task_block_until returns -EINTR. A
+ * no-op for a task that is not parked in one. IRQ-safe. */
+void task_interrupt(struct task *t);
+
+/* A pending signal the task has not blocked, i.e. one that will run on
+ * its next return to ring 3. */
+static inline int task_signal_deliverable(const struct task *t) {
+  return (t->sig_pending & ~t->sig_blocked) != 0;
+}
 int task_wake_futex(u64 phys);
 
 void task_exit(long code) NORETURN;
