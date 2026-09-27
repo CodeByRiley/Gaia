@@ -25,7 +25,7 @@
 
 /* QEMU's slirp gateway is 10.0.2.2 and it serves a /24. Static addressing
  * until DHCP lands, at which point netif_set_ipv4 replaces all three. */
-static const u8 e1000_ipv4_addr[IPV4_ALEN] = {10, 0, 2, 30};
+static const u8 e1000_ipv4_addr[IPV4_ALEN] = {10, 0, 2, 30}; // 10.0.2.30 default we probe later
 static const u8 e1000_ipv4_mask[IPV4_ALEN] = {255, 255, 255, 0};
 static const u8 e1000_ipv4_gateway[IPV4_ALEN] = {10, 0, 2, 2};
 static u64 next_mmio_virt = MMIO_VIRT_BASE;
