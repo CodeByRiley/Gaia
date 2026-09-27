@@ -15,7 +15,8 @@
 /* Matches sys_proc_list's own cap. */
 #define MAX_PROCS 64
 
-/* SIGKILL. process_kill maps this to exit code 128 + signal. */
+/* SIGKILL: cannot be caught, so the target always dies, and wait4 sees it
+ * as killed by signal 9. */
 #define PKILL_SIGNAL 9
 
 /* The kernel refuses to kill anything without a user PML4, so every kernel

@@ -123,6 +123,7 @@ optional_payloads=(
 	"userspace/bin/pe_test/pe_test.exe::usr/bin/pe_test.exe"
 	"userspace/bin/udpecho/udpecho.elf::usr/bin/udpecho.elf"
 	"userspace/bin/pipetest/pipetest.elf::usr/bin/pipetest.elf"
+	"userspace/bin/sigtest/sigtest.elf::usr/bin/sigtest.elf"
 	"userspace/bin/netmon/netmon.elf::usr/bin/netmon.elf"
 	"userspace/bin/thread/thread.elf::usr/bin/thread.elf"
 	"userspace/bin/stress/stress.elf::usr/bin/stress.elf"

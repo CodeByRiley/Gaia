@@ -67,7 +67,10 @@ long pipe_read(struct pipe *p, void *buf, usize n, int nonblock) {
       irq_restore(flags);
       return -EAGAIN;
     }
-    wq_wait(&p->readable, 0);
+    if (wq_wait(&p->readable, 0) == -EINTR) {
+      irq_restore(flags);
+      return -EINTR;
+    }
   }
 
   usize chunk = n < p->count ? n : p->count;
@@ -106,7 +109,10 @@ long pipe_write(struct pipe *p, const void *buf, usize n, int nonblock) {
         rc = -EAGAIN;
         break;
       }
-      wq_wait(&p->writable, 0);
+      if (wq_wait(&p->writable, 0) == -EINTR) {
+        rc = -EINTR;
+        break;
+      }
       continue;
     }
 

@@ -159,6 +159,11 @@ isr_common:
   test byte [rsp + INTERRUPT_FRAME_CS_OFF], 3
   jz .kernel_gs_ready
   swapgs
+  ; From ring 3: save the interrupted code's FPU/SSE state before any C
+  ; runs, exactly as the syscall entry does. GPRs are already on the stack.
+  mov rax, [gs:CPU_LOCAL_CURRENT_OFF]
+  mov rax, [rax + TASK_CONTEXT_OFF]
+  fxsave64 [rax + TASK_CONTEXT_USER_FX_OFF]
 .kernel_gs_ready:
 
   mov rdi, rsp        ; SysV ABI: first arg = rdi = pointer to regs
@@ -167,6 +172,14 @@ isr_common:
   cld                 ; required by SysV before calling C
   call isr_handler
   mov rsp, rbx
+
+  ; Back to ring 3: put that state back. GS is still the kernel's here.
+  test byte [rsp + INTERRUPT_FRAME_CS_OFF], 3
+  jz .no_user_fx
+  mov rax, [gs:CPU_LOCAL_CURRENT_OFF]
+  mov rax, [rax + TASK_CONTEXT_OFF]
+  fxrstor64 [rax + TASK_CONTEXT_USER_FX_OFF]
+.no_user_fx:
 
   POP_GPRS
 

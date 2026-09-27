@@ -42,6 +42,19 @@ closed fd. `TASK_FD_TTY` spells the console explicitly when `dup` copies it
 elsewhere. There is no fork: a spawned child inherits its parent's fds 0-2
 and nothing else, which is how a shell wires a pipeline.
 
+**Signal** , per task, Linux x86_64 semantics as musl expects: pending and
+blocked masks on `struct task`, dispositions in `task_context`. Delivered on
+every return to ring 3 (syscall exit and IRQ exit), through a Linux
+`rt_sigframe` and back via `rt_sigreturn`. A signal interrupts a wait-queue
+sleep with `EINTR`; other blocks (VFS gate, futex, `exec`'s wait) are not
+interruptible. No job control, no `sigaltstack`, no syscall restart.
+`kernel/sched/signal.h` has the full contract.
+
+**User FPU image** , `task_context.user_fx`: the ring-3 x87/SSE state,
+saved on every entry from user mode and restored on every return. The kernel
+is compiled with SSE, so live registers inside the kernel are never the
+user's. Distinct from `fxstate`, which the context switch owns.
+
 **Exit record** , what a child leaves when it exits with nobody blocked on
 it: pid, parent, code. The reaper frees the slot as before; `wait4` reads
 the record. Bounded, oldest dropped first, cleared when the parent exits.

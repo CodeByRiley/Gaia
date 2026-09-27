@@ -64,11 +64,24 @@ syscall_entry:
   push r14
   push r15
 
+  ; Save the caller's FPU/SSE state before any C runs: the kernel is built
+  ; with SSE, and the syscall ABI promises every register but rax, rcx and
+  ; r11 comes back unchanged. rax is already in the frame.
+  mov rax, [gs:CPU_LOCAL_CURRENT_OFF]
+  mov rax, [rax + TASK_CONTEXT_OFF]
+  fxsave64 [rax + TASK_CONTEXT_USER_FX_OFF]
+
   ; SYSCALL_FRAME_SIZE is a multiple of 16 and the stack top is 16-aligned, so
   ; RSP is already where SysV wants it before a call. No padding.
   mov rdi, rsp                       ; struct syscall_frame *
   ; FMASK already cleared DF; syscall.c asserts that entry contract.
   call syscall_dispatch
+
+  ; current is this task again even if it slept: it only resumes here.
+  ; A signal frame or rt_sigreturn may have rewritten user_fx.
+  mov rax, [gs:CPU_LOCAL_CURRENT_OFF]
+  mov rax, [rax + TASK_CONTEXT_OFF]
+  fxrstor64 [rax + TASK_CONTEXT_USER_FX_OFF]
 
   pop r15
   pop r14
