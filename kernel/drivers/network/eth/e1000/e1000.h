@@ -31,6 +31,12 @@
 #define REG_IMC 0x00D8
 
 #define REG_IMASK REG_IMS // Interrupt Mask Set/Read alias
+
+/* ICR / IMS cause bits. */
+#define ICR_LSC    (UINT32_C(1) << 2) // Link status change
+#define ICR_RXDMT0 (UINT32_C(1) << 4) // RX descriptors below threshold
+#define ICR_RXO    (UINT32_C(1) << 6) // RX overrun
+#define ICR_RXT0   (UINT32_C(1) << 7) // RX timer: a frame was written back
 #define REG_RCTL 0x0100
 
 #define REG_RXDESCLO 0x2800

@@ -28,7 +28,11 @@
 #include <utilities/string.h>
 
 #define MAX_IDT_ENTRIES 256
-#define MAX_IRQ_HANDLERS 256
+#define MAX_IRQ_LINES 16
+/* Handlers per line. PCI INTx lines are shared , QEMU routes e1000 and
+ * the USB controllers onto the same few , so one slot per line meant the
+ * last driver to install silently took the line from the others. */
+#define MAX_IRQ_SHARED 4
 
 static struct idt_entry idt[MAX_IDT_ENTRIES];
 static struct idt_ptr idtr;
@@ -84,12 +88,26 @@ void idt_load_this_cpu(void) {
 }
 
 typedef void (*irq_fn)(void);
-static irq_fn irq_handlers[MAX_IRQ_HANDLERS] = {0};
+static irq_fn irq_handlers[MAX_IRQ_LINES][MAX_IRQ_SHARED] = {0};
 static unsigned irq_depth[MAX_CPUS];
 
 int irq_in_handler(void) { return irq_depth[percpu_current_id()] != 0; }
 
-void irq_install(u8 irq, irq_fn fn) { irq_handlers[irq] = fn; }
+void irq_install(u8 irq, irq_fn fn) {
+  if (irq >= MAX_IRQ_LINES || !fn)
+    return;
+  /* Installing the same handler twice is a no-op, so re-init paths that
+   * install again stay idempotent instead of running it twice per IRQ. */
+  for (int i = 0; i < MAX_IRQ_SHARED; i++) {
+    if (irq_handlers[irq][i] == fn)
+      return;
+    if (!irq_handlers[irq][i]) {
+      irq_handlers[irq][i] = fn;
+      return;
+    }
+  }
+  log_write_int("IDT: no free handler slot on IRQ", irq, KERNEL, LOG_ERROR);
+}
 
 struct exception_recovery_state {
   u8 armed;
@@ -528,8 +546,10 @@ void isr_handler(struct interrupt_frame *r) {
      * lookup for paths such as panic reporting where GS may be unarmed. */
     int cpu = percpu_this()->cpu_id;
     irq_depth[cpu]++;
-    if (irq_handlers[irq])
-      irq_handlers[irq]();
+    /* Every handler on a shared line runs; each checks its own device's
+     * status and returns if the interrupt was not its. */
+    for (int i = 0; i < MAX_IRQ_SHARED && irq_handlers[irq][i]; i++)
+      irq_handlers[irq][i]();
     pic_send_eoi(irq);
     irq_depth[cpu]--;
     /* EOI must precede a context switch or the PIC keeps IRQ0 in service and

@@ -1,6 +1,9 @@
 /* kernel/drivers/driver.c - minimal device/driver registry. */
+#include <arch/irq.h>
+#include <devices/pit.h>
 #include <drivers/driver.h>
 #include <sched/sched.h>
+#include <sync/waitqueue.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <utilities/log.h>
@@ -15,21 +18,34 @@ static u32 device_count;
 static int pci_devices_probed;
 static int poll_task_started;
 
-/* The poll task used to end each pass with task_yield(). That looks like
- * it gives up the CPU, but yield returns immediately when nothing else is
- * runnable, so the loop became a tight spin that burned a core. Under TCG
- * it starved the guest badly enough to drop PIT interrupts: usleep(1)
- * measured 15.7 seconds, and every sleeping task in the system inherited
- * that error.
+/* How long the poll task sleeps with nothing to do. It is the resolution of
+ * the timers that ride the poll pass , ARP retransmits (1 s) and link state
+ * , not a receive latency: a device with an interrupt kicks the task awake
+ * through driver_poll_kick the moment it has work. */
+#define DRIVER_IDLE_MS 100U
+
+static struct wait_queue poll_wq = WAIT_QUEUE_INIT;
+/* Set by a kick, cleared by the task just before a pass, so a kick that
+ * lands during a pass makes the task go round again instead of sleeping
+ * through it. Read and cleared with IRQs off. */
+static volatile int poll_kicked;
+
+void driver_poll_kick(void) {
+  poll_kicked = 1;
+  wq_wake_all(&poll_wq);
+}
+
+/* The poll task used to end each pass with task_yield(), which returns at
+ * once when nothing else is runnable , a tight spin that starved the guest
+ * badly enough under TCG to drop PIT interrupts. It then slept one tick per
+ * idle pass, which still cost a wakeup every tick and put up to a tick of
+ * latency on every received frame.
  *
- * So sleep when there is nothing to do, and only come straight back when
- * the last pass actually found work -- a receive burst still drains at
- * full speed, because each pass that handles a frame yields rather than
- * sleeps. Idle costs one wakeup per tick instead of a whole core.
- *
- * This is a stopgap for the receive path specifically. The real answer is
- * the e1000 interrupt handler, which is on the TODO; polling is honest
- * while the protocol layers above it are still the unknown quantity. */
+ * Now it parks on poll_wq. A driver's IRQ handler acknowledges its device
+ * and calls driver_poll_kick; the work itself , protocol input, replies,
+ * logging , stays here in task context, where it can allocate and take
+ * locks. A receive burst still drains at full speed: a pass that handled
+ * something yields rather than sleeps. */
 static void driver_poll_thread(void) {
   int busy = 0;
   for (;;) {
@@ -45,10 +61,17 @@ static void driver_poll_thread(void) {
     if (worked && busy < 8) {
       busy++;
       task_yield();
-    } else {
-      busy = 0;
-      task_sleep_ticks(1);
+      continue;
     }
+    busy = 0;
+
+    u32 freq = pit_get_freq();
+    u64 idle_ticks = ((u64)DRIVER_IDLE_MS * (freq ? freq : 100) + 999) / 1000;
+    u64 flags = irq_save();
+    if (!poll_kicked)
+      wq_wait(&poll_wq, pit_ticks() + (idle_ticks ? idle_ticks : 1));
+    poll_kicked = 0;
+    irq_restore(flags);
   }
 }
 

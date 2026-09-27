@@ -1,6 +1,8 @@
 #include <drivers/driver.h>
 #include <drivers/network/eth/e1000/e1000.h>
 #include <drivers/base/vendors/pci_ids.h>
+#include <interrupts/idt.h>
+#include <interrupts/pic.h>
 #include <memory/heap.h>
 #include <memory/hhdm.h>
 #include <memory/pmm.h>
@@ -26,6 +28,15 @@ static const u8 e1000_ipv4_addr[IPV4_ALEN] = {10, 0, 2, 30};
 static const u8 e1000_ipv4_mask[IPV4_ALEN] = {255, 255, 255, 0};
 static const u8 e1000_ipv4_gateway[IPV4_ALEN] = {10, 0, 2, 2};
 static u64 next_mmio_virt = MMIO_VIRT_BASE;
+
+/* Causes that mean "the poll pass has something to do". */
+#define E1000_IRQ_CAUSES (ICR_RXT0 | ICR_RXO | ICR_RXDMT0 | ICR_LSC)
+
+/* NICs whose interrupt is live, for the handler to walk. The line may be
+ * shared with other NICs or with USB, so the handler asks each one. */
+#define E1000_MAX_NICS 4
+static struct e1000_dev *e1000_irq_nics[E1000_MAX_NICS];
+static int e1000_irq_nic_count;
 
 static int e1000_wait_clear(struct e1000_dev *nic, u32 reg,
                             u32 mask) {
@@ -184,9 +195,9 @@ static void e1000_enable_bus_master(const struct pci_device *pci) {
   pci_write16(pci->addr, PCI_CFG_COMMAND, cmd);
 }
 
-/* netif tx callback. Must not block: reached from the driver poll task
- * today and from the IRQ handler once that path lands. A full ring is
- * reported as failure rather than spun on. */
+/* netif tx callback. Must not block: reached from the driver poll task,
+ * which may be answering a frame it just received. A full ring is reported
+ * as failure rather than spun on. */
 static int e1000_tx(void *driver_data, const void *frame, u16 len) {
   struct e1000_dev *nic = (struct e1000_dev *)driver_data;
   if (!nic || !frame || len > E1000_FRAME_MAX)
@@ -238,7 +249,9 @@ static int e1000_init_hardware(struct e1000_dev *nic) {
     return -1;
   }
 
-  E1000_WRITE(nic, REG_IMS, 0x01); // Unmask ICR_RXDMT0 (Receive Interrupt)
+  /* Reset leaves every cause masked. They stay masked until the rings
+   * exist and e1000_enable_irq has somewhere to send them. */
+  E1000_WRITE(nic, REG_IMC, 0xFFFFFFFF);
   (void)E1000_READ(nic, REG_ICR);
 
   ctrl = E1000_READ(nic, REG_CTRL);
@@ -364,6 +377,48 @@ static int e1000_poll_rx(struct device *dev) {
   return handled;
 }
 
+/* Top half only. Reading ICR acknowledges every cause it returns, which is
+ * what lowers a level-triggered INTx line; the frames themselves are left
+ * for the poll task, where eth_input can allocate, lock and transmit. A NIC
+ * reporting zero did not raise this interrupt , the line is shared. */
+static void e1000_irq_handler(void) {
+  int kick = 0;
+  for (int i = 0; i < e1000_irq_nic_count; i++) {
+    if (E1000_READ(e1000_irq_nics[i], REG_ICR))
+      kick = 1;
+  }
+  if (kick)
+    driver_poll_kick();
+}
+
+/* Route the NIC's INTx line to the handler, then unmask its causes , in
+ * that order, so the first interrupt has somewhere to go. Without a usable
+ * line the NIC still works, but only as fast as the poll task's idle
+ * timeout, so say so. */
+static void e1000_enable_irq(struct e1000_dev *nic, struct pci_device *pci) {
+  u8 line = pci->int_line;
+  if (pci->int_pin == 0 || line == 0 || line >= 16 || line == 2) {
+    log_write_int("e1000: no usable INTx line, RX is polled; line =", line,
+                  KERNEL, LOG_WARN);
+    return;
+  }
+  if (e1000_irq_nic_count >= E1000_MAX_NICS) {
+    log_write("e1000: IRQ table full, RX is polled", KERNEL, LOG_WARN);
+    return;
+  }
+
+  e1000_irq_nics[e1000_irq_nic_count++] = nic;
+  irq_install(line, e1000_irq_handler);
+
+  u16 cmd = pci_read16(pci->addr, PCI_CFG_COMMAND);
+  pci_write16(pci->addr, PCI_CFG_COMMAND, cmd & (u16)~PCI_CMD_INT_DISABLE);
+  pic_clear_mask(line);
+
+  (void)E1000_READ(nic, REG_ICR);
+  E1000_WRITE(nic, REG_IMS, E1000_IRQ_CAUSES);
+  log_write_int("e1000: interrupts enabled on IRQ", line, KERNEL, LOG_INFO);
+}
+
 static int e1000_probe(struct device *dev) {
   struct e1000_dev *nic = kmalloc(sizeof(struct e1000_dev));
   if (!nic)
@@ -409,6 +464,7 @@ static int e1000_probe(struct device *dev) {
     return -1;
   }
 
+  e1000_enable_irq(nic, &dev->bus_info.pci);
   return 0;
 }
 

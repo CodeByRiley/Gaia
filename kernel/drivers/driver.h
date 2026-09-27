@@ -79,6 +79,10 @@ int driver_register_isa_device(u16 io_base, u8 irq);
  * Idempotent: each PCI function is imported once. */
 int driver_probe_pci_devices(void);
 
+/* Wake the shared poll task for an immediate pass. For IRQ handlers: ack
+ * the device, kick, and leave the work to the task. IRQ-safe. */
+void driver_poll_kick(void);
+
 u32 driver_device_count(void);
 
 const struct device *driver_device_at(u32 index);
