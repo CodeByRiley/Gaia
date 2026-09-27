@@ -34,7 +34,17 @@ parked on one object until its state changes. The producer calls
 `wq_wake_all`; each woken task re-checks its condition. Exclusion is
 interrupts-off on the BSP, the scheduler's own rule, so check-then-park cannot
 lose a wake. Entries live on the waiter's kernel stack and are unlinked when a
-parked task is killed. Socket receive and `poll` use it today.
+parked task is killed. Socket receive, pipes, `poll` and `wait4` use it.
+
+**Standard descriptors** , fds 0-2 hold any object (pipe end, file,
+socket), but an *unused* standard slot means the task's console, not a
+closed fd. `TASK_FD_TTY` spells the console explicitly when `dup` copies it
+elsewhere. There is no fork: a spawned child inherits its parent's fds 0-2
+and nothing else, which is how a shell wires a pipeline.
+
+**Exit record** , what a child leaves when it exits with nobody blocked on
+it: pid, parent, code. The reaper frees the slot as before; `wait4` reads
+the record. Bounded, oldest dropped first, cleared when the parent exits.
 
 ## Storage
 
