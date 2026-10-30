@@ -6,6 +6,10 @@
 void *ext2_bytes(struct ext2_fs *fs, u64 offset, usize length) {
   if (!fs || offset > fs->image_size || length > fs->image_size - offset)
     return 0;
+  if (fs->lazy && ext2_lazy_ensure(fs->lazy, offset, length)) {
+    fs->io_failed = 1;
+    return 0;
+  }
   return fs->image + (usize)offset;
 }
 
@@ -17,7 +21,14 @@ void *ext2_block(struct ext2_fs *fs, u32 block_number) {
 
 static int ext2_probe_image(const void *image, usize size) { return fs_probe_is_ext(image, size); }
 
-int ext2_mount_image(struct vfs_superblock *super, void *image, usize size) {
+/* Shared by RAM images (lazy == NULL) and device mounts. With a lazy
+ * image, everything read here before the ext2_fs exists , the probe
+ * header, the superblock, the group descriptors , is made resident first;
+ * from then on ext2_bytes does it. */
+static int mount_common(struct vfs_superblock *super, u8 *image, usize size,
+                        struct ext2_lazy *lazy) {
+  if (lazy && ext2_lazy_ensure(lazy, 0, size < 2048 ? size : 2048))
+    return -1;
   if (!ext2_probe_image(image, size))
     return -1;
   struct ext2_superblock *superblock =
@@ -52,6 +63,9 @@ int ext2_mount_image(struct vfs_superblock *super, void *image, usize size) {
 
   u64 descriptor_offset  = (u64)(superblock->first_data_block + 1) * block_size;
   usize descriptor_bytes = (usize)group_count * sizeof(struct ext2_group_descriptor);
+  if (lazy && descriptor_offset <= size && descriptor_bytes <= size - descriptor_offset &&
+      ext2_lazy_ensure(lazy, descriptor_offset, descriptor_bytes))
+    return -1;
   struct ext2_group_descriptor *groups =
       descriptor_offset <= size && descriptor_bytes <= size - descriptor_offset
           ? (struct ext2_group_descriptor *)((u8 *)image + descriptor_offset)
@@ -71,6 +85,7 @@ int ext2_mount_image(struct vfs_superblock *super, void *image, usize size) {
   fs->inode_size         = inode_size;
   fs->group_count        = group_count;
   fs->pointers_per_block = block_size / sizeof(u32);
+  fs->lazy               = lazy;
 
   u32 inode_table_blocks =
       (u32)(((u64)superblock->inodes_per_group * inode_size + block_size - 1) / block_size);
@@ -94,13 +109,23 @@ int ext2_mount_image(struct vfs_superblock *super, void *image, usize size) {
   return super->root ? 0 : -1;
 }
 
+int ext2_mount_image(struct vfs_superblock *super, void *image, usize size) {
+  return mount_common(super, image, size, 0);
+}
+
+int ext2_mount_lazy(struct vfs_superblock *super, struct ext2_lazy *lazy, u8 *image, usize size) {
+  return mount_common(super, image, size, lazy);
+}
+
 static void ext2_unmount_image(struct vfs_superblock *super) {
   struct ext2_fs *fs = super->private_data;
   if (!fs)
     return;
   if (fs->dirty_blocks)
     kfree(fs->dirty_blocks);
-  if (fs->owns_image)
+  if (fs->lazy)
+    ext2_lazy_release(fs->lazy);
+  else if (fs->owns_image)
     kfree(fs->image);
   kfree(fs);
 }

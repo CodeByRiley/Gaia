@@ -123,7 +123,22 @@ struct ext2_fs {
   u8 *dirty_blocks;
   int owns_image;
   int io_failed;
+  /* Device mounts only: `image` is a reserved window whose pages are read
+   * from the device on first touch (ext2_io.c). NULL for RAM images. */
+  struct ext2_lazy *lazy;
 };
+
+/* On-demand image for a block-device mount. Pages are loaded the first time
+ * ext2_bytes covers them and stay resident until unmount, so every pointer
+ * the driver hands out stays valid for the life of the mount. */
+struct ext2_lazy;
+/* Make [offset, offset + length) of the image resident. 0 or -1 (I/O). */
+int ext2_lazy_ensure(struct ext2_lazy *lazy, u64 offset, usize length);
+/* Drop every loaded page and the window itself. */
+void ext2_lazy_release(struct ext2_lazy *lazy);
+/* Mount over a lazy image; the mount takes `lazy` over on success and when
+ * it leaves super->private_data set, as ext2_mount_image does an image. */
+int ext2_mount_lazy(struct vfs_superblock *super, struct ext2_lazy *lazy, u8 *image, usize size);
 
 int ext2_mount_image(struct vfs_superblock *super, void *image, usize size);
 int ext2_mount_block(struct vfs_superblock *super, void *device);
