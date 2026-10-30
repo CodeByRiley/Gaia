@@ -92,6 +92,9 @@ optional_payloads=(
 	"rootfs/firmware/gsp_ga10x.bin::firmware/gsp_ga10x.bin"
 	"rootfs/firmware/gsp_tu10x.bin::firmware/gsp_tu10x.bin"
 
+	# Built from the installed SDK outside this tree; see tests/sdk_smoke_test.py.
+	"build/sdk-smoke/sdksmoke.elf::usr/bin/sdksmoke.elf"
+
 	"rootfs/music/beethoven.wav::music/beethoven.wav"
 	"rootfs/games/doom/doom.wad::games/doom/doom.wad"
 

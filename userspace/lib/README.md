@@ -34,6 +34,17 @@ It cannot return an exit code yet because the kernel process-list ABI does not
 expose one. A future `waitpid` syscall can extend this API without making every
 application reimplement the polling logic.
 
+## SDK
+
+The public subset of this library is declared under `userspace/include/gaia/`
+and installed as `<gaia/...>` with `make sdk-install` (see `build/sdk.mk`).
+Only process, console, system, IPC, and audio are public so far; window,
+graphics, and input headers still depend on in-tree paths. A public header
+must compile with nothing but the installed SDK and musl on the include path,
+and must agree with the in-tree declarations , `make sdk-check` enforces both.
+`lib/process.h` forwards to `<gaia/process.h>`, so that API has one
+declaration.
+
 ## Rendering helpers
 
 `gfx.h` contains pixel and surface primitives, while `ui.h` provides the

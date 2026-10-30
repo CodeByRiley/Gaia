@@ -186,6 +186,7 @@ endif
 include build/runtimes.mk
 include build/application.mk
 include build/library.mk
+include build/sdk.mk
 ifeq ($(BUILD_DOOM),1)
 USERSPACE_TARGETS += bin/doom/doom.elf
 endif
