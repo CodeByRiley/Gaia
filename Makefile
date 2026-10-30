@@ -135,7 +135,7 @@ userspace:
 ifeq ($(USERSPACE_CLEAN),1)
 	$(MAKE) -C userspace clean
 endif
-	$(MAKE) -C userspace all BUILD_DOOM=$(BUILD_DOOM) BUILD_NETSURF=$(BUILD_NETSURF)
+	$(MAKE) -C userspace package-list BUILD_DOOM=$(BUILD_DOOM) BUILD_NETSURF=$(BUILD_NETSURF)
 
 
 $(disk_img): userspace tools/create_disk.sh $(rootfs_payload_files) | $(kernel_bin)

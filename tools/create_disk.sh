@@ -47,25 +47,25 @@ payloads=(
 	"rootfs/system/wallpaper.bmp::system/wallpaper.bmp"
 
 # System Apps
-	"userspace/bin/shutdown/shutdown.elf::system/bin/shutdown.elf"
-	"userspace/bin/heimdall/heimdall.elf::system/bin/heimdall.elf"
-	"userspace/bin/diskinfo/diskinfo.elf::system/bin/diskinfo.elf"
-	"userspace/bin/notepad/notepad.elf::system/bin/notepad.elf"
-	"userspace/bin/hermes/hermes.elf::system/bin/hermes.elf"
-	"userspace/bin/umount/umount.elf::system/bin/umount.elf"
-	"userspace/bin/lsdisk/lsdisk.elf::system/bin/lsdisk.elf"
-	"userspace/bin/reboot/reboot.elf::system/bin/reboot.elf"
-	"userspace/bin/pkill/pkill.elf::system/bin/pkill.elf"
-	"userspace/bin/plist/plist.elf::system/bin/plist.elf"
-	"userspace/bin/mount/mount.elf::system/bin/mount.elf"
-	"userspace/bin/sync/sync.elf::system/bin/sync.elf"
-	"userspace/bin/wipe/wipe.elf::system/bin/wipe.elf"
-	"userspace/bin/mkfs/mkfs.elf::system/bin/mkfs.elf"
-	"userspace/bin/tree/tree.elf::system/bin/tree.elf"
-	"userspace/bin/holyd.elf::system/bin/holyd.elf"
-	"userspace/bin/cat/cat.elf::system/bin/cat.elf"
-	"userspace/bin/sh/sh.elf::system/bin/sh.elf"
-	"userspace/bin/ls/ls.elf::system/bin/ls.elf"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 )
 
 # Optional payloads: anything gitignored, unbuilt, or hardware-specific.
@@ -91,10 +91,10 @@ optional_payloads=(
 	"rootfs/firmware/ucodes_tu10x.bin::firmware/ucodes_tu10x.bin"
 	"rootfs/firmware/gsp_ga10x.bin::firmware/gsp_ga10x.bin"
 	"rootfs/firmware/gsp_tu10x.bin::firmware/gsp_tu10x.bin"
-	"userspace/bin/netsurf/netsurf.elf::usr/bin/netsurf.elf"
+
 	"rootfs/music/beethoven.wav::music/beethoven.wav"
 	"rootfs/games/doom/doom.wad::games/doom/doom.wad"
-	"userspace/bin/doom/doom.elf::usr/bin/doom.elf"
+
 
 	# The .hd scripts come from the HolyD submodule, which is their only
 	# home now , edit them in userspace/bin/holyd and commit there.
@@ -116,28 +116,65 @@ optional_payloads=(
 	"userspace/bin/holyd/tests/math.hd::holyd/tests/math.hd"
 
 	# User Apps
-	"userspace/bin/stress_peer/stress_peer.elf::usr/bin/stress_peer.elf"
-	"userspace/bin/audiotest/audiotest.elf::usr/bin/audiotest.elf"
-	"userspace/bin/mmaptest/mmaptest.elf::usr/bin/mmaptest.elf"
-	"userspace/bin/fdchild/fdchild.elf::usr/bin/fdchild.elf"
-	"userspace/bin/pe_test/pe_test.exe::usr/bin/pe_test.exe"
-	"userspace/bin/udpecho/udpecho.elf::usr/bin/udpecho.elf"
-	"userspace/bin/pipetest/pipetest.elf::usr/bin/pipetest.elf"
-	"userspace/bin/sigtest/sigtest.elf::usr/bin/sigtest.elf"
-	"userspace/bin/netmon/netmon.elf::usr/bin/netmon.elf"
-	"userspace/bin/thread/thread.elf::usr/bin/thread.elf"
-	"userspace/bin/stress/stress.elf::usr/bin/stress.elf"
-	"userspace/bin/vmtest/vmtest.elf::usr/bin/vmtest.elf"
-	"userspace/bin/uidemo/uidemo.elf::usr/bin/uidemo.elf"
-	"userspace/bin/hello/hello.exe::usr/bin/hello.exe"
-	"userspace/bin/mtest/mtest.elf::usr/bin/mtest.elf"
-	"userspace/bin/hello/hello.elf::usr/bin/hello.elf"
-	"userspace/bin/btop/btop.elf::usr/bin/btop.elf"
-	"userspace/bin/muse/muse.elf::usr/bin/muse.elf"
-	"userspace/bin/ping/ping.elf::usr/bin/ping.elf"
-	"userspace/bin/gfx/gfx.elf::usr/bin/gfx.elf"
-	"userspace/bin/ls/ls.exe::usr/bin/ls.exe"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 )
+
+# Only the active build graph may supply executables. A removed manifest or
+# disabled port must not reappear merely because an old binary is on disk.
+target_list="build/userspace/targets.list"
+if [[ ! -f "$target_list" ]]; then
+    echo "create_disk: missing $target_list; build userspace first" >&2
+    exit 1
+fi
+while IFS= read -r host_path; do
+    host_path="${host_path%$'\r'}"
+    [[ -z "$host_path" ]] && continue
+    case "$host_path" in
+        userspace/bin/shutdown/shutdown.elf) destination="system/bin/shutdown.elf" ;;
+        userspace/bin/heimdall/heimdall.elf) destination="system/bin/heimdall.elf" ;;
+        userspace/bin/diskinfo/diskinfo.elf) destination="system/bin/diskinfo.elf" ;;
+        userspace/bin/notepad/notepad.elf) destination="system/bin/notepad.elf" ;;
+        userspace/bin/hermes/hermes.elf) destination="system/bin/hermes.elf" ;;
+        userspace/bin/umount/umount.elf) destination="system/bin/umount.elf" ;;
+        userspace/bin/lsdisk/lsdisk.elf) destination="system/bin/lsdisk.elf" ;;
+        userspace/bin/reboot/reboot.elf) destination="system/bin/reboot.elf" ;;
+        userspace/bin/pkill/pkill.elf) destination="system/bin/pkill.elf" ;;
+        userspace/bin/plist/plist.elf) destination="system/bin/plist.elf" ;;
+        userspace/bin/mount/mount.elf) destination="system/bin/mount.elf" ;;
+        userspace/bin/sync/sync.elf) destination="system/bin/sync.elf" ;;
+        userspace/bin/wipe/wipe.elf) destination="system/bin/wipe.elf" ;;
+        userspace/bin/mkfs/mkfs.elf) destination="system/bin/mkfs.elf" ;;
+        userspace/bin/tree/tree.elf) destination="system/bin/tree.elf" ;;
+        userspace/bin/holyd.elf) destination="system/bin/holyd.elf" ;;
+        userspace/bin/cat/cat.elf) destination="system/bin/cat.elf" ;;
+        userspace/bin/sh/sh.elf) destination="system/bin/sh.elf" ;;
+        userspace/bin/ls/ls.elf) destination="system/bin/ls.elf" ;;
+        userspace/bin/*.elf|userspace/bin/*.exe) destination="usr/bin/${host_path##*/}" ;;
+        *) echo "create_disk: invalid registered target: $host_path" >&2; exit 1 ;;
+    esac
+    [[ -f "$host_path" ]] || { echo "missing registered binary: $host_path" >&2; exit 1; }
+    payloads+=("$host_path::$destination")
+done < "$target_list"
 
 for entry in "${optional_payloads[@]}"; do
 	host_path="${entry%%::*}"
