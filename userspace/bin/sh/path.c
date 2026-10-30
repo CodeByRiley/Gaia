@@ -5,17 +5,15 @@
 
 static char exec_path[EXEC_PATH_MAX] = DEFAULT_EXEC_PATH;
 
-const char *shell_exec_path(void) {
-  return exec_path;
-}
+const char *shell_exec_path(void) { return exec_path; }
 
 /* Read one colon-delimited PATH component. */
 int path_next(const char *path, int *cursor, char *out, int max) {
   if (!path || !cursor || *cursor < 0 || !out || max < 2)
     return 0;
 
-  int i = *cursor;
-  int n = 0;
+  int i        = *cursor;
+  int n        = 0;
   int overflow = 0;
 
   while (path[i] && path[i] != ':') {

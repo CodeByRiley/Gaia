@@ -1,9 +1,9 @@
 #include "complete.h"
 #include "bin/sh/path.h"
 #include "bin/sh/shell.h"
-#include <string.h>
-#include "lib/syscall.h"
 #include "lib/console.h"
+#include "lib/syscall.h"
+#include <string.h>
 
 static char comp_matches[COMP_MAX_MATCHES][COMP_NAME_MAX];
 static int comp_count    = 0;

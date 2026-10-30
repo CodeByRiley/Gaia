@@ -16,15 +16,17 @@
  *   - TAB completes command names from PATH or files from the current dir.
  */
 // #region INCLUDES
-#include "shell.h"
+#include "builtin.h"
 #include "console.h"
+#include "exec.h"
+#include "history.h"
 #include "line.h"
 #include "parse.h"
 #include "path.h"
-#include "builtin.h"
-#include "exec.h"
+#include "shell.h"
 
 #include <lib/console.h>
+#include <stdio.h>
 #include <string.h>
 // #endregion INCLUDES
 
@@ -44,6 +46,8 @@ int main(int argc, char **argv) {
     int len = read_line(line, sizeof(line));
     if (len == 0)
       continue;
+
+    history_add(line);
 
     int ac = tokenize(line, targs, 16);
     if (ac == 0)

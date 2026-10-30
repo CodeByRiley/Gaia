@@ -53,10 +53,7 @@ const struct builtin *find_builtin(const char *name) {
   return NULL;
 }
 
-int shell_exit_requested(void) {
-  return shell_should_exit;
-}
-
+int shell_exit_requested(void) { return shell_should_exit; }
 
 /* `run PATH[.elf] [ARGS...] [&]` , explicit form. Strips the leading
  * "run" token and forwards the rest to exec_argv. */
@@ -128,7 +125,6 @@ static int builtin_fdnstest(int argc, char **argv) {
   close(parent_fd);
   return code == 0 ? 0 : 1;
 }
-
 
 static int builtin_help(int argc, char **argv) {
   (void)argc;

@@ -11,8 +11,11 @@
 global start
 global page_table_l4
 extern long_mode_start
+extern cpu_supported_features
 section .boot.text progbits alloc exec nowrite align=16
 bits 32
+
+CPU_FEATURE_SSSE3 equ (1 << 3)
 
 mb2_magic equ 0x36D76289
 
@@ -38,9 +41,9 @@ start:
   call serial_putln
   call check_cpuid
 
-  mov esi, msg_chk_sse
+  mov esi, msg_chk_simd
   call serial_putln
-  call check_sse
+  call check_simd
 
   mov esi, msg_chk_lm
   call serial_putln
@@ -94,13 +97,35 @@ check_cpuid:
   mov esi, msg_no_cpuid
   jmp error
 
-; verify SSE supported via cpuid leaf 1, edx bit 25
-check_sse:
-  mov eax, 0x1
+; Require SSE/SSE2, detect optional SSSE3.
+check_simd:
+  mov esi, msg_chk_sse
+  call serial_putln
+
+  mov eax, 1
+  xor ecx, ecx
   cpuid
-  test edx, 1 << 25          ; SSE flag
+
+  ; SSE and SSE2 are mandatory.
+  test edx, 1 << 25
   jz .no_sse
+
+  test edx, 1 << 26
+  jz .no_sse
+
+  ; SSSE3 is optional.
+  test ecx, 1 << 9
+  jz .done
+
+  mov esi, msg_ssse3_supported
+  call serial_putln
+
+  ; SSSE3 supported.
+  ; We set it through C cpu_detect_features()
+
+.done:
   ret
+
 .no_sse:
   mov esi, msg_no_sse
   jmp error
@@ -353,11 +378,15 @@ serial_puts:
 ; send string + CRLF over COM1
 ; esi: string pointer
 serial_putln:
+	push eax
+	push edx
   call serial_puts
   mov al, 0x0D               ; CR
   call serial_putc
   mov al, 0x0A               ; LF
   call serial_putc
+  pop edx
+  pop eax
   ret
 
 section .boot.bss nobits alloc noexec write align=4096
@@ -384,21 +413,26 @@ magic_save:
   resd 1                     ; saved multiboot2 magic
 
 section .boot.rodata progbits alloc noexec nowrite align=8
-msg_error_prefix:  db "[ERROR] ", 0
-msg_no_multiboot:  db "NO MULTIBOOT", 0
-msg_no_nx:         db "NO NX", 0
-msg_no_cpuid:      db "NO CPUID", 0
-msg_no_sse:        db "NO SSE", 0
-msg_no_long_mode:  db "NO LONG MODE", 0
+msg_error_prefix:  		db "[ERROR] ", 0
+msg_no_multiboot:  		db "NO MULTIBOOT", 0
+msg_no_nx:         		db "NO NX", 0
+msg_no_cpuid:      		db "NO CPUID", 0
+msg_no_sse:        		db "NO SSE", 0
+msg_no_avx:				 		db "NO AVX", 0
+msg_no_long_mode:  		db "NO LONG MODE", 0
 
-msg_boot:          db "[BOOT(32)] entered 32-bit start", 0
-msg_chk_cpuid:     db "[BOOT(32)] checking cpuid", 0
-msg_chk_sse:       db "[BOOT(32)] checking sse", 0
-msg_chk_lm:        db "[BOOT(32)] checking long mode", 0
-msg_setup_pt:      db "[BOOT(32)] setting up page tables", 0
-msg_enable_paging: db "[BOOT(32)] enabling paging", 0
-msg_enable_sse:    db "[BOOT(32)] enabling sse", 0
-msg_jump_lm:       db "[BOOT(32)] jumping to long mode", 0
+msg_ssse3_supported:  db "SSSE3 SUPPORTED", 0
+msg_avx_supported:    db "SSSE3 SUPPORTED", 0
+
+msg_boot:          		db "[BOOT(32)] entered 32-bit start", 0
+msg_chk_cpuid:     		db "[BOOT(32)] checking cpuid", 0
+msg_chk_simd:       	db "[BOOT(32)] checking simd", 0
+msg_chk_sse:       	  db "[BOOT(32)] checking sse", 0
+msg_chk_lm:        		db "[BOOT(32)] checking long mode", 0
+msg_setup_pt:      		db "[BOOT(32)] setting up page tables", 0
+msg_enable_paging: 		db "[BOOT(32)] enabling paging", 0
+msg_enable_sse:    		db "[BOOT(32)] enabling sse", 0
+msg_jump_lm:       		db "[BOOT(32)] jumping to long mode", 0
 
 ; 64-bit GDT: null + flat code segment
 gdt64:

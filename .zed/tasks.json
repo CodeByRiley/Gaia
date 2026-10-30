@@ -1,5 +1,5 @@
 [
-  {
+	{
     "label": "Create Disk",
     "command": "wsl bash -lc 'cd /mnt/e/Projects/Weird/Gaia && .\\tools\\create_disk.sh'",
     "use_new_terminal": false,

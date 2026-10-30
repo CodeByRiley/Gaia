@@ -143,6 +143,11 @@ void pump_ipc(void) {
   }
 }
 
+static void tty_inject_sequence(int tty, const char *sequence) {
+  while (*sequence)
+    tty_inject(tty, *sequence++);
+}
+
 /* Translate input event from screen coords to the focused window's
  * client-area coords before forwarding. Clients draw into a surface that
  * starts at (0,0) so they shouldn't have to know their own position on
@@ -221,12 +226,6 @@ void request_window_close(int handle, u32 now) {
   ipc_send(w->owner_pid, &out);
 }
 
-// void handle_mouse_input(const struct msg* msg) {
-//   if(prompt.active) {
-//     if ()
-//   }
-// }
-//
 void pump_input(void) {
   struct msg m;
 
@@ -664,6 +663,40 @@ void pump_input(void) {
         }
         if (ctrl_held && m.param == KEY_EQUAL) {
           con_set_scale(focus_con, focus_con->scale + 1);
+          continue;
+        }
+
+        if (ctrl_held && m.param == KEY_EQUAL) {
+          con_set_scale(focus_con, focus_con->scale + 1);
+          continue;
+        }
+
+        /* Forward special keys to the focused console's TTY. */
+        const char *sequence = NULL;
+
+        switch (m.param) {
+        case KEY_UP:
+          sequence = "\x1b[A";
+          break;
+        case KEY_DOWN:
+          sequence = "\x1b[B";
+          break;
+        case KEY_RIGHT:
+          sequence = "\x1b[C";
+          break;
+        case KEY_LEFT:
+          sequence = "\x1b[D";
+          break;
+        case KEY_HOME:
+          sequence = "\x1b[H";
+          break;
+        case KEY_END:
+          sequence = "\x1b[F";
+          break;
+        }
+
+        if (sequence) {
+          tty_inject_sequence(focus_con->tty, sequence);
           continue;
         }
 
