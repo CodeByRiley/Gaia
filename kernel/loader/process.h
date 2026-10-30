@@ -50,6 +50,15 @@ int user_stack_alloc_in(u64 *pml4);
 /* Synchronous exec: blocks until the child exits and returns its code. */
 long process_exec(const char *path, char *const argv[]);
 
+/* The loading half of execve(2), for the calling task. Builds `path` with
+ * the given argument and environment vectors (kernel copies) into a fresh
+ * address space, then replaces the caller's with it, releasing a vfork
+ * parent. Returns 0 with the new image's entry point and initial stack
+ * pointer, or a negative errno with the caller untouched. Descriptor,
+ * signal and register reset is the syscall layer's job. */
+long process_execve(const char *path, int argc, char *const argv[], int envc, char *const envp[],
+                    u64 *entry, u64 *user_rsp);
+
 /* Fire-and-forget spawn: reserves and returns the final child pid (>0), then
  * loads the image on the BSP loader task. The task is visible as LOADING until
  * activation and is reaped normally if loading fails. */

@@ -17,8 +17,10 @@ long write(int fd, const void *buf, size_t n) {
 long read(int fd, void *buf, size_t n) {
   return syscall_result(syscall3(SYS_READ, fd, (sysarg_t)(uintptr_t)buf, (sysarg_t)(uintptr_t)n));
 }
+/* No mode parameter here, so a created file asks for 0666 and the umask
+ * decides, as fopen would. The kernel reads the third register either way. */
 long open(const char *path, int flags) {
-  return syscall_result(syscall2(SYS_OPEN, (sysarg_t)(uintptr_t)path, flags));
+  return syscall_result(syscall3(SYS_OPEN, (sysarg_t)(uintptr_t)path, flags, 0666));
 }
 long close(int fd) { return syscall_result(syscall1(SYS_CLOSE, fd)); }
 long lseek(int fd, long off, int whence) {

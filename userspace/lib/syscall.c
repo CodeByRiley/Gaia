@@ -45,7 +45,10 @@ long readdir_path(const char *path, unsigned *index, char *buf, size_t n) {
                   (sysarg_t)n);
 }
 
-long mkdir_path(const char *path) { return syscall1(SYS_MKDIR, (sysarg_t)(uintptr_t)path); }
+/* 0777 less the umask, as mkdir(1) asks; the kernel reads the mode register. */
+long mkdir_path(const char *path) {
+  return syscall2(SYS_MKDIR, (sysarg_t)(uintptr_t)path, 0777);
+}
 
 long rmdir_path(const char *path) { return syscall1(SYS_RMDIR, (sysarg_t)(uintptr_t)path); }
 

@@ -25,6 +25,8 @@
 #define EINTR 4   /* Interrupted system call */
 #define ECHILD 10 /* No child processes */
 #define EACCES 13 /* Permission denied */
+#define E2BIG 7    /* Argument list too long */
+#define ENOEXEC 8  /* Exec format error */
 
 /* File descriptor errors */
 #define EBADF 9   /* Bad file descriptor */

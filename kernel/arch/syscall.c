@@ -31,6 +31,7 @@
  */
 #include <arch/gdt.h>
 #include <arch/percpu.h>
+#include <arch/linux_syscall_names.h>
 #include <arch/syscall.h>
 #include <devices/io.h>
 #include <devices/pit.h>
@@ -111,14 +112,48 @@ _Static_assert(SYSRET_STAR_BASE + 16 == (GDT_USER_CODE | GDT_RPL_USER),
 #define MAX_SHMEM_PAGES 4096 /* per-call cap; 16 MiB */
 #define AUDIO_WRITE_MAX (1024 * 1024)
 
+#define O_ACCMODE 03
+#define O_WRONLY 01
+#define O_RDWR 02
 #define O_EXCL 0x80
 #define O_CREAT 0x40
 #define O_TRUNC 0x200
 #define O_NONBLOCK 04000
 #define O_DIRECTORY 0200000
+#define O_CLOEXEC 02000000
+
+#define FD_CLOEXEC 1
 
 #define AT_FDCWD (-100)
+#define AT_SYMLINK_NOFOLLOW 0x100
+#define AT_REMOVEDIR 0x200
+#define AT_EACCESS 0x200
 #define AT_EMPTY_PATH 0x1000
+
+/* access(2) modes. F_OK is zero: existence only. */
+#define F_OK 0
+#define X_OK 1
+#define W_OK 2
+#define R_OK 4
+
+/* clone(2). The low byte is the signal the parent gets at exit. */
+#define CLONE_CSIGNAL 0xff
+#define CLONE_VM 0x00000100
+#define CLONE_VFORK 0x00004000
+#define LINUX_SIGCHLD 17
+
+#define MADV_NORMAL 0
+#define MADV_RANDOM 1
+#define MADV_SEQUENTIAL 2
+#define MADV_WILLNEED 3
+#define MADV_DONTNEED 4
+#define MADV_FREE 8
+
+/* execve copies the caller's vectors into the kernel before anything else.
+ * Linux bounds the strings by a quarter of the stack rlimit; Gaia's stack is
+ * fixed at USER_STACK_PAGES, so the same quarter of that is the budget. */
+#define EXEC_STRINGS_MAX ((usize)USER_STACK_PAGES * 4096 / 4)
+#define EXEC_VECTOR_MAX 4096
 
 #define S_IFREG 0100000
 #define S_IFDIR 0040000
@@ -252,6 +287,10 @@ _Static_assert(sizeof(struct linux_utsname) == 390, "Linux x86_64 utsname ABI si
 extern void syscall_entry(void);
 
 static int resolve_path(const char *path, char *out, usize max);
+static long resolve_user_path_at(int dirfd, const char *user_path, int allow_empty, char *out,
+                                 usize max);
+static int copy_user_string(const char *user, char *out, usize max);
+static int fd_is_known(struct task *t, int fd);
 static int user_buffer_ok(const void *pointer, u64 bytes, int writable);
 static long sys_futex_wait(u32 *addr, u32 expected);
 static long sys_futex_wake(u32 *addr);
@@ -481,16 +520,42 @@ static int user_buffer_ok(const void *pointer, u64 bytes, int writable) {
   return task && uvm_buffer_ok(task->vm, pointer, bytes, writable);
 }
 
-/* mmap(addr, len, prot, flags).
+/* Fill a fresh private mapping from `file` at `offset`. The file position
+ * is put back afterwards, since mmap must not move it. Bytes past EOF stay
+ * zero, which is what Linux gives for the tail of the last page. */
+static long mmap_copy_file(struct vfs_file *file, u64 offset, u64 base, u64 bytes) {
+  u64 saved = file->position;
+  if (offset >= file->size)
+    return 0;
+  u64 want = file->size - offset;
+  if (want > bytes)
+    want = bytes;
+  if (!user_buffer_ok((void *)(uintptr_t)base, want, 1))
+    return -EFAULT;
+  int rc = vfs_seek(file, offset);
+  if (rc != 0)
+    return rc < 0 ? rc : -EIO;
+  usize got = vfs_read(file, (void *)(uintptr_t)base, (usize)want);
+  vfs_seek(file, saved);
+  return got == want ? 0 : -EIO;
+}
+
+/* mmap(addr, len, prot, flags, fd, offset).
  *
- * Anonymous, private, demand-backed: the reservation covers the address
- * range and pages receive zeroed frames on first access. There is no
- * file-backed mapping; a loader reads section bytes in with read() after
- * mapping it.
+ * Anonymous mappings are demand-backed: the reservation covers the address
+ * range and pages receive zeroed frames on first access.
+ *
+ * A MAP_PRIVATE file mapping is a copy of the file taken at map time. That
+ * is a legal MAP_PRIVATE: POSIX leaves unspecified whether later writes to
+ * the file show through, and writes through the mapping never reach the
+ * file. MAP_SHARED file mappings would need the page cache to back them and
+ * report ENODEV, Linux's answer for a file that cannot be mapped. With no
+ * fork there is never a second process to share anonymous MAP_SHARED pages
+ * with, so those are served as private.
  *
  * Without MAP_FIXED, `addr` is ignored and the range comes from the arena.
  * With MAP_FIXED, `addr` must be page-aligned and entirely unmapped. */
-static long sys_mmap(u64 addr, long len, int prot, int flags) {
+static long sys_mmap(u64 addr, long len, int prot, int flags, int fd, long offset) {
   if (len <= 0)
     return -EINVAL;
 
@@ -506,8 +571,76 @@ static long sys_mmap(u64 addr, long len, int prot, int flags) {
   if (bytes < (u64)len)
     return -EINVAL;
 
-  u64 base = uvm_reserve(t->vm, addr, bytes, pte_flags, (flags & MAP_FIXED) != 0);
-  return base ? (long)base : -ENOMEM;
+  struct vfs_file *file = 0;
+  if (!(flags & MAP_ANONYMOUS)) {
+    if (offset < 0 || (offset & 4095))
+      return -EINVAL;
+    if (fd < 0 || fd >= TASK_MAX_FDS)
+      return -EBADF;
+    file = task_fd_file(t, fd);
+    if (!file) {
+      struct task_fd *slot = task_fd_slot(t, fd);
+      return slot && slot->type != TASK_FD_UNUSED ? -EACCES : -EBADF;
+    }
+    if (task_fd_is_dir(t, fd))
+      return -ENODEV;
+    if (!(flags & MAP_PRIVATE))
+      return -ENODEV;
+  }
+
+  /* The copy needs write access to land; the final protection is applied
+   * once it has. */
+  u64 load_flags = file ? pte_flags | VMM_WRITE : pte_flags;
+  u64 base       = uvm_reserve(t->vm, addr, bytes, load_flags, (flags & MAP_FIXED) != 0);
+  if (!base)
+    return -ENOMEM;
+  if (!file)
+    return (long)base;
+
+  long rc = mmap_copy_file(file, (u64)offset, base, bytes);
+  if (rc == 0 && load_flags != pte_flags && uvm_protect(t->vm, base, bytes, pte_flags) != 0)
+    rc = -ENOMEM;
+  if (rc != 0) {
+    uvm_release(t->vm, base, bytes);
+    return rc;
+  }
+  return (long)base;
+}
+
+/* madvise(addr, len, advice).
+ *
+ * The four pure hints change nothing here and succeed: there is no
+ * readahead or reclaim policy for them to steer. MADV_DONTNEED and MADV_FREE
+ * really do drop the pages , the next touch reads zeroes, which is the
+ * contract for private anonymous memory , and are refused (EINVAL) for
+ * ranges that are not anonymous reservations. Anything else is EINVAL, as
+ * Linux reports advice it does not know. */
+static long sys_madvise(u64 addr, long len, int advice) {
+  if (addr & 4095 || len < 0)
+    return -EINVAL;
+  struct task *t = task_current();
+  if (!task_pml4(t))
+    return -EINVAL;
+  u64 bytes = ((u64)len + 4095) & ~4095ULL;
+  if (bytes < (u64)len)
+    return -EINVAL;
+
+  switch (advice) {
+  case MADV_NORMAL:
+  case MADV_RANDOM:
+  case MADV_SEQUENTIAL:
+  case MADV_WILLNEED:
+    return 0;
+  case MADV_DONTNEED:
+  case MADV_FREE:
+    if (bytes == 0)
+      return 0;
+    if (framebuffer_registered_range_overlaps(t->vm->user_pml4, addr, bytes))
+      return -EBUSY;
+    return uvm_discard(t->vm, addr, bytes) == 0 ? 0 : -EINVAL;
+  default:
+    return -EINVAL;
+  }
 }
 
 /* mprotect(addr, len, prot).
@@ -690,12 +823,10 @@ static long sys_write(long fd, const void *buf, long n) {
 // #region PROCESS HANDLERS
 
 static long sys_exec(const char *path, char *const argv[]) {
-  if (!path)
-    return -EFAULT;
-
   char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
+  long error = resolve_user_path_at(AT_FDCWD, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
 
   return process_exec(resolved, argv);
 }
@@ -704,12 +835,10 @@ static long sys_exec(const char *path, char *const argv[]) {
  * Used by the shell to launch windowed apps that should keep running while
  * the user types more commands. */
 static long sys_spawn(const char *path, char *const argv[]) {
-  if (!path)
-    return -EFAULT;
-
   char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
+  long error = resolve_user_path_at(AT_FDCWD, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
 
   return process_spawn_async(resolved, argv);
 }
@@ -1034,12 +1163,10 @@ static long sys_tty_spawn(const char *path, char *const argv[], long idx) {
   struct task *t = task_current();
   if (!t || t->pid != msg_input_owner())
     return -EPERM;
-  if (!path)
-    return -EFAULT;
-
   char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
+  long error = resolve_user_path_at(AT_FDCWD, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
 
   return process_spawn_async_tty(resolved, argv, (int)idx);
 }
@@ -1170,12 +1297,11 @@ static int path_append_component(char *out, usize *len, usize max, const char *s
   return 0;
 }
 
-static int resolve_path(const char *path, char *out, usize max) {
+/* Normalise `path` against `base` (an absolute, already normal path) into
+ * `out`. "." and ".." are folded lexically; there are no symlinks for them
+ * to disagree with. Returns -1 only when the result does not fit. */
+static int resolve_path_from(const char *base, const char *path, char *out, usize max) {
   if (!path || !out || max < 2)
-    return -1;
-
-  struct task *t = task_current();
-  if (!t || !t->files)
     return -1;
 
   usize len = 0;
@@ -1183,10 +1309,10 @@ static int resolve_path(const char *path, char *out, usize max) {
   out[1]    = 0;
   len       = 1;
 
-  if (!path_is_absolute(path)) {
+  if (!path_is_absolute(path) && base) {
     len = 0;
-    while (len < max - 1 && t->files->cwd[len]) {
-      out[len] = t->files->cwd[len];
+    while (len < max - 1 && base[len]) {
+      out[len] = base[len];
       len++;
     }
     out[len] = 0;
@@ -1213,19 +1339,77 @@ static int resolve_path(const char *path, char *out, usize max) {
   return 0;
 }
 
-static long sys_open(const char *path, int flags) {
+static int resolve_path(const char *path, char *out, usize max) {
+  struct task *t = task_current();
+  if (!t || !t->files)
+    return -1;
+  return resolve_path_from(t->files->cwd, path, out, max);
+}
+
+/* Every path a syscall receives goes through here, the plain calls as
+ * AT_FDCWD. The string is copied into the kernel first, so nothing walks
+ * user memory that another thread could rewrite or unmap mid-walk, and a
+ * bad pointer is EFAULT rather than a kernel fault.
+ *
+ * A relative path resolves against the cwd for AT_FDCWD and against the
+ * directory `dirfd` names otherwise; an absolute one ignores dirfd, as
+ * POSIX has it. An empty path is ENOENT unless the caller passed
+ * AT_EMPTY_PATH (`allow_empty`), in which case it names dirfd itself , a
+ * directory or the cwd; a non-directory dirfd is the caller's to handle,
+ * since there is no path to give back for it.
+ *
+ * Returns 0 with the absolute path in `out`, or a negative errno. */
+static long resolve_user_path_at(int dirfd, const char *user_path, int allow_empty, char *out,
+                                 usize max) {
+  char path[TASK_CWD_MAX];
+  long error = copy_user_string(user_path, path, sizeof(path));
+  if (error)
+    return error;
+  if (!path[0] && !allow_empty)
+    return -ENOENT;
+
+  struct task *t = task_current();
+  if (!t || !t->files)
+    return -ESRCH;
+
+  const char *base = t->files->cwd;
+  if (path[0] != '/' && dirfd != AT_FDCWD) {
+    if (!fd_is_known(t, dirfd))
+      return -EBADF;
+    if (!task_fd_is_dir(t, dirfd))
+      return -ENOTDIR;
+    base = task_fd_slot(t, dirfd)->dir_path;
+  }
+  if (resolve_path_from(base, path, out, max) != 0)
+    return -ENAMETOOLONG;
+  return 0;
+}
+
+/* A mode a creating call asked for, after the caller's umask. */
+static u32 creation_mode(u32 mode) {
+  struct task *t = task_current();
+  u32 mask       = t && t->files ? t->files->umask : TASK_DEFAULT_UMASK;
+  return mode & 07777 & ~mask;
+}
+
+/* Give a just-created object the mode its creator asked for. A filesystem
+ * that stores no modes (FAT, EPERM) keeps its own, which is what Linux's
+ * vfat does with a creation mode too; any other failure is reported. */
+static long apply_creation_mode(long rc) { return rc == -EPERM ? 0 : rc; }
+
+static long open_resolved(const char *resolved, int flags, u32 mode) {
   struct task *t = task_current();
   if (!t)
     return -ESRCH;
-
-  char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
 
   struct vfs_file *f = (struct vfs_file *)kmalloc(sizeof(*f));
   if (!f)
     return -ENOMEM;
   memset(f, 0, sizeof(*f));
+
+  u8 fd_flags = (flags & O_CLOEXEC) ? TASK_FD_CLOEXEC : 0;
+  if (flags & O_NONBLOCK)
+    fd_flags |= TASK_FD_NONBLOCK;
 
   int rc = vfs_open(resolved, f);
   if (rc == 0 && (flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
@@ -1234,7 +1418,8 @@ static long sys_open(const char *path, int flags) {
     return -EEXIST;
   }
   if (rc == 0 && f->type == VFS_NODE_DIRECTORY) {
-    if ((flags & (O_CREAT | O_TRUNC)) != 0) {
+    /* A directory opens read-only or not at all. */
+    if ((flags & (O_CREAT | O_TRUNC)) != 0 || (flags & O_ACCMODE) != 0) {
       vfs_close(f);
       kfree(f);
       return -EISDIR;
@@ -1258,6 +1443,7 @@ static long sys_open(const char *path, int flags) {
     slot->type      = TASK_FD_DIRECTORY;
     slot->file      = f;
     slot->dir_index = 0;
+    slot->flags     = fd_flags;
     return fd;
   }
 
@@ -1269,6 +1455,8 @@ static long sys_open(const char *path, int flags) {
 
   if (rc != 0 && (flags & O_CREAT)) {
     rc = vfs_create(resolved, f);
+    if (rc == 0)
+      rc = (int)apply_creation_mode(vfs_file_chmod(f, creation_mode(mode)));
   } else if (rc == 0 && (flags & O_TRUNC)) {
     rc = vfs_truncate(f);
   }
@@ -1285,22 +1473,29 @@ static long sys_open(const char *path, int flags) {
     kfree(f);
     return -EMFILE;
   }
-
+  task_fd_slot(t, fd)->flags = fd_flags;
   return fd;
 }
 
-static long sys_unlink(const char *path) {
+/* open and openat. A file this call creates gets `mode` less the umask,
+ * where the filesystem can store it. */
+static long sys_openat(int dirfd, const char *path, int flags, u32 mode) {
   char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
-  return vfs_unlink(resolved);
+  long error = resolve_user_path_at(dirfd, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
+  return open_resolved(resolved, flags, mode);
 }
 
-static long sys_rmdir(const char *path) {
+/* unlinkat(dirfd, path, flags): AT_REMOVEDIR makes it rmdir. */
+static long sys_unlinkat(int dirfd, const char *path, int flags) {
+  if (flags & ~AT_REMOVEDIR)
+    return -EINVAL;
   char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
-  return vfs_rmdir(resolved);
+  long error = resolve_user_path_at(dirfd, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
+  return (flags & AT_REMOVEDIR) ? vfs_rmdir(resolved) : vfs_unlink(resolved);
 }
 
 static long sys_read(int fd, void *buf, usize n) {
@@ -1310,7 +1505,9 @@ static long sys_read(int fd, void *buf, usize n) {
 
   /* The console, when nothing has been put in the slot. */
   if (task_fd_is_console(t, fd)) {
-    if (!t || !buf || n <= 0 || !user_buffer_ok(buf, n, 1))
+    if (n == 0)
+      return 0;
+    if (!t || !buf || !user_buffer_ok(buf, n, 1))
       return -EFAULT;
     return sys_tty_read_input((char *)buf, (long)n);
   }
@@ -1374,12 +1571,13 @@ static void linux_stat_from_vfs(const struct vfs_stat *fs, struct linux_kstat *o
 }
 
 static long sys_stat_raw(const char *path, struct stat_user *out) {
-  if (!path || !out)
+  if (!out || !user_buffer_ok(out, sizeof(*out), 1))
     return -EFAULT;
 
   char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
+  long error = resolve_user_path_at(AT_FDCWD, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
 
   struct vfs_stat fs;
   int rc = vfs_stat(resolved, &fs);
@@ -1390,23 +1588,105 @@ static long sys_stat_raw(const char *path, struct stat_user *out) {
   return 0;
 }
 
-static long sys_stat(const char *path, struct linux_kstat *out) {
-  if (!path || !out)
-    return -EFAULT;
-
-  char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
-
+static long stat_resolved(const char *resolved, struct linux_kstat *out) {
   struct vfs_stat fs;
   int rc = vfs_stat(resolved, &fs);
   if (rc != 0)
     return rc < 0 ? rc : -EIO;
 
-  if (!user_buffer_ok(out, sizeof(*out), 1))
+  if (!out || !user_buffer_ok(out, sizeof(*out), 1))
     return -EFAULT;
   linux_stat_from_vfs(&fs, out);
   return 0;
+}
+
+static long sys_stat(const char *path, struct linux_kstat *out) {
+  char resolved[TASK_CWD_MAX];
+  long error = resolve_user_path_at(AT_FDCWD, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
+  return stat_resolved(resolved, out);
+}
+
+/* Access policy.
+ *
+ * Gaia has one credential: every process is uid 0 / gid 0 (see the getuid
+ * family), so access(2) answers the way Linux answers root. Existence is
+ * checked for real; R_OK and W_OK are then granted, because the superuser
+ * bypasses read/write permission bits and no Gaia filesystem is mounted
+ * read-only; X_OK is granted only when some execute bit is set, which is the
+ * one check Linux still applies to root, so a data file is never reported
+ * executable. AT_EACCESS changes nothing when real and effective ids are the
+ * same id.
+ *
+ * Mode bits come from the filesystem: ext2 stores them, FAT synthesises them
+ * (see fat_vfs.c getattr). */
+static long access_resolved(const char *resolved, int mode) {
+  struct vfs_stat fs;
+  int rc = vfs_stat(resolved, &fs);
+  if (rc != 0)
+    return rc < 0 ? rc : -EIO;
+  if ((mode & X_OK) && !(fs.mode & (S_IXUSR | S_IXGRP | S_IXOTH)))
+    return -EACCES;
+  return 0;
+}
+
+/* faccessat2(dirfd, path, mode, flags); access and faccessat are this with
+ * no flags. faccessat (269) has no flags argument at all , musl only reaches
+ * for 439 when it has flags to pass , so the two numbers must not be merged
+ * into one handler that reads a fourth register for 269. */
+static long sys_faccessat2(int dirfd, const char *path, int mode, int flags) {
+  if (mode & ~(R_OK | W_OK | X_OK))
+    return -EINVAL;
+  if (flags & ~(AT_EACCESS | AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH))
+    return -EINVAL;
+
+  char resolved[TASK_CWD_MAX];
+  long error =
+      resolve_user_path_at(dirfd, path, (flags & AT_EMPTY_PATH) != 0, resolved, sizeof(resolved));
+  if (error == -ENOTDIR && (flags & AT_EMPTY_PATH)) {
+    /* The empty path names dirfd itself, which may be any open file. */
+    struct task *t = task_current();
+    struct vfs_stat fs;
+    char probe;
+    if (copy_user_string(path, &probe, 1) != 0 || probe)
+      return error;
+    if (!task_fd_file(t, dirfd))
+      return (mode & X_OK) ? -EACCES : 0; /* pipe or console: never executable */
+    int rc = vfs_file_stat(task_fd_file(t, dirfd), &fs);
+    if (rc != 0)
+      return rc < 0 ? rc : -EIO;
+    if ((mode & X_OK) && !(fs.mode & (S_IXUSR | S_IXGRP | S_IXOTH)))
+      return -EACCES;
+    return 0;
+  }
+  if (error)
+    return error;
+  return access_resolved(resolved, mode);
+}
+
+/* readlinkat(dirfd, path, buf, size), and readlink as its AT_FDCWD form.
+ *
+ * No Gaia filesystem stores symbolic links, so every existing path is a
+ * non-link and gets EINVAL , the real Linux answer for readlink on a
+ * regular file or directory, and the one musl's realpath() and similar
+ * loops treat as "not a link, keep going". A missing path is still ENOENT. */
+static long sys_readlinkat(int dirfd, const char *path, char *buf, long size) {
+  if (size <= 0)
+    return -EINVAL;
+  if (!buf || !user_buffer_ok(buf, (u64)size, 1))
+    return -EFAULT;
+
+  char resolved[TASK_CWD_MAX];
+  long error = resolve_user_path_at(dirfd, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
+
+  struct vfs_stat fs;
+  int rc = vfs_stat(resolved, &fs);
+  if (rc != 0)
+    return rc < 0 ? rc : -EIO;
+  return -EINVAL;
 }
 
 /* fstat works off the open handle rather than re-resolving a path, so it
@@ -1567,21 +1847,29 @@ static long sys_dup3(int oldfd, int newfd, int flags) {
     return -EBADF;
   if (newfd < 0 || newfd >= TASK_MAX_FDS)
     return -EBADF;
-  if (oldfd == newfd)
+  if (oldfd == newfd || (flags & ~O_CLOEXEC))
     return -EINVAL;
-  (void)flags; /* O_CLOEXEC: there is no exec that keeps descriptors. */
-  return fd_dup_into(t, oldfd, newfd);
+  long rc = fd_dup_into(t, oldfd, newfd);
+  if (rc >= 0 && (flags & O_CLOEXEC))
+    task_fd_slot(t, newfd)->flags |= TASK_FD_CLOEXEC;
+  return rc;
 }
 
 static long sys_dup2(int oldfd, int newfd) {
   struct task *t = task_current();
   if (oldfd == newfd)
     return fd_is_known(t, oldfd) ? newfd : -EBADF;
-  return sys_dup3(oldfd, newfd, 0);
+  if (!fd_is_known(t, oldfd))
+    return -EBADF;
+  if (newfd < 0 || newfd >= TASK_MAX_FDS)
+    return -EBADF;
+  return fd_dup_into(t, oldfd, newfd);
 }
 
 static long sys_pipe2(int *fds, int flags) {
   struct task *t = task_current();
+  if (flags & ~(O_NONBLOCK | O_CLOEXEC))
+    return -EINVAL;
   if (!fds || !user_buffer_ok(fds, 2 * sizeof(int), 1))
     return -EFAULT;
   if (!t || !t->files)
@@ -1609,6 +1897,10 @@ static long sys_pipe2(int *fds, int flags) {
   if (flags & O_NONBLOCK) {
     r->flags |= TASK_FD_NONBLOCK;
     w->flags |= TASK_FD_NONBLOCK;
+  }
+  if (flags & O_CLOEXEC) {
+    r->flags |= TASK_FD_CLOEXEC;
+    w->flags |= TASK_FD_CLOEXEC;
   }
 
   fds[0] = rfd;
@@ -1653,8 +1945,9 @@ static long sys_readdir(u32 *index, char *buf, usize n) {
 
 static long sys_readdir_path(const char *path, u32 *index, char *buf, usize n) {
   char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
+  long error = resolve_user_path_at(AT_FDCWD, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
   return vfs_read_dir(resolved, index, buf, n);
 }
 
@@ -1687,7 +1980,7 @@ static long sys_getdents64(int fd, void *user_buf, usize len) {
     if (rc == 0)
       break;
     if (rc < 0)
-      return written ? (long)written : -1;
+      return written ? (long)written : rc;
 
     usize name_len = strlen(entry.name);
     usize reclen   = align_up_size(offsetof(struct linux_dirent64, d_name) + name_len + 1, 8);
@@ -1796,9 +2089,25 @@ static long sys_fcntl(int fd, int cmd, long arg) {
     return -EBADF;
 
   switch (cmd) {
-  case F_GETFD:
-  case F_SETFD:
+  case F_GETFD: {
+    struct task_fd *slot = task_fd_slot(t, fd);
+    return (slot && (slot->flags & TASK_FD_CLOEXEC)) ? FD_CLOEXEC : 0;
+  }
+  case F_SETFD: {
+    /* An unused standard slot is the console with no slot state to hold a
+     * flag. Materialise it as an explicit TTY descriptor so the flag sticks
+     * and exec can honour it. */
+    struct task_fd *slot = task_fd_slot(t, fd);
+    if (!slot)
+      return -EBADF;
+    if (slot->type == TASK_FD_UNUSED)
+      slot->type = TASK_FD_TTY;
+    if (arg & FD_CLOEXEC)
+      slot->flags |= TASK_FD_CLOEXEC;
+    else
+      slot->flags &= (u8)~TASK_FD_CLOEXEC;
     return 0;
+  }
   case F_SETFL: {
     /* O_NONBLOCK is the only status flag anything here honours. The rest
      * are accepted and dropped, as before. */
@@ -1821,7 +2130,10 @@ static long sys_fcntl(int fd, int cmd, long arg) {
     int newfd = fd_lowest_free(t, (int)arg);
     if (newfd < 0)
       return -EMFILE;
-    return fd_dup_into(t, fd, newfd);
+    long rc = fd_dup_into(t, fd, newfd);
+    if (rc >= 0 && cmd == F_DUPFD_CLOEXEC)
+      task_fd_slot(t, newfd)->flags |= TASK_FD_CLOEXEC;
+    return rc;
   }
   default:
     return -EINVAL;
@@ -2079,16 +2391,23 @@ static long sys_nanosleep(const struct linux_timespec *req, struct linux_timespe
   return 0;
 }
 
+/* newfstatat. AT_SYMLINK_NOFOLLOW is accepted and changes nothing, since
+ * no path here is ever a link; that also makes lstat exactly stat. */
 static long sys_fstatat(int dirfd, const char *path, struct linux_kstat *out, int flags) {
-  if (!out)
-    return -EFAULT;
-  if ((flags & AT_EMPTY_PATH) && path && !path[0] && dirfd >= 0)
-    return sys_fstat(dirfd, out);
-  if (!path)
-    return -EFAULT;
-  if (dirfd != AT_FDCWD && path[0] != '/')
+  if (flags & ~(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH))
     return -EINVAL;
-  return sys_stat(path, out);
+
+  char resolved[TASK_CWD_MAX];
+  long error =
+      resolve_user_path_at(dirfd, path, (flags & AT_EMPTY_PATH) != 0, resolved, sizeof(resolved));
+  if (error == -ENOTDIR && (flags & AT_EMPTY_PATH)) {
+    char probe;
+    if (copy_user_string(path, &probe, 1) == 0 && !probe)
+      return sys_fstat(dirfd, out); /* empty path, non-directory dirfd */
+  }
+  if (error)
+    return error;
+  return stat_resolved(resolved, out);
 }
 
 static long sys_set_tid_address(u64 clear_tid_addr) {
@@ -2110,11 +2429,50 @@ static long sys_linux_futex(u32 *addr, int op, u32 val, const struct linux_times
   }
 }
 
-static long sys_mkdir(const char *path) {
+/* mkdir and mkdirat. The new directory gets `mode` less the umask, as
+ * open's created files do. */
+static long sys_mkdirat(int dirfd, const char *path, u32 mode) {
   char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
-  return vfs_mkdir(resolved);
+  long error = resolve_user_path_at(dirfd, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
+  error = vfs_mkdir(resolved);
+  if (error)
+    return error;
+  return apply_creation_mode(vfs_chmod(resolved, creation_mode(mode) & 0777));
+}
+
+/* chmod, fchmodat and fchmod. Only the permission bits move; there are no
+ * owners, so nothing restricts who may change them. EPERM on a filesystem
+ * that stores no modes (FAT), and for a descriptor with no inode behind it
+ * (pipe, console, socket). fchmodat has no flags argument; Linux's flags
+ * form is fchmodat2, which this does not provide. */
+static long sys_fchmodat(int dirfd, const char *path, u32 mode) {
+  char resolved[TASK_CWD_MAX];
+  long error = resolve_user_path_at(dirfd, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
+  return vfs_chmod(resolved, mode & 07777);
+}
+
+static long sys_fchmod(int fd, u32 mode) {
+  struct task *t = task_current();
+  if (!fd_is_known(t, fd))
+    return -EBADF;
+  struct vfs_file *file = task_fd_file(t, fd);
+  if (!file)
+    return -EPERM;
+  return vfs_file_chmod(file, mode & 07777);
+}
+
+/* umask(mask): set the creation mask, return the previous one. */
+static long sys_umask(u32 mask) {
+  struct task *t = task_current();
+  if (!t || !t->files)
+    return -ESRCH;
+  u32 old         = t->files->umask;
+  t->files->umask = mask & 0777;
+  return old;
 }
 
 /* ---------------- Mounting --------------------------------------------
@@ -2319,14 +2677,31 @@ static long sys_blockdev_flush(const char *source) {
   return block_flush(&device) ? -EIO : 0;
 }
 
-static long sys_chdir(const char *path) {
-  struct task *t = task_current();
-  if (!t || !t->files || !path)
-    return -EFAULT;
+static long chdir_resolved(const char *resolved);
 
+static long sys_chdir(const char *path) {
   char resolved[TASK_CWD_MAX];
-  if (resolve_path(path, resolved, sizeof(resolved)) != 0)
-    return -ENAMETOOLONG;
+  long error = resolve_user_path_at(AT_FDCWD, path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
+  return chdir_resolved(resolved);
+}
+
+/* A directory fd remembers the path it was opened by, which is what makes
+ * this possible without inode-to-path lookups. */
+static long sys_fchdir(int fd) {
+  struct task *t = task_current();
+  if (!fd_is_known(t, fd))
+    return -EBADF;
+  if (!task_fd_is_dir(t, fd))
+    return -ENOTDIR;
+  return chdir_resolved(task_fd_slot(t, fd)->dir_path);
+}
+
+static long chdir_resolved(const char *resolved) {
+  struct task *t = task_current();
+  if (!t || !t->files)
+    return -ESRCH;
 
   /* Existence check by stat rather than by reading an entry: a directory
    * whose first name is long would not fit in a probe buffer, and an
@@ -2703,6 +3078,411 @@ static long sys_futex_wake(u32 *addr) {
   return task_wake_futex(phys);
 }
 
+/* pread64 / pwrite64: positioned I/O on a regular file that leaves the file
+ * position where it was. Pipes, sockets and the console have no position
+ * (ESPIPE); directories are EISDIR. Seek, transfer and restore are three VFS
+ * calls rather than one, so another descriptor sharing this open file (a dup
+ * or an inherited copy) can observe the moved position in between. */
+static struct vfs_file *positioned_file(struct task *t, int fd, long off, long *error) {
+  *error = 0;
+  if (fd < 0 || fd >= TASK_MAX_FDS || !fd_is_known(t, fd)) {
+    *error = -EBADF;
+    return 0;
+  }
+  if (task_fd_is_console(t, fd) || task_fd_pipe(t, fd, NULL) || task_fd_socket(t, fd)) {
+    *error = -ESPIPE;
+    return 0;
+  }
+  if (task_fd_is_dir(t, fd)) {
+    *error = -EISDIR;
+    return 0;
+  }
+  if (off < 0) {
+    *error = -EINVAL;
+    return 0;
+  }
+  return task_fd_file(t, fd);
+}
+
+static long sys_pread64(int fd, void *buf, usize n, long off) {
+  long error;
+  struct vfs_file *file = positioned_file(task_current(), fd, off, &error);
+  if (!file)
+    return error ? error : -EBADF;
+  if (n == 0 || (u64)off >= file->size)
+    return 0;
+  usize transfer = file->size - (u64)off < n ? (usize)(file->size - (u64)off) : n;
+  if (!buf || !user_buffer_ok(buf, transfer, 1))
+    return -EFAULT;
+
+  u64 saved = file->position;
+  int rc    = vfs_seek(file, (u64)off);
+  if (rc != 0)
+    return rc < 0 ? rc : -EIO;
+  usize got = vfs_read(file, buf, transfer);
+  vfs_seek(file, saved);
+  return (long)got;
+}
+
+static long sys_pwrite64(int fd, const void *buf, usize n, long off) {
+  long error;
+  struct vfs_file *file = positioned_file(task_current(), fd, off, &error);
+  if (!file)
+    return error ? error : -EBADF;
+  if (n == 0)
+    return 0;
+  if (!buf || !user_buffer_ok(buf, n, 0))
+    return -EFAULT;
+
+  u64 saved = file->position;
+  int rc    = vfs_seek(file, (u64)off);
+  if (rc != 0)
+    return rc < 0 ? rc : -EIO;
+  usize put = vfs_write(file, buf, n);
+  vfs_seek(file, saved);
+  return put ? (long)put : -EIO;
+}
+
+/* Credentials. Gaia has no users: every process runs as uid 0, gid 0, and
+ * the access policy (access_resolved) is the matching superuser one. These
+ * report that model rather than invent a non-root id nothing enforces. */
+static long sys_getuid(void) { return 0; }
+
+static long sys_getppid(void) {
+  struct task *t = task_current();
+  return t ? t->parent_pid : 0;
+}
+
+/* Resource limits.
+ *
+ * Gaia enforces three limits, all fixed: the stack (USER_STACK_PAGES, mapped
+ * at exec and never grown), the descriptor table (TASK_MAX_FDS) and the
+ * process table (MAX_TASKS). Those report their real value as both soft and
+ * hard limit, so a program sizing itself from them , GCC raising its stack
+ * limit, for one , sees the truth. Everything else is not enforced and
+ * reports RLIM_INFINITY, which is what "no limit" means. A set succeeds only
+ * when it asks for what is already in force; anything else is EPERM, since
+ * no limit here can move. */
+#define RLIMIT_NPROC 6
+#define RLIMIT_NOFILE 7
+#define RLIMIT_STACK 3
+#define RLIMIT_NLIMITS 16
+#define RLIM_INFINITY (~0ULL)
+
+struct linux_rlimit {
+  u64 cur;
+  u64 max;
+};
+
+static u64 rlimit_value(int resource) {
+  switch (resource) {
+  case RLIMIT_STACK:
+    return (u64)USER_STACK_PAGES * 4096;
+  case RLIMIT_NOFILE:
+    return TASK_MAX_FDS;
+  case RLIMIT_NPROC:
+    return MAX_TASKS;
+  default:
+    return RLIM_INFINITY;
+  }
+}
+
+static long sys_prlimit64(int pid, int resource, const struct linux_rlimit *next,
+                          struct linux_rlimit *old) {
+  struct task *t = task_current();
+  if (pid != 0 && (!t || pid != t->pid))
+    return task_find(pid) ? -EPERM : -ESRCH;
+  if (resource < 0 || resource >= RLIMIT_NLIMITS)
+    return -EINVAL;
+  if (next && !user_buffer_ok(next, sizeof(*next), 0))
+    return -EFAULT;
+  if (old && !user_buffer_ok(old, sizeof(*old), 1))
+    return -EFAULT;
+
+  u64 value = rlimit_value(resource);
+  if (next) {
+    if (next->cur > next->max)
+      return -EINVAL;
+    if (next->cur != value || next->max != value)
+      return -EPERM;
+  }
+  if (old) {
+    old->cur = value;
+    old->max = value;
+  }
+  return 0;
+}
+
+// #region EXEC + VFORK
+
+extern void syscall_resume_frame(struct syscall_frame *f) NORETURN;
+
+/* First kernel code a vfork child runs. Its frame is a copy of the parent's
+ * at the clone/vfork call, with rax = 0 and the child's stack pointer. It
+ * goes on this kernel stack before the heap copy is freed, and leaves
+ * through the same validated iretq tail every syscall return uses. */
+static void vfork_child_resume(void) {
+  struct task *t = task_current();
+  struct syscall_frame frame;
+  memcpy(&frame, t->resume_frame, sizeof(frame));
+  kfree(t->resume_frame);
+  t->resume_frame = 0;
+  if (syscall_prepare_return(&frame) != 0) {
+    log_write("vfork: rejected invalid child return frame", KERNEL, LOG_ERROR);
+    task_exit(-11);
+  }
+  syscall_resume_frame(&frame);
+}
+
+/* vfork semantics, for both vfork(2) and clone(CLONE_VM | CLONE_VFORK).
+ *
+ * The child is a real process with its own pid, descriptor table, cwd and
+ * signal state, running on the parent's memory; the parent does not return
+ * until the child has exec'd or exited. That is exactly the contract vfork
+ * promises , the child may only call exec or _exit , and it is what musl's
+ * posix_spawn, and so GCC's pex-unix, is built on. It needs no copy of the
+ * address space, which Gaia has no copy-on-write to provide. */
+static long vfork_from(struct syscall_frame *f, u64 child_rsp) {
+  struct syscall_frame *copy = (struct syscall_frame *)kmalloc(sizeof(*copy));
+  if (!copy)
+    return -ENOMEM;
+  memcpy(copy, f, sizeof(*copy));
+  copy->rax = 0;
+  copy->rsp = child_rsp;
+
+  struct task *child = task_spawn_vfork(vfork_child_resume, copy);
+  if (!child) {
+    kfree(copy);
+    return -EAGAIN;
+  }
+  int pid = child->pid;
+  task_vfork_wait(pid);
+  return pid;
+}
+
+/* clone(flags, stack, parent_tid, child_tid, tls).
+ *
+ * Only the vfork shape is supported: CLONE_VM | CLONE_VFORK plus an exit
+ * signal of SIGCHLD or none. Thread creation (CLONE_THREAD and friends,
+ * which musl's pthread_create asks for) and fork-style clones without
+ * CLONE_VM (which need a copied address space) are ENOSYS, so callers fail
+ * cleanly , pthread_create reports EAGAIN , instead of getting a child that
+ * is not what they asked for. */
+static long sys_clone(struct syscall_frame *f, u64 flags, u64 child_stack) {
+  u64 signal = flags & CLONE_CSIGNAL;
+  if ((flags & ~(u64)CLONE_CSIGNAL) != (CLONE_VM | CLONE_VFORK))
+    return -ENOSYS;
+  if (signal != 0 && signal != LINUX_SIGCHLD)
+    return -ENOSYS;
+  return vfork_from(f, child_stack ? child_stack : f->rsp);
+}
+
+/* Copy a NULL-terminated vector of user strings into kernel storage: `blob`
+ * holds the bytes, `out` the pointers into it. Returns the count, or a
+ * negative errno: EFAULT for an unreadable pointer or string, E2BIG when the
+ * vector or its strings exceed the exec budget. */
+static long copy_user_vector(char *const *user, char **out, char *blob, usize *used) {
+  if (!user)
+    return 0; /* Linux accepts a NULL argv or envp as empty */
+  for (long count = 0;; count++) {
+    if (!user_buffer_ok(&user[count], sizeof(user[count]), 0))
+      return -EFAULT;
+    const char *string = user[count];
+    if (!string)
+      return count;
+    if (count >= EXEC_VECTOR_MAX || *used >= EXEC_STRINGS_MAX)
+      return -E2BIG;
+    long error = copy_user_string(string, blob + *used, EXEC_STRINGS_MAX - *used);
+    if (error)
+      return error == -ENAMETOOLONG ? -E2BIG : error;
+    out[count] = blob + *used;
+    *used += strlen(blob + *used) + 1;
+  }
+}
+
+/* Linux x86-64 FXSAVE image after FNINIT and the ABI MXCSR: x87 control word
+ * 0x37F, all exceptions masked, round to nearest. */
+static void fx_reset(u8 *fx) {
+  memset(fx, 0, 512);
+  fx[0] = 0x7f;
+  fx[1] = 0x03;
+  u32 mxcsr = 0x1f80;
+  memcpy(fx + 24, &mxcsr, sizeof(mxcsr));
+}
+
+/* execve(path, argv, envp).
+ *
+ * Everything that can fail happens before the old image is touched: the
+ * path is checked (ENOENT, EACCES for directories and files with no execute
+ * bit), the vectors are copied in, and the new image is built in its own
+ * address space. Only then does the task switch over, and from there the
+ * call cannot fail and does not return.
+ *
+ * What survives exec is what POSIX says survives: pid, parent, cwd, tty,
+ * blocked and pending signals, ignored dispositions, and every descriptor
+ * without FD_CLOEXEC. Caught signals revert to SIG_DFL, the FS/GS bases and
+ * FPU state are reset, and a vfork parent is released. */
+static long sys_execve(struct syscall_frame *f, const char *user_path, char *const *user_argv,
+                       char *const *user_envp) {
+  struct task *t = task_current();
+  if (!t || !t->files || !t->context)
+    return -ESRCH;
+
+  char resolved[TASK_CWD_MAX];
+  long error = resolve_user_path_at(AT_FDCWD, user_path, 0, resolved, sizeof(resolved));
+  if (error)
+    return error;
+  struct vfs_stat st;
+  int rc = vfs_stat(resolved, &st);
+  if (rc != 0)
+    return rc < 0 ? rc : -EIO;
+  if (st.type != VFS_NODE_FILE || !(st.mode & (S_IXUSR | S_IXGRP | S_IXOTH)))
+    return -EACCES;
+
+  char *blob  = (char *)kmalloc(EXEC_STRINGS_MAX);
+  char **argv = (char **)kmalloc((EXEC_VECTOR_MAX + 1) * sizeof(char *));
+  char **envp = (char **)kmalloc((EXEC_VECTOR_MAX + 1) * sizeof(char *));
+  long result = -ENOMEM;
+  if (!blob || !argv || !envp)
+    goto out;
+
+  usize used = 0;
+  long argc  = copy_user_vector(user_argv, argv, blob, &used);
+  if (argc < 0) {
+    result = argc;
+    goto out;
+  }
+  long envc = copy_user_vector(user_envp, envp, blob, &used);
+  if (envc < 0) {
+    result = envc;
+    goto out;
+  }
+
+  u64 entry = 0, user_rsp = 0;
+  result = process_execve(resolved, (int)argc, argv, (int)envc, envp, &entry, &user_rsp);
+  if (result != 0)
+    goto out;
+
+  /* Point of no return passed. */
+  for (int fd = 0; fd < TASK_MAX_FDS; fd++) {
+    struct task_fd *slot = &t->files->fd[fd];
+    if (slot->type != TASK_FD_UNUSED && (slot->flags & TASK_FD_CLOEXEC))
+      task_fd_release(slot);
+  }
+  for (int sig = 0; sig < TASK_SIGNAL_COUNT; sig++) {
+    struct task_signal_action *action = &t->context->signal_actions[sig];
+    if (action->handler != 1) /* SIG_IGN survives exec; handlers cannot */
+      memset(action, 0, sizeof(*action));
+  }
+  task_set_fs_base(0);
+  wrmsr(0xC0000102u, t->context->gs_base); /* ring-3 GS, swapped out while here */
+  fx_reset(t->context->user_fx);
+
+  u64 rflags = f->rflags;
+  memset(f, 0, offsetof(struct syscall_frame, rip));
+  f->rip    = entry;
+  f->rsp    = user_rsp;
+  f->rflags = rflags;
+  log_write_fmt(USER, LOG_INFO, "execve: pid=%d %s", t->pid, resolved);
+
+out:
+  if (blob)
+    kfree(blob);
+  if (argv)
+    kfree(argv);
+  if (envp)
+    kfree(envp);
+  return result;
+}
+
+// #endregion EXEC + VFORK
+
+// #region DIAGNOSTICS
+
+/* A syscall the dispatcher has no arm for, or one it recognises but will not
+ * serve, is reported once per process and number: a program that probes a
+ * call in a loop would otherwise drown the log. The table is a small ring,
+ * so a long-running system eventually reports a pair again, which is fine.
+ * Only the number is logged , no argument is dereferenced for it. */
+#define SYSCALL_REPORTED_MAX 64
+static struct {
+  int pid;
+  long num;
+} syscall_reported[SYSCALL_REPORTED_MAX];
+static unsigned syscall_reported_next;
+
+static void report_syscall(long num, const char *category) {
+  struct task *t = task_current();
+  int pid        = t ? t->pid : 0;
+  for (int i = 0; i < SYSCALL_REPORTED_MAX; i++)
+    if (syscall_reported[i].pid == pid && syscall_reported[i].num == num)
+      return;
+  syscall_reported[syscall_reported_next % SYSCALL_REPORTED_MAX].pid = pid;
+  syscall_reported[syscall_reported_next % SYSCALL_REPORTED_MAX].num = num;
+  syscall_reported_next++;
+
+  const char *process = t && t->name[0] ? t->name : "?";
+  const char *name =
+      num >= 0 && num < LINUX_SYSCALL_NAME_COUNT ? linux_syscall_names[num] : (const char *)0;
+  if (name)
+    log_write_fmt(
+        KERNEL, LOG_WARN, "syscall: pid=%d %s: %s %s (%ld)", pid, process, category, name, num);
+  else
+    log_write_fmt(KERNEL,
+                  LOG_WARN,
+                  "syscall: pid=%d %s: %s non-Linux syscall %ld (0x%lx)",
+                  pid,
+                  process,
+                  category,
+                  num,
+                  num);
+}
+
+#ifdef SYSCALL_TRACE
+/* Debug builds only (-DSYSCALL_TRACE): log the first use of every Linux
+ * syscall number by each process, which is the set a port needs. The
+ * per-pid bitmaps are claimed on first use and recycled once their pid no
+ * longer names a task. */
+#define SYSCALL_TRACE_NUMBERS 512
+static struct {
+  int pid;
+  u64 seen[SYSCALL_TRACE_NUMBERS / 64];
+} syscall_trace[MAX_TASKS];
+
+static void trace_syscall(long num) {
+  struct task *t = task_current();
+  if (!t || num < 0 || num >= SYSCALL_TRACE_NUMBERS)
+    return;
+  int slot = -1;
+  for (int i = 0; i < MAX_TASKS && slot < 0; i++)
+    if (syscall_trace[i].pid == t->pid)
+      slot = i;
+  for (int i = 0; i < MAX_TASKS && slot < 0; i++) {
+    if (!syscall_trace[i].pid || !task_find(syscall_trace[i].pid)) {
+      slot = i;
+      memset(&syscall_trace[i], 0, sizeof(syscall_trace[i]));
+      syscall_trace[i].pid = t->pid;
+    }
+  }
+  if (slot < 0)
+    return;
+  u64 bit = 1ULL << (num % 64);
+  if (syscall_trace[slot].seen[num / 64] & bit)
+    return;
+  syscall_trace[slot].seen[num / 64] |= bit;
+  const char *name = num < LINUX_SYSCALL_NAME_COUNT ? linux_syscall_names[num] : (const char *)0;
+  log_write_fmt(KERNEL,
+                LOG_DEBUG,
+                "syscall-trace: pid=%d %s first %s (%ld)",
+                t->pid,
+                t->name[0] ? t->name : "?",
+                name ? name : "gaia",
+                num);
+}
+#endif
+
+// #endregion DIAGNOSTICS
+
 long syscall_dispatch(struct syscall_frame *f) {
   long num = (long)f->rax;
   long a1  = (long)f->rdi;
@@ -2717,6 +3497,10 @@ long syscall_dispatch(struct syscall_frame *f) {
   long a6 = (long)f->r9;
 
   long ret = -ENOSYS;
+
+#ifdef SYSCALL_TRACE
+  trace_syscall(num);
+#endif
 
   switch (num) {
   case SYS_WRITE:
@@ -2734,21 +3518,96 @@ long syscall_dispatch(struct syscall_frame *f) {
   case SYS_READ:
     ret = sys_read((uintptr_t)a1, (void *)(uintptr_t)a2, (uintptr_t)a3);
     break;
-  case SYS_OPENAT: {
-    const char *path = (const char *)(uintptr_t)a2;
-    if (!path || !user_buffer_ok(path, 1, 0)) {
-      ret = -EFAULT;
-      break;
-    }
-    if ((int)a1 != AT_FDCWD && *path != '/') {
-      ret = -ENOSYS;
-      break;
-    }
-    ret = sys_open(path, (int)a3);
+  case SYS_OPENAT:
+    ret = sys_openat((int)a1, (const char *)(uintptr_t)a2, (int)a3, (u32)a4);
     break;
-  }
   case SYS_OPEN:
-    ret = sys_open((const char *)(uintptr_t)a1, (uintptr_t)a2);
+    ret = sys_openat(AT_FDCWD, (const char *)(uintptr_t)a1, (int)a2, (u32)a3);
+    break;
+  case SYS_PREAD64:
+    ret = sys_pread64((int)a1, (void *)(uintptr_t)a2, (usize)a3, a4);
+    break;
+  case SYS_PWRITE64:
+    ret = sys_pwrite64((int)a1, (const void *)(uintptr_t)a2, (usize)a3, a4);
+    break;
+  case SYS_ACCESS:
+    ret = sys_faccessat2(AT_FDCWD, (const char *)(uintptr_t)a1, (int)a2, 0);
+    break;
+  case SYS_FACCESSAT:
+    ret = sys_faccessat2((int)a1, (const char *)(uintptr_t)a2, (int)a3, 0);
+    break;
+  case SYS_FACCESSAT2:
+    ret = sys_faccessat2((int)a1, (const char *)(uintptr_t)a2, (int)a3, (int)a4);
+    break;
+  case SYS_READLINK:
+    ret = sys_readlinkat(AT_FDCWD, (const char *)(uintptr_t)a1, (char *)(uintptr_t)a2, a3);
+    break;
+  case SYS_READLINKAT:
+    ret = sys_readlinkat((int)a1, (const char *)(uintptr_t)a2, (char *)(uintptr_t)a3, a4);
+    break;
+  case SYS_UNLINKAT:
+    ret = sys_unlinkat((int)a1, (const char *)(uintptr_t)a2, (int)a3);
+    break;
+  case SYS_MKDIRAT:
+    ret = sys_mkdirat((int)a1, (const char *)(uintptr_t)a2, (u32)a3);
+    break;
+  case SYS_CHMOD:
+    ret = sys_fchmodat(AT_FDCWD, (const char *)(uintptr_t)a1, (u32)a2);
+    break;
+  case SYS_FCHMODAT:
+    ret = sys_fchmodat((int)a1, (const char *)(uintptr_t)a2, (u32)a3);
+    break;
+  case SYS_FCHMOD:
+    ret = sys_fchmod((int)a1, (u32)a2);
+    break;
+  case SYS_UMASK:
+    ret = sys_umask((u32)a1);
+    break;
+  case SYS_FCHDIR:
+    ret = sys_fchdir((int)a1);
+    break;
+  case SYS_GETUID:
+  case SYS_GETGID:
+  case SYS_GETEUID:
+  case SYS_GETEGID:
+    ret = sys_getuid();
+    break;
+  case SYS_GETRLIMIT:
+    ret = a2 ? sys_prlimit64(0, (int)a1, 0, (struct linux_rlimit *)(uintptr_t)a2) : -EFAULT;
+    break;
+  case SYS_PRLIMIT64:
+    ret = sys_prlimit64((int)a1,
+                        (int)a2,
+                        (const struct linux_rlimit *)(uintptr_t)a3,
+                        (struct linux_rlimit *)(uintptr_t)a4);
+    break;
+  case SYS_GETPPID:
+    ret = sys_getppid();
+    break;
+  case SYS_CLONE:
+    ret = sys_clone(f, (u64)a1, (u64)a2);
+    break;
+  case SYS_VFORK:
+    ret = vfork_from(f, f->rsp);
+    break;
+  case SYS_FORK:
+    /* A fork child needs its own copy of the address space, and there is no
+     * copy-on-write to give it one. vfork and posix_spawn work. */
+    report_syscall(num, "unsupported");
+    ret = -ENOSYS;
+    break;
+  case SYS_EXECVE:
+    ret = sys_execve(
+        f, (const char *)(uintptr_t)a1, (char *const *)(uintptr_t)a2, (char *const *)(uintptr_t)a3);
+    break;
+  case SYS_MADVISE:
+    ret = sys_madvise((u64)a1, a2, (int)a3);
+    break;
+  case SYS_MREMAP:
+    /* No in-place growth or move for reservations yet. musl's realloc falls
+     * back to allocate-copy-free when this fails. */
+    report_syscall(num, "unsupported");
+    ret = -ENOSYS;
     break;
   case SYS_CLOSE:
     ret = sys_close((uintptr_t)a1);
@@ -2775,7 +3634,7 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_lseek((uintptr_t)a1, (uintptr_t)a2, (uintptr_t)a3);
     break;
   case SYS_MMAP:
-    ret = sys_mmap((u64)a1, a2, (int)a3, (int)a4);
+    ret = sys_mmap((u64)a1, a2, (int)a3, (int)a4, (int)a5, a6);
     break;
   case SYS_MPROTECT:
     ret = sys_mprotect((u64)a1, a2, (int)a3);
@@ -2793,6 +3652,7 @@ long syscall_dispatch(struct syscall_frame *f) {
                            (usize)a4);
     break;
   case SYS_STAT:
+  case SYS_LSTAT: /* no symlinks, so lstat is stat */
     ret = sys_stat((const char *)(uintptr_t)a1, (struct linux_kstat *)(uintptr_t)a2);
     break;
   case SYS_FSTAT:
@@ -2979,10 +3839,10 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_get_ticks();
     break;
   case SYS_UNLINK:
-    ret = sys_unlink((const char *)(uintptr_t)a1);
+    ret = sys_unlinkat(AT_FDCWD, (const char *)(uintptr_t)a1, 0);
     break;
   case SYS_RMDIR:
-    ret = sys_rmdir((const char *)(uintptr_t)a1);
+    ret = sys_unlinkat(AT_FDCWD, (const char *)(uintptr_t)a1, AT_REMOVEDIR);
     break;
   case SYS_MOUNT:
     ret = sys_mount((const char *)(uintptr_t)a1,
@@ -3011,7 +3871,7 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = vfs_sync_all();
     break;
   case SYS_MKDIR:
-    ret = sys_mkdir((const char *)(uintptr_t)a1);
+    ret = sys_mkdirat(AT_FDCWD, (const char *)(uintptr_t)a1, (u32)a2);
     break;
   case SYS_EXEC:
     ret = sys_exec((const char *)(uintptr_t)a1, (char *const *)(uintptr_t)a2);
@@ -3138,7 +3998,7 @@ long syscall_dispatch(struct syscall_frame *f) {
                        (u32 *)(uintptr_t)a6);
     break;
   default:
-    log_write_hex("unknown syscall =", num, KERNEL, LOG_ERROR);
+    report_syscall(num, "unimplemented");
   }
   f->rax = (u64)ret;
   /* Before validation: a handler redirect rewrites RIP and RSP, and those

@@ -27,6 +27,16 @@ struct vfs_inode *ext2_vfs_inode(struct vfs_superblock *super, u32 number) {
                        &file_ops);
 }
 
+static int setmode(struct vfs_inode *inode, u32 permissions) {
+  struct ext2_fs *fs      = inode->super->private_data;
+  struct ext2_inode *disk = inode->private_data;
+  if (fs->io_failed)
+    return -1;
+  disk->mode = (u16)((disk->mode & EXT2_S_IFMT) | (permissions & 07777u));
+  ext2_dirty(fs, disk, fs->inode_size);
+  return ext2_sync(fs) ? -1 : 0;
+}
+
 static int lookup(struct vfs_inode *dir, const char *name, struct vfs_inode **out) {
   u32 number;
   if (ext2_dir_lookup(dir->super->private_data, dir->number, name, &number, 0))
@@ -188,6 +198,7 @@ static const struct vfs_inode_operations inode_ops = {
     .rmdir    = rmdir,
     .getattr  = getattr,
     .truncate = truncate,
+    .setmode  = setmode,
 };
 static const struct vfs_file_operations file_ops = {
     .read    = read,

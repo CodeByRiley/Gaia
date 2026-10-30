@@ -20,6 +20,7 @@
  * callee-saved + rsp, swaps to the new task's saved_rsp.
  */
 
+#include <arch/cpu.h>
 #include <arch/gdt.h>
 #include <arch/irq.h>
 #include <arch/percpu.h>
@@ -82,6 +83,8 @@ void task_inherit_cwd(struct task *child, struct task *parent) {
 
   if (child == NULL || child->files == NULL)
     return;
+
+  child->files->umask = parent && parent->files ? parent->files->umask : TASK_DEFAULT_UMASK;
 
   if (parent == NULL || parent->files == NULL || parent->files->cwd[0] == '\0') {
     child->files->cwd[0] = '/';
@@ -276,6 +279,7 @@ static int task_state_alloc(struct task *t, int with_vm) {
   if (!t->files)
     goto fail;
   memset(t->files, 0, sizeof(*t->files));
+  t->files->umask = TASK_DEFAULT_UMASK;
 
   t->input = (struct task_input *)kmalloc(sizeof(*t->input));
   if (!t->input)
@@ -396,10 +400,12 @@ int task_fd_dup(struct task_fd *dst, const struct task_fd *src, int src_is_conso
     break;
   }
 
-  /* The copy shares the open file, so it shares its status flags too. */
+  /* The copy shares the open file, so it shares its status flags too. The
+   * close-on-exec bit is the one descriptor flag, and a new descriptor
+   * starts without it. */
   dst->type      = src->type;
   dst->object    = src->object;
-  dst->flags     = src->flags;
+  dst->flags     = src->flags & (u8)~TASK_FD_CLOEXEC;
   dst->dir_index = src->dir_index;
   return 0;
 }
@@ -978,6 +984,154 @@ struct task *task_spawn_thread(u64 entry, u64 user_stack) {
   return t;
 }
 
+/* Parents parked in task_vfork_wait. One queue for all of them: each woken
+ * parent re-checks its own child, and vfork is rare enough that a shared
+ * queue costs nothing. */
+static struct wait_queue vfork_wq = WAIT_QUEUE_INIT;
+
+struct task *task_spawn_vfork(void (*resume)(void), void *resume_frame) {
+  struct task *parent = current;
+  if (!parent || !parent->vm || !parent->vm->user_pml4 || !parent->vm->pml4_ref_count ||
+      !parent->context || !parent->files || !resume || !resume_frame)
+    return 0;
+
+  struct task *t = alloc_slot();
+  if (!t) {
+    log_write("vfork: task table full", KERNEL, LOG_ERROR);
+    return 0;
+  }
+
+  void *stack_base = kmalloc(KSTACK_BYTES);
+  if (!stack_base) {
+    log_write("vfork: kstack alloc failed", KERNEL, LOG_ERROR);
+    return 0;
+  }
+
+  memset(t, 0, sizeof(*t));
+  t->saved_rsp          = build_initial_frame(stack_base, resume);
+  t->cr3                = parent->cr3;
+  t->syscall_kstack_top = kstack_aligned_top(stack_base);
+  t->prio               = SCHED_PRIO_NORMAL;
+  t->kstack             = stack_base;
+
+  if (task_state_alloc(t, 1) != 0) {
+    kfree(stack_base);
+    memset(t, 0, sizeof(*t));
+    return 0;
+  }
+
+  /* A process, not a thread: it gets a copy of every descriptor, flags and
+   * all, as fork gives. task_fd_dup drops close-on-exec because dup() must,
+   * so put the parent's descriptor flags back afterwards. */
+  for (int fd = 0; fd < TASK_MAX_FDS; fd++) {
+    struct task_fd *src = &parent->files->fd[fd];
+    if (task_fd_dup(&t->files->fd[fd], src, 0) != 0) {
+      for (int undo = 0; undo < fd; undo++)
+        task_fd_release(&t->files->fd[undo]);
+      task_state_free(t);
+      kfree(stack_base);
+      memset(t, 0, sizeof(*t));
+      log_write("vfork: descriptor copy failed", KERNEL, LOG_ERROR);
+      return 0;
+    }
+    t->files->fd[fd].flags = src->flags;
+  }
+
+  /* Same page tables, same reservation table, as task_spawn_thread shares
+   * them: the parent is parked, so nothing else changes them meanwhile. */
+  kfree(t->vm);
+  t->vm = parent->vm;
+  __atomic_add_fetch(t->vm->pml4_ref_count, 1, __ATOMIC_ACQ_REL);
+
+  t->context->fs_base         = parent->context->fs_base;
+  t->context->gs_base         = parent->context->gs_base;
+  t->context->abi_personality = parent->context->abi_personality;
+  memcpy(t->context->signal_actions,
+         parent->context->signal_actions,
+         sizeof(t->context->signal_actions));
+  memcpy(t->context->user_fx, parent->context->user_fx, sizeof(t->context->user_fx));
+  fxstate_init(t->context->fxstate);
+  t->sig_blocked = parent->sig_blocked;
+
+  task_inherit_cwd(t, parent);
+  task_inherit_tty(t, parent);
+  memcpy(t->name, parent->name, sizeof(t->name));
+
+  t->resume_frame = resume_frame;
+  t->vfork_parent = parent->pid;
+  t->parent_pid   = parent->pid;
+  t->pid          = next_pid++;
+  t->state        = TASK_READY;
+  ready_push(t);
+  return t;
+}
+
+void task_vfork_release(struct task *t) {
+  if (!t || !t->vfork_parent)
+    return;
+  t->vfork_parent = 0;
+  wq_wake_all(&vfork_wq);
+}
+
+void task_vfork_wait(int child_pid) {
+  struct task *me = current;
+  u64 flags       = irq_save();
+  for (;;) {
+    struct task *child = task_find(child_pid);
+    if (!child || child->vfork_parent != me->pid)
+      break;
+    /* task_block, not wq_wait: wq_wait gives up on any deliverable signal,
+     * and returning while the child still runs on our stack would let two
+     * tasks write the same frames. Linux's vfork wait is uninterruptible
+     * for the same reason. */
+    struct wq_entry e;
+    wq_add(&vfork_wq, &e);
+    task_block(-1);
+    wq_remove_all(me);
+  }
+  irq_restore(flags);
+}
+
+void task_exec_address_space(u64 *user_pml4, int *pml4_refs, struct task_vm *vm, u64 brk_base) {
+  struct task *t      = current;
+  struct task_vm *old = t->vm;
+
+  *pml4_refs          = 1;
+  vm->user_pml4       = user_pml4;
+  vm->pml4_ref_count  = pml4_refs;
+  vm->brk_base        = brk_base;
+  vm->brk_current     = brk_base;
+
+  u64 flags = irq_save();
+  t->vm     = vm;
+  t->cr3    = virt_to_phys(user_pml4);
+  write_cr3(t->cr3);
+  irq_restore(flags);
+
+  /* The parent may run again the moment it is woken, and it runs on the
+   * address space this task just let go of, so this comes after the CR3
+   * switch and never before. */
+  task_vfork_release(t);
+
+  if (!old || !old->user_pml4)
+    return;
+  framebuffer_unregister_user(old->user_pml4, t->pid);
+  if (old->pml4_ref_count) {
+    int left = __atomic_sub_fetch(old->pml4_ref_count, 1, __ATOMIC_ACQ_REL);
+    if (left > 0)
+      return; /* a vfork parent or sibling thread still owns it */
+    kfree(old->pml4_ref_count);
+    old->pml4_ref_count = 0;
+  }
+  /* Same rule as the reaper: frames another process still writes through
+   * must not go back to the PMM, so a sharer's old image leaks instead. */
+  if (old->shmem_shared_out > 0)
+    return;
+  pe_process_free(old->pe_process);
+  free_user_pml4(old->user_pml4);
+  kfree(old);
+}
+
 /* Stage CPU-local state immediately before the stack swap. A resumable
  * outgoing task supplies `prev`; exit passes NULL because no state is saved.
  * Read its actual FS base here: userspace can change segment state without
@@ -1314,6 +1468,10 @@ static void mark_task_exited(struct task *task, long code) {
     }
   }
 
+  /* A vfork child that dies before exec hands the address space back here;
+   * its parent was parked on it and must resume now. */
+  task_vfork_release(task);
+
   task->state     = TASK_ZOMBIE;
   task->exit_code = code;
 
@@ -1576,6 +1734,8 @@ void task_reap(struct task *t) {
    * live in t->vm, which task_state_free is about to release. */
   task_release_address_space(t);
   task_state_free(t);
+  if (t->resume_frame)
+    kfree(t->resume_frame);
 
   /* pid=0 marks the slot free for alloc_slot. */
   memset(t, 0, sizeof(*t));

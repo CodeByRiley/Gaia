@@ -23,6 +23,7 @@
 #include <memory/heap.h>
 #include <memory/hhdm.h>
 #include <memory/pmm.h>
+#include <memory/uvm.h>
 #include <memory/vmm.h>
 #include <sched/sched.h>
 #include <sched/signal.h>
@@ -313,55 +314,86 @@ static void startup_random(u64 out[2]) {
   }
 }
 
-static int load_request_image(struct spawn_request *req, struct loaded_image *image) {
+/* Push `count` strings onto the new image's stack, recording each one's user
+ * address in `out`. */
+static int push_strings(struct loaded_image *image, int count, char *const strings[], u64 *out) {
+  for (int i = 0; i < count; i++) {
+    usize len = strlen(strings[i]) + 1;
+    if (len > image->user_rsp - USER_STACK_LOW)
+      return -1;
+    image->user_rsp -= len;
+    if (copy_to_user_pml4(image->pml4, image->user_rsp, strings[i], len) != 0)
+      return -1;
+    out[i] = image->user_rsp;
+  }
+  return 0;
+}
+
+/* Build a complete image for `path` in a fresh PML4: program, stack, and the
+ * startup vectors. Nothing outside `image` is touched, so a failure leaves
+ * the caller exactly as it was. `argv`/`envp` are kernel copies. `cancelled`
+ * may be NULL; an async spawn polls it between stages.
+ *
+ * Returns 0, or a negative errno: ENOENT when the file cannot be opened,
+ * ENOEXEC when it is neither a loadable ELF nor a PE, E2BIG when the vectors
+ * do not fit the stack, ENOMEM when the address space cannot be built. */
+static int load_image(const char *path, int argc, char *const argv[], int envc,
+                      char *const envp[], const int *cancelled, struct loaded_image *image) {
   memset(image, 0, sizeof(*image));
   image->pml4 = process_pml4_create();
   if (!image->pml4) {
     log_write("process_spawn: pml4 alloc failed", KERNEL, LOG_ERROR);
-    return -1;
+    return -ENOMEM;
   }
 
+  int error      = -ENOEXEC;
+  u64 *ptrs      = 0;
+  u64 *initial   = 0;
   u8 magic[16]   = {0};
   int open_error = 0;
-  FILE *sniff    = fopen_ex(req->path, "r", &open_error);
+  FILE *sniff    = fopen_ex(path, "r", &open_error);
   if (!sniff) {
-    log_write_string("process_spawn: cannot open executable", req->path, KERNEL, LOG_ERROR);
+    log_write_string("process_spawn: cannot open executable", path, KERNEL, LOG_ERROR);
     log_write_string(
         "process_spawn: fopen failed:", fopen_error_string(open_error), KERNEL, LOG_ERROR);
+    error = -ENOENT;
     goto fail;
   }
   usize read = fread(magic, 1, sizeof(magic), sniff);
   fclose(sniff);
 
   if (read == sizeof(magic) && magic[0] == 'M' && magic[1] == 'Z') {
-    image->entry       = pe_load_process(req->path, image->pml4, &image->pe_process);
+    image->entry       = pe_load_process(path, image->pml4, &image->pe_process);
     image->personality = image->pe_process ? 2 : 0;
     log_write_hex("process_spawn: using pe entry =", image->entry, KERNEL, LOG_INFO);
   } else if (read == sizeof(magic) && magic[0] == 0x7f && magic[1] == 'E' && magic[2] == 'L' &&
              magic[3] == 'F') {
-    image->entry       = elf_load_with_metadata(req->path, image->pml4, &image->elf);
+    image->entry       = elf_load_with_metadata(path, image->pml4, &image->elf);
     image->personality = 1;
     log_write_hex("process_spawn: using elf entry =", image->entry, KERNEL, LOG_INFO);
   } else {
     log_write("process_spawn: unknown or truncated executable", KERNEL, LOG_ERROR);
   }
-  if (!image->entry || req->cancelled)
+  if (!image->entry || (cancelled && *cancelled))
     goto fail;
 
-  if (user_stack_alloc_in(image->pml4) != 0 || req->cancelled)
+  error = -ENOMEM;
+  if (user_stack_alloc_in(image->pml4) != 0 || (cancelled && *cancelled))
     goto fail;
 
   if (image->pe_process) {
     char command[2048];
     usize n = 0;
-    for (int i = 0; i < req->argc; i++) {
+    for (int i = 0; i < argc; i++) {
       if (i)
         command[n++] = ' ';
-      usize k = strlen(req->args[i]);
-      if (n + k + 3 >= sizeof(command))
+      usize k = strlen(argv[i]);
+      if (n + k + 3 >= sizeof(command)) {
+        error = -E2BIG;
         goto fail;
+      }
       command[n++] = '"';
-      memcpy(command + n, req->args[i], k);
+      memcpy(command + n, argv[i], k);
       n += k;
       command[n++] = '"';
     }
@@ -379,59 +411,85 @@ static int load_request_image(struct spawn_request *req, struct loaded_image *im
     if (copy_to_user_pml4(image->pml4, random_address, random, sizeof(random)))
       goto fail;
   }
-  u64 arg_ptrs[ARGV_MAX];
-  for (int i = 0; i < req->argc; i++) {
-    usize len = strlen(req->args[i]) + 1;
-    image->user_rsp -= len;
-    if (copy_to_user_pml4(image->pml4, image->user_rsp, req->args[i], len) != 0)
-      goto fail;
-    arg_ptrs[i] = image->user_rsp;
-  }
+
+  /* argv then envp pointers, side by side, so one allocation covers both.
+   * Heap rather than kernel stack: execve hands over whatever vector the
+   * caller built, and a compiler driver's is not small. */
+  ptrs = (u64 *)kmalloc(((usize)argc + (usize)envc + 1) * sizeof(u64));
+  if (!ptrs)
+    goto fail;
+  error = -E2BIG;
+  if (push_strings(image, envc, envp, ptrs + argc) != 0 ||
+      push_strings(image, argc, argv, ptrs) != 0)
+    goto fail;
   image->user_rsp &= ~0xFULL;
 
   /* Initial userspace stack:
    *   argc
    *   argv[0..argc-1]
    *   NULL            argv terminator
-   *   NULL            empty envp terminator
-   *   AT_NULL, 0      empty auxiliary vector
+   *   envp[0..envc-1]
+   *   NULL            envp terminator
+   *   auxv pairs, AT_NULL-terminated
    *
    * The original Gaia crt0 only consumes argc/argv, but musl's crt1 scans
    * envp and auxv before calling main. Supplying explicit terminators keeps
    * both startup paths on the same ABI. */
-  u64 initial_stack[ARGV_MAX + 32];
-  initial_stack[0] = (u64)req->argc;
-  for (int i = 0; i < req->argc; i++)
-    initial_stack[i + 1] = arg_ptrs[i];
-  initial_stack[req->argc + 1] = 0;
-  initial_stack[req->argc + 2] = 0;
-  usize words                  = req->argc + 3;
+  usize max_words = (usize)argc + (usize)envc + 3 + 32;
+  initial         = (u64 *)kmalloc(max_words * sizeof(u64));
+  error           = -ENOMEM;
+  if (!initial)
+    goto fail;
+  usize words      = 0;
+  initial[words++] = (u64)argc;
+  for (int i = 0; i < argc; i++)
+    initial[words++] = ptrs[i];
+  initial[words++] = 0;
+  for (int i = 0; i < envc; i++)
+    initial[words++] = ptrs[argc + i];
+  initial[words++] = 0;
   if (image->personality == 1) {
     u64 aux[] = {
         6, 4096, 9, image->elf.entry, 11, 0, 12, 0, 13, 0, 14, 0, 23, 0, 25, random_address};
-    memcpy(initial_stack + words, aux, sizeof(aux));
+    memcpy(initial + words, aux, sizeof(aux));
     words += sizeof(aux) / sizeof(aux[0]);
     if (image->elf.phdr) {
       u64 phaux[] = {3, image->elf.phdr, 4, image->elf.phent, 5, image->elf.phnum};
-      memcpy(initial_stack + words, phaux, sizeof(phaux));
+      memcpy(initial + words, phaux, sizeof(phaux));
       words += sizeof(phaux) / sizeof(phaux[0]);
     }
   }
-  initial_stack[words++] = 0;
-  initial_stack[words++] = 0;
-  usize initial_bytes    = words * sizeof(u64);
+  initial[words++]    = 0;
+  initial[words++]    = 0;
+  usize initial_bytes = words * sizeof(u64);
+  error               = -E2BIG;
+  if (initial_bytes + 16 > image->user_rsp - USER_STACK_LOW)
+    goto fail;
   if (initial_bytes & 0xF)
     image->user_rsp -= sizeof(u64);
   image->user_rsp -= initial_bytes;
-  if (copy_to_user_pml4(image->pml4, image->user_rsp, initial_stack, initial_bytes) != 0)
+  if (copy_to_user_pml4(image->pml4, image->user_rsp, initial, initial_bytes) != 0)
     goto fail;
+  kfree(initial);
+  kfree(ptrs);
   return 0;
 
 fail:
+  if (initial)
+    kfree(initial);
+  if (ptrs)
+    kfree(ptrs);
   pe_process_free(image->pe_process);
   free_user_pml4(image->pml4);
   memset(image, 0, sizeof(*image));
-  return -1;
+  return error;
+}
+
+static int load_request_image(struct spawn_request *req, struct loaded_image *image) {
+  char *argv[ARGV_MAX];
+  for (int i = 0; i < req->argc; i++)
+    argv[i] = req->args[i];
+  return load_image(req->path, req->argc, argv, 0, 0, &req->cancelled, image) == 0 ? 0 : -1;
 }
 
 static int spawn_request_now(struct spawn_request *req) {
@@ -530,6 +588,44 @@ long process_exec(const char *path, char *const argv[]) {
     task_reap(t);
   }
   return code;
+}
+
+long process_execve(const char *path, int argc, char *const argv[], int envc, char *const envp[],
+                    u64 *entry, u64 *user_rsp) {
+  struct task *t = task_current();
+  if (!t || !t->vm || !t->context)
+    return -EINVAL;
+
+  /* Everything that can fail is allocated before the old image is touched:
+   * past task_exec_address_space there is nothing to return to. */
+  struct task_vm *vm = (struct task_vm *)kmalloc(sizeof(*vm));
+  int *refs          = (int *)kmalloc(sizeof(int));
+  if (!vm || !refs) {
+    if (vm)
+      kfree(vm);
+    if (refs)
+      kfree(refs);
+    return -ENOMEM;
+  }
+  memset(vm, 0, sizeof(*vm));
+  uvm_init(vm);
+
+  struct loaded_image image;
+  int error = load_image(path, argc, argv, envc, envp, 0, &image);
+  if (error) {
+    kfree(vm);
+    kfree(refs);
+    return error;
+  }
+
+  vm->pe_process = image.pe_process;
+  task_exec_address_space(image.pml4, refs, vm, (image.elf.end + 4095) & ~4095ULL);
+  t->context->gs_base         = image.pe_process ? GAIA_WIN32_TEB : 0;
+  t->context->abi_personality = image.personality;
+  set_process_name(t, path);
+  *entry    = image.entry;
+  *user_rsp = image.user_rsp;
+  return 0;
 }
 
 /* tty < 0 means "inherit the caller's", which is what plain spawn wants. */
