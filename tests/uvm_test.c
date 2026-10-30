@@ -218,12 +218,47 @@ static void test_fixed_rejects_occupied_range(void) {
 
 static void test_reservation_table_is_bounded(void) {
   reset();
+  /* Alternating permissions, so no reservation can merge into its
+   * neighbour and every one needs a record of its own. */
   for (int i = 0; i < MAX_USER_VMAS; i++) {
-    expect(uvm_reserve(&vm, 0, 4096, RW, 0) != 0,
+    expect(uvm_reserve(&vm, 0, 4096, (i & 1) ? RO : RW, 0) != 0,
            "reservations up to the table size succeed");
   }
-  expect(uvm_reserve(&vm, 0, 4096, RW, 0) == 0,
+  expect(uvm_reserve(&vm, 0, 4096, (MAX_USER_VMAS & 1) ? RO : RW, 0) == 0,
          "the reservation past the table size fails instead of overrunning it");
+}
+
+static int vmas_in_use(void) {
+  int used = 0;
+  for (int i = 0; i < MAX_USER_VMAS; i++)
+    used += vm.vmas[i].used ? 1 : 0;
+  return used;
+}
+
+static void test_adjacent_reservations_merge(void) {
+  reset();
+  for (int i = 0; i < 4 * MAX_USER_VMAS; i++) {
+    if (!uvm_reserve(&vm, 0, 4096, RW, 0)) {
+      expect(0, "back-to-back reservations with equal permissions never fill the table");
+      return;
+    }
+  }
+  expect(vmas_in_use() == 1, "back-to-back equal reservations share one record");
+
+  reset();
+  u64 base = 0x0000000100000000ULL;
+  expect(uvm_reserve(&vm, base, 4096, RW, 1) == base, "left reservation");
+  expect(uvm_reserve(&vm, base + 8192, 4096, RW, 1) == base + 8192, "right reservation");
+  expect(vmas_in_use() == 2, "separated reservations stay separate");
+  expect(uvm_reserve(&vm, base + 4096, 4096, RW, 1) == base + 4096, "bridging reservation");
+  expect(vmas_in_use() == 1, "a bridging reservation joins both neighbours");
+  expect(uvm_reserve(&vm, base + 12288, 4096, RO, 1) == base + 12288,
+         "different permissions abut");
+  expect(vmas_in_use() == 2, "different permissions never merge");
+  expect(uvm_release(&vm, base + 4096, 4096) == 0, "a merged record still splits on release");
+  expect(uvm_fault_in(&vm, base, 1) == 1 && uvm_fault_in(&vm, base + 8192, 1) == 1 &&
+             uvm_fault_in(&vm, base + 4096, 1) == 0,
+         "the split leaves both sides reserved and the middle free");
 }
 
 /* --- demand paging ----------------------------------------------------- */
@@ -418,6 +453,7 @@ int main(void) {
   test_reserve_rejects_bad_ranges();
   test_fixed_rejects_occupied_range();
   test_reservation_table_is_bounded();
+  test_adjacent_reservations_merge();
 
   test_fault_in_materialises_zeroed_page();
   test_write_to_readonly_reservation_is_refused();
