@@ -63,3 +63,9 @@ userspace/bin/vim
 # QEMU filter-dump target from tools/run.bat: rewritten by every run.
 net.pcap
 documents/
+
+# Future compatibility shims
+/userspace/include/shims/posix/bsd/
+/userspace/include/shims/posix/darwin/
+/userspace/shims/posix/bsd/
+/userspace/shims/posix/darwin/
