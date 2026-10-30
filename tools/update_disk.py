@@ -75,7 +75,7 @@ TARGET_DEST = {
     'notepad': 'notepad', 'hermes': 'hermes', 'umount': 'umount',
     'lsdisk': 'lsdisk', 'reboot': 'reboot', 'pkill': 'pkill',
     'plist': 'plist', 'mount': 'mount', 'sync': 'sync', 'wipe': 'wipe',
-    'mkfs': 'mkfs', 'tree': 'tree', 'cat': 'cat', 'sh': 'sh', 'ls': 'ls',
+    'mkfs': 'mkfs', 'tree': 'tree', 'cat': 'cat', 'chmod': 'chmod', 'sh': 'sh', 'ls': 'ls',
 }
 
 def target_destination(path: str) -> str:
