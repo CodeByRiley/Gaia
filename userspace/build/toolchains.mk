@@ -18,3 +18,5 @@ PE_LDFLAGS := -nostdlib -static -e _start \
 PE_CFLAGS := -ffreestanding -nostdlib -fno-pie -mno-red-zone -static \
 							-fno-asynchronous-unwind-tables \
               -I . -I lib -I include -I ../kernel -O2 -Wall -Wextra -std=gnu23 -DDEBUG
+
+USER_PE_AR = $(shell $(USER_PE_CC) -print-prog-name=ar)

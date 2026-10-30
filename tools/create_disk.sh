@@ -169,6 +169,7 @@ while IFS= read -r host_path; do
         userspace/bin/cat/cat.elf) destination="system/bin/cat.elf" ;;
         userspace/bin/sh/sh.elf) destination="system/bin/sh.elf" ;;
         userspace/bin/ls/ls.elf) destination="system/bin/ls.elf" ;;
+        build/userspace/pe/shims/*.dll) destination="system/win32/${host_path##*/}" ;;
         userspace/bin/*.elf|userspace/bin/*.exe) destination="usr/bin/${host_path##*/}" ;;
         *) echo "create_disk: invalid registered target: $host_path" >&2; exit 1 ;;
     esac

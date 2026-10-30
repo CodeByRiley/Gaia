@@ -158,6 +158,7 @@ void forward_input(int target_pid, int win_handle, const struct msg *m) {
   memset(&out, 0, sizeof(out));
   out.type = IPC_WM_INPUT;
   out.a = m->type;
+  out.flags = (uint32_t)win_handle;
 
   if (m->type == MSG_MOUSE_MOVE || m->type == MSG_MOUSE_DOWN ||
       m->type == MSG_MOUSE_UP) {
@@ -223,6 +224,7 @@ void request_window_close(int handle, u32 now) {
   memset(&out, 0, sizeof(out));
   out.type = IPC_WM_INPUT;
   out.a = WM_EV_QUIT;
+  out.flags = (uint32_t)handle;
   ipc_send(w->owner_pid, &out);
 }
 

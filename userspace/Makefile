@@ -175,9 +175,17 @@ endif
 %.o: %.c
 	$(USER_ELF_CC) $(DOOM_CFLAGS) $(CCDB) -c $< -o $@
 
+BUILD_COMPAT_TESTS ?= 0
+COMPAT_LINUX_CC ?= $(if $(filter Windows_NT,$(OS)),wsl gcc,gcc)
 USERSPACE_TARGETS := bin/holyd.elf
+ifeq ($(BUILD_COMPAT_TESTS),1)
+USERSPACE_TARGETS += bin/linuxhello/linuxhello.elf
+bin/linuxhello/linuxhello.elf: bin/linuxhello/linuxhello.c
+	$(COMPAT_LINUX_CC) -static -no-pie -O2 $< -o $@
+endif
 include build/runtimes.mk
 include build/application.mk
+include build/library.mk
 ifeq ($(BUILD_DOOM),1)
 USERSPACE_TARGETS += bin/doom/doom.elf
 endif
@@ -186,7 +194,7 @@ USERSPACE_TARGETS += bin/netsurf/netsurf.elf
 endif
 
 .PHONY: all clean doom netsurf
-all: $(USERSPACE_TARGETS)
+all: $(USERSPACE_TARGETS) $(SHIM_TARGETS)
 
 doom: bin/doom/doom.elf
 netsurf: bin/netsurf/netsurf.elf
@@ -568,7 +576,7 @@ space := $(empty) $(empty)
 # GNU Make writes the complete active graph, including explicitly built ports.
 package-list: all
 	@mkdir -p ../build/userspace
-	$(file >../build/userspace/targets.list,$(subst $(space),$(newline),$(addprefix userspace/,$(USERSPACE_TARGETS))))
+	$(file >../build/userspace/targets.list,$(subst $(space),$(newline),$(addprefix userspace/,$(USERSPACE_TARGETS)) $(patsubst ../%,%,$(SHIM_DLLS))))
 
 clean:
 	rm -f $(USERSPACE_TARGETS) bin/holyd.elf bin/doom/doom.elf bin/netsurf/netsurf.elf $(HOLYD_OBJS) $(HOLYD_OBJS:.o=.d)

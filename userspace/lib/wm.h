@@ -86,6 +86,7 @@ enum {
 };
 
 struct wm_event {
+    int      window_handle; /* Target Heimdall window, including input/quit. */
     int      type;       /* WM_EV_*                                       */
     int      param;      /* keycode or button mask                        */
     int      x, y;       /* mouse pos (input) or new client size (resize) */

@@ -1,0 +1,15 @@
+LIBRARY msvcrt.dll
+EXPORTS
+malloc
+calloc
+free
+realloc
+puts
+exit
+_write
+memcpy=ntdll.memcpy
+memset=ntdll.memset
+memmove=ntdll.memmove
+memcmp=ntdll.memcmp
+strlen=ntdll.strlen
+strcmp=ntdll.strcmp

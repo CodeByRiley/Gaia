@@ -185,7 +185,7 @@ build-x86_64: $(kernel_bin) $(disk_img)
 
 # --- host + QEMU regression suites -------------------------------------
 HOST_CC ?= gcc
-HOST_TEST_CFLAGS := -std=c11 -O2 -Wall -Wextra
+HOST_TEST_CFLAGS := -std=c11 -O2 -Wall -Wextra -idirafter kernel
 HOST_TEST_DIR := build/tests
 
 # Host stand-ins for the kernel allocator and log. Linked by the tests that
@@ -231,36 +231,36 @@ $(HOST_TEST_DIR):
 
 $(HOST_TEST_DIR)/vfs_test.exe: tests/vfs_test.c $(VFS_HOST_SRCS) \
 		kernel/fs/vfs/vfs.h kernel/fs/vfs/internal.h | $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -I kernel tests/vfs_test.c $(VFS_HOST_SRCS) -o $@
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -idirafter kernel tests/vfs_test.c $(VFS_HOST_SRCS) -o $@
 
 $(HOST_TEST_DIR)/pmm_test.exe: tests/pmm_test.c kernel/memory/pmm.c \
 		kernel/memory/pmm.h | $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -DPMM_HOST_TEST -I kernel \
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -DPMM_HOST_TEST -idirafter kernel \
 		tests/pmm_test.c kernel/memory/pmm.c -o $@
 
 $(HOST_TEST_DIR)/vmm_test.exe: tests/vmm_test.c kernel/memory/vmm.c \
 		kernel/memory/vmm.h kernel/memory/hhdm.h | $(HOST_TEST_DIR)
 	$(HOST_CC) $(HOST_TEST_CFLAGS) -DHHDM_HOST_TEST -DVMM_HOST_TEST \
-		-I kernel tests/vmm_test.c kernel/memory/vmm.c -o $@
+		-idirafter kernel tests/vmm_test.c kernel/memory/vmm.c -o $@
 
 $(HOST_TEST_DIR)/uvm_test.exe: tests/uvm_test.c kernel/memory/uvm.c \
 		kernel/memory/uvm.h kernel/memory/vmm.h kernel/memory/hhdm.h \
 		kernel/loader/process.h | $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -DHHDM_HOST_TEST -I kernel \
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -DHHDM_HOST_TEST -idirafter kernel \
 		tests/uvm_test.c kernel/memory/uvm.c -o $@
 
 $(HOST_TEST_DIR)/process_pml4_test.exe: tests/process_pml4_test.c \
 		kernel/loader/process.c kernel/memory/vmm.h kernel/memory/hhdm.h \
 		| $(HOST_TEST_DIR)
 	$(HOST_CC) $(HOST_TEST_CFLAGS) -DHHDM_HOST_TEST \
-		-DPROCESS_PML4_HOST_TEST -I kernel \
+		-DPROCESS_PML4_HOST_TEST -idirafter kernel \
 		tests/process_pml4_test.c kernel/loader/process.c -o $@
 
 $(HOST_TEST_DIR)/fat_directory_test.exe: tests/fat_directory_test.c \
 		$(HOST_KERNEL_STUBS) $(FAT_HOST_SRCS) $(VFS_HOST_SRCS) \
 		$(FS_HOST_HEADERS) tests/vfs_backend_checks.h \
 		| $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -I kernel \
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -idirafter kernel \
 		tests/fat_directory_test.c $(FAT_HOST_SRCS) $(VFS_HOST_SRCS) \
 		$(HOST_KERNEL_STUBS) -o $@
 
@@ -268,7 +268,7 @@ $(HOST_TEST_DIR)/fat_device_test.exe: tests/fat_device_test.c \
 		$(HOST_KERNEL_STUBS) $(FAT_HOST_SRCS) $(VFS_HOST_SRCS) \
 		$(FS_HOST_HEADERS) tests/vfs_backend_checks.h \
 		kernel/drivers/storage/block.h | $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -I kernel \
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -idirafter kernel \
 		tests/fat_device_test.c $(FAT_HOST_SRCS) $(VFS_HOST_SRCS) \
 		$(HOST_KERNEL_STUBS) -o $@
 
@@ -300,32 +300,32 @@ EXT2_HOST_SRCS := kernel/fs/ext2/ext2_mount.c kernel/fs/ext2/ext2_inode.c \
 $(HOST_TEST_DIR)/vfs_serialization_test.exe: tests/vfs_serialization_test.c \
 		$(EXT2_HOST_SRCS) $(HOST_KERNEL_STUBS) $(FS_HOST_HEADERS) \
 		$(HOST_TEST_DIR)/ext2-base.img | $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -I kernel tests/vfs_serialization_test.c \
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -idirafter kernel tests/vfs_serialization_test.c \
 		$(EXT2_HOST_SRCS) $(HOST_KERNEL_STUBS) -o $@
 
 $(HOST_TEST_DIR)/ext2_vfs_test.exe: tests/ext2_vfs_test.c $(EXT2_HOST_SRCS) \
 		tests/vfs_backend_checks.h $(FS_HOST_HEADERS) \
 		$(HOST_KERNEL_STUBS) $(HOST_TEST_DIR)/ext2-base.img | $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -I kernel tests/ext2_vfs_test.c \
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -idirafter kernel tests/ext2_vfs_test.c \
 		$(EXT2_HOST_SRCS) $(HOST_KERNEL_STUBS) -o $@
 
 $(HOST_TEST_DIR)/stdio_mode_test.exe: tests/stdio_mode_test.c \
 		$(HOST_KERNEL_STUBS) kernel/fs/stdio.c $(FAT_HOST_SRCS) $(VFS_HOST_SRCS) \
 		kernel/fs/stdio.h $(FS_HOST_HEADERS) \
 		| $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -fno-builtin -I kernel tests/stdio_mode_test.c \
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -fno-builtin -idirafter kernel tests/stdio_mode_test.c \
 		kernel/fs/stdio.c $(FAT_HOST_SRCS) $(VFS_HOST_SRCS) $(HOST_KERNEL_STUBS) -o $@
 
 $(HOST_TEST_DIR)/ext2_device_test.exe: tests/ext2_device_test.c $(EXT2_HOST_SRCS) \
 		$(FS_HOST_HEADERS) tests/vfs_backend_checks.h kernel/drivers/storage/block.h \
 		$(HOST_KERNEL_STUBS) $(HOST_TEST_DIR)/ext2-base.img | $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -I kernel tests/ext2_device_test.c \
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -idirafter kernel tests/ext2_device_test.c \
 		$(EXT2_HOST_SRCS) $(HOST_KERNEL_STUBS) -o $@
 
 $(HOST_TEST_DIR)/usb_device_test.exe: tests/usb_device_test.c \
 		kernel/drivers/usb/usb_device.c kernel/drivers/usb/usb_device.h \
 		kernel/devices/usb.h | $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -I kernel \
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -idirafter kernel \
 		tests/usb_device_test.c kernel/drivers/usb/usb_device.c -o $@
 
 USB_STORAGE_HOST_SRCS := kernel/drivers/usb/storage/bot.c \
@@ -333,7 +333,7 @@ USB_STORAGE_HOST_SRCS := kernel/drivers/usb/storage/bot.c \
 $(HOST_TEST_DIR)/usb_storage_test.exe: tests/usb_storage_test.c $(USB_STORAGE_HOST_SRCS) \
 		kernel/drivers/usb/storage/usb_storage.h kernel/drivers/storage/block.h \
 		kernel/devices/usb.h kernel/sync/spinlock.h | $(HOST_TEST_DIR)
-	$(HOST_CC) $(HOST_TEST_CFLAGS) -I kernel tests/usb_storage_test.c \
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -idirafter kernel tests/usb_storage_test.c \
 		$(USB_STORAGE_HOST_SRCS) -o $@
 
 .PHONY: test-storage test-fs
@@ -476,3 +476,15 @@ clean_paths := build dist \
 clean:
 	$(call run_linux,rm -rf $(clean_paths))
 	$(MAKE) -C userspace clean
+
+
+$(HOST_TEST_DIR)/pe_image_test.exe: tests/pe_image_test.c kernel/loader/pe_image.c kernel/loader/pe_image.h kernel/loader/pe.h | $(HOST_TEST_DIR)
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -idirafter kernel tests/pe_image_test.c kernel/loader/pe_image.c -o $@
+
+$(HOST_TEST_DIR)/win32_shared_test.exe: tests/win32_shared_test.c userspace/shims/win32/shared/handles.c userspace/shims/win32/shared/paths.c userspace/shims/win32/shared/unicode.c | $(HOST_TEST_DIR)
+	$(HOST_CC) $(HOST_TEST_CFLAGS) -idirafter userspace/include -I userspace -idirafter kernel $^ -o $@
+
+.PHONY: test-compat-host
+test-compat-host: $(HOST_TEST_DIR)/pe_image_test.exe $(HOST_TEST_DIR)/win32_shared_test.exe
+	$(HOST_TEST_DIR)/pe_image_test.exe
+	$(HOST_TEST_DIR)/win32_shared_test.exe

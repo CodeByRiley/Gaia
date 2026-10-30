@@ -170,6 +170,7 @@ int wm_poll_event(struct wm_event *out) {
         /* heimdall packs (msg_type, param, x, y) into (a, b, c, d).
          * MSG_* codes (1..5) are intentionally aligned with WM_EV_*. */
         memset(out, 0, sizeof(*out));
+        out->window_handle = (int)m.flags;
         out->type  = m.a;
         out->param = m.b;
         out->x     = m.c;
@@ -178,6 +179,7 @@ int wm_poll_event(struct wm_event *out) {
 
     case IPC_WM_RESIZE_NOTIFY:
         memset(out, 0, sizeof(*out));
+        out->window_handle = m.a;
         out->type       = WM_EV_RESIZE;
         out->w          = m.b;
         out->h          = m.c;

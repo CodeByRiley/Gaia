@@ -25,7 +25,7 @@ endef
 
 define app-link
 $(1): $(2) $(3) $(4) build/application.mk build/runtimes.mk build/toolchains.mk
-	$(if $(filter elf.musl,$(5)),CC=$(USER_ELF_CC) "$$(SHELL)" $(MUSL_LINK) $$@ $(2) $(3) $(6),$(if $(filter pe.native,$(5)),$(USER_PE_CC) $(PE_LDFLAGS),$(USER_ELF_LD) $(USER_LDFLAGS)) $(6) $(2) $(3) -o $$@)
+	$(if $(filter elf.musl,$(5)),CC=$(USER_ELF_CC) "$$(SHELL)" $(MUSL_LINK) $$@ $(2) $(3) $(6),$(if $(filter pe.win32,$(5)),$(USER_PE_CC) $(PE_LDFLAGS) -e mainCRTStartup,$(if $(filter pe.native,$(5)),$(USER_PE_CC) $(PE_LDFLAGS),$(USER_ELF_LD) $(USER_LDFLAGS))) $(6) $(2) $(3) -o $$@)
 endef
 
 define register-format
@@ -58,7 +58,7 @@ $(eval APP_PE_RUNTIME ?= $(if $(filter pe,$(APP_FORMAT)),$(APP_RUNTIME),native))
 $(if $(APP_SOURCES),,$(error $(1): APP_SOURCES is required))
 $(if $(filter-out %.c %.s %.S %.asm,$(APP_SOURCES)),$(error $(1): unsupported source extension))
 $(foreach src,$(APP_SOURCES),$(if $(or $(filter /% %:,$(src)),$(findstring :,$(src)),$(findstring ..,$(src)),$(findstring \,$(src))),$(error $(1): source must be a local relative path: $(src)))$(if $(wildcard $(_dir)/$(src)),,$(error $(1): missing source $(src))))
-$(if $(filter-out musl native,$(APP_RUNTIME)),$(error $(1): APP_RUNTIME must be musl or native))
+$(if $(filter-out musl native win32,$(APP_RUNTIME)),$(error $(1): APP_RUNTIME must be musl, native, or win32))
 $(if $(filter undefined,$(origin APP_LIBS)),$(eval APP_LIBS := gaia))
 $(foreach fmt,$(if $(filter both,$(APP_FORMAT)),elf pe,$(APP_FORMAT)),$(call register-format,$(fmt),$(1)))
 endef

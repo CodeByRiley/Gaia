@@ -1,0 +1,14 @@
+LIBRARY gdi32.dll
+EXPORTS
+CreateSolidBrush
+DeleteObject
+GetStockObject
+FillRect
+SetPixel
+Rectangle
+SetTextColor
+SetBkColor
+SetBkMode
+TextOutA
+TextOutW
+SetDIBitsToDevice

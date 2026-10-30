@@ -1,0 +1,4 @@
+LIBRARY compatprobe.dll
+EXPORTS
+ProbeValue @7
+ProbeProcessId=kernel32.GetCurrentProcessId
