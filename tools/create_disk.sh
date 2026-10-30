@@ -45,26 +45,13 @@ payloads=(
 	"rootfs/system/icons/skald.bmp::system/icons/skald.bmp"
 	"rootfs/system/icons/DOOM.bmp::system/icons/doom.bmp"
 	"rootfs/system/wallpaper.bmp::system/wallpaper.bmp"
-
+	"rootfs/system/bin/as.elf::system/bin/as.elf"
+	"rootfs/system/test.elf::system/test"
+	"rootfs/system/hello.elf::system/hello"
+	"rootfs/system/stress.elf::system/stress"
+	"rootfs/system/child.elf::system/child"
+	"rootfs/system/parent.elf::system/parent"
 # System Apps
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 )
 
