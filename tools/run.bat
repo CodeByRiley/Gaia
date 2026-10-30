@@ -104,17 +104,18 @@ echo [RUN SCRIPT]"(DEBUG)" Starting QEMU...
   -cdrom dist/x86_64/kernel.iso ^
   -drive id=disk,file="%DISK%",if=none,format=raw ^
   -device ide-hd,drive=disk,bus=ide.0 ^
-  -drive id=data-disk,file="./build/data.img",if=none,format=raw ^
-  -device ide-hd,drive=data-disk,bus=ide.1 ^
   -boot d ^
   -accel tcg,thread=multi,tb-size=128 ^
   -cpu max ^
   -smp 4 ^
   -vga none ^
+  -device virtio-serial-pci,id=vserial0,disable-legacy=on ^
+  -chardev socket,id=clip0,host=127.0.0.1,port=9595,server=on,wait=off ^
+  -device virtserialport,bus=vserial0.0,nr=1,chardev=clip0,name=gaia.clipboard ^
   -device virtio-vga-gl,xres=%QEMU_XRES%,yres=%QEMU_YRES% ^
   -display sdl,gl=on ^
   -serial stdio ^
-  -m 512M ^
+  -m 2048M ^
   -device ich9-usb-ehci1,id=ehci ^
   -device usb-tablet,bus=ehci.0 ^
   -audiodev sdl,id=snd0 ^
@@ -142,3 +143,5 @@ endlocal & exit /b %RESULT%
 REM -vga virtio ^
 REM -device piix3-usb-uhci,id=uhci ^
 REM -device usb-tablet,bus=uhci.0 ^
+REM -drive id=data-disk,file="./build/data.img",if=none,format=raw ^
+REM -device ide-hd,drive=data-disk,bus=ide.1 ^

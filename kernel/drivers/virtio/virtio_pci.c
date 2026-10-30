@@ -9,7 +9,7 @@
  * VIRTIO_BAR_VBASE, 64 MiB per device. Plenty of room for the ~16 KiB
  * a virtio device actually needs.
  */
-#include <drivers/video/virtio/virtio.h>
+#include <drivers/virtio/virtio.h>
 #include <memory/hhdm.h>
 #include <memory/pmm.h>
 #include <memory/vmm.h>

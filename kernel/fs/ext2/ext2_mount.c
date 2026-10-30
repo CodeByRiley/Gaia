@@ -1,3 +1,4 @@
+#include "utilities/log.h"
 #include <fs/ext2/ext2_internal.h>
 #include <fs/probe.h>
 #include <memory/heap.h>
@@ -33,6 +34,23 @@ static int mount_common(struct vfs_superblock *super, u8 *image, usize size,
     return -1;
   struct ext2_superblock *superblock =
       (struct ext2_superblock *)((u8 *)image + EXT_SUPERBLOCK_OFFSET);
+  log_write_fmt(FILESYS, LOG_DEBUG,
+                "EXT2: revision=%u block_size=%u inode_size=%u",
+                superblock->revision_level,
+                1024u << superblock->log_block_size,
+                superblock->inode_size);
+
+  log_write_fmt(FILESYS, LOG_DEBUG,
+                "EXT2: blocks=%u first_data_block=%u image_size=%llu",
+                superblock->blocks_count,
+                superblock->first_data_block,
+                (unsigned long long)size);
+
+  log_write_fmt(FILESYS, LOG_DEBUG,
+                "EXT2: compat=0x%x incompat=0x%x ro_compat=0x%x",
+                superblock->feature_compat,
+                superblock->feature_incompat,
+                superblock->feature_ro_compat);
   if (superblock->revision_level > 1 || superblock->log_block_size > 2 ||
       superblock->blocks_per_group == 0 || superblock->inodes_per_group == 0 ||
       superblock->blocks_count <= superblock->first_data_block ||
@@ -48,8 +66,13 @@ static int mount_common(struct vfs_superblock *super, u8 *image, usize size,
       superblock->inodes_per_group > block_size * 8u)
     return -1;
   u64 volume_size = (u64)superblock->blocks_count * block_size;
-  if (volume_size > size)
-    return -1;
+  if (volume_size > size) {
+      log_write_fmt(FILESYS, LOG_ERROR,
+                    "EXT2: volume_size=%llu exceeds image_size=%llu",
+                    (unsigned long long)volume_size,
+                    (unsigned long long)size);
+      return -1;
+  }
   u32 data_blocks = superblock->blocks_count - superblock->first_data_block;
   u32 group_count = (data_blocks + superblock->blocks_per_group - 1) / superblock->blocks_per_group;
   u32 inode_groups =

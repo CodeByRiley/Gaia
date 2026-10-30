@@ -2,7 +2,7 @@
 #define SKALD_PATH_H
 
 #define EXEC_PATH_MAX 256
-#define EXEC_DIR_MAX  256
+#define EXEC_DIR_MAX 256
 
 const char *shell_exec_path(void);
 

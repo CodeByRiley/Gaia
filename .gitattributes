@@ -8,15 +8,12 @@
 # cloning fresh -- which is exactly the case the P0 item in TODO.txt cares
 # about.
 *.sh text eol=lf
-
 # Same reasoning for anything else consumed by a POSIX shell or WSL.
 *.bash text eol=lf
 configure text eol=lf
-
 # Windows-side scripts genuinely want CRLF.
 *.bat text eol=crlf
 *.ps1 text eol=crlf
-
 # Binary payloads: never touch, never diff as text.
 *.img binary
 *.iso binary
@@ -28,3 +25,4 @@ configure text eol=lf
 *.png binary
 *.ttf binary
 *.pcap binary
+rootfs/system/libexec/gcc/** filter=lfs diff=lfs merge=lfs -text

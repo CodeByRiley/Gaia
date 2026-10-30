@@ -1,5 +1,7 @@
 /* Kernel entry point and staged subsystem initialization. */
-#include "net/ksocket.h"
+#include "drivers/char/virtio/virtio_con.h"
+#include <arch/cpu.h>
+#include <net/ksocket.h>
 #include <acpi/acpi.h>
 #include <arch/gdt.h>
 #include <arch/percpu.h>
@@ -53,6 +55,8 @@ static void arch_init(void) {
   gdt_init();
   idt_init();
   log_write("idt initialised", KERNEL, LOG_INFO);
+  cpu_detect_features();
+  cpu_log_features();
   pic_remap();
   pit_init(PIT_SCHED_HZ);
   log_write("pit initialised", KERNEL, LOG_INFO);
@@ -128,6 +132,7 @@ static void devices_init(void) {
   isa_probe_devices();
   driver_register(&sb16_driver);
   driver_register(&e1000_driver);
+  driver_register(&virtio_console_driver);
   usb_init();
   driver_register(&ahci_driver);
 }
