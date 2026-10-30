@@ -7,7 +7,8 @@ cd "$(dirname "$0")/.."
 iso_dir=boot/x86_64/iso
 kernel=dist/x86_64/kernel.bin
 disk="${DISK_IMAGE:-build/disk.img}"
-out_iso=dist/x86_64/kernel.iso
+# OUT_ISO lets a test build a second, smaller image without replacing this one.
+out_iso="${OUT_ISO:-dist/x86_64/kernel.iso}"
 
 core_img=build/core.img
 efi_img=build/efi.img
