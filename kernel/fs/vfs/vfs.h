@@ -36,6 +36,9 @@ struct vfs_inode_operations {
   int (*rmdir)(struct vfs_inode *dir, const char *name);
   int (*getattr)(struct vfs_inode *inode, struct vfs_stat *out);
   int (*truncate)(struct vfs_inode *inode);
+  /* Replace the permission bits (07777) and keep the file type. Optional: a
+   * backend that cannot store modes leaves it NULL and chmod is EPERM. */
+  int (*setmode)(struct vfs_inode *inode, uint32_t permissions);
 };
 /* release must tolerate a partially failed open. iterate returns >0 for an
  * entry, 0 at EOF, -1 on failure; index is a backend-owned cookie. */
@@ -132,6 +135,10 @@ int vfs_seek(struct vfs_file *file, uint64_t position);
 int vfs_truncate(struct vfs_file *file);
 int vfs_stat(const char *path, struct vfs_stat *out);
 int vfs_file_stat(struct vfs_file *file, struct vfs_stat *out);
+/* chmod on a path / on an open file. Only the permission bits change.
+ * EPERM when the filesystem stores no modes (FAT). */
+int vfs_chmod(const char *path, uint32_t permissions);
+int vfs_file_chmod(struct vfs_file *file, uint32_t permissions);
 int vfs_unlink(const char *path);
 int vfs_mkdir(const char *path);
 int vfs_rmdir(const char *path);

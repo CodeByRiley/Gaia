@@ -31,6 +31,12 @@ void log_write_hex(const char *message, uint64_t value, uint8_t type,
   (void)level;
 }
 
+void log_write_fmt(uint8_t type, uint8_t level, const char *fmt, ...) {
+  (void)type;
+  (void)level;
+  (void)fmt;
+}
+
 /* No CMOS on the host, and a test that asserted on the wall clock would fail
  * once a day anyway. Reporting invalid makes fat_set_timestamp leave the date
  * fields alone, which is the behaviour the directory tests already expect. */

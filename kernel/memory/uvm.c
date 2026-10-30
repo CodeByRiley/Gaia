@@ -245,12 +245,36 @@ u64 uvm_reserve(struct task_vm *vm, u64 addr, u64 bytes, u64 pte_flags, int fixe
       return 0;
   }
 
-  *vma = (struct user_vma){
-      .start     = base,
-      .end       = base + bytes,
-      .pte_flags = pte_flags,
-      .used      = 1,
-  };
+  /* Grow a neighbour with the same permissions rather than spend a slot.
+   * Auto-placed mappings are handed out back to back, so without this every
+   * mmap costs one record and a large program (GCC's cc1, among others)
+   * exhausts the table within its first few dozen allocations. The record
+   * found above is left unused when a merge absorbs the range. */
+  struct user_vma *below = 0, *above = 0;
+  for (int i = 0; i < MAX_USER_VMAS; i++) {
+    struct user_vma *v = &vm->vmas[i];
+    if (!v->used || v->pte_flags != pte_flags)
+      continue;
+    if (v->end == base)
+      below = v;
+    else if (v->start == base + bytes)
+      above = v;
+  }
+  if (below && above) {
+    below->end = above->end;
+    memset(above, 0, sizeof(*above));
+  } else if (below) {
+    below->end = base + bytes;
+  } else if (above) {
+    above->start = base;
+  } else {
+    *vma = (struct user_vma){
+        .start     = base,
+        .end       = base + bytes,
+        .pte_flags = pte_flags,
+        .used      = 1,
+    };
+  }
   return base;
 }
 
@@ -297,5 +321,30 @@ int uvm_release(struct task_vm *vm, u64 addr, u64 bytes) {
 
   if (addr >= USER_MMAP_BASE && addr + bytes <= USER_MMAP_LIMIT)
     hole_add(vm, addr, bytes);
+  return 0;
+}
+
+int uvm_discard(struct task_vm *vm, u64 addr, u64 bytes) {
+  if (!vm || !vm->user_pml4 || (addr & 4095) || (bytes & 4095))
+    return -1;
+  if (!uvm_range_ok(addr, bytes))
+    return -1;
+
+  /* Validate the whole range before dropping a single frame. */
+  for (u64 off = 0; off < bytes; off += 4096) {
+    if (!vma_at(vm, addr + off))
+      return -1;
+    if (vmm_entry_in(vm->user_pml4, addr + off) & VMM_SHARED)
+      return -1;
+  }
+
+  for (u64 off = 0; off < bytes; off += 4096) {
+    u64 va    = addr + off;
+    u64 entry = vmm_entry_in(vm->user_pml4, va);
+    if (!entry)
+      continue;
+    vmm_unmap_in(vm->user_pml4, va);
+    pmm_free_frame(entry & VMM_ADDR_MASK);
+  }
   return 0;
 }

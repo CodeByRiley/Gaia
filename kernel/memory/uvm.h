@@ -107,6 +107,14 @@ int uvm_protect(struct task_vm *vm, u64 addr, u64 bytes, u64 pte_flags);
  * which is what POSIX says. Returns 0, or -1 if the range is illegal. */
 int uvm_release(struct task_vm *vm, u64 addr, u64 bytes);
 
+/* Throw away the contents of a reserved range but keep the reservation, so
+ * the next touch of each page faults in a zeroed frame: madvise's
+ * MADV_DONTNEED for private anonymous memory. Every page must lie inside a
+ * reservation, since image and stack pages have no zero-fill to come back
+ * to, and none may hold a borrowed (VMM_SHARED) frame. Returns 0, or -1
+ * having changed nothing. */
+int uvm_discard(struct task_vm *vm, u64 addr, u64 bytes);
+
 /* Materialise the zeroed page containing `addr` if a reservation covers it
  * and permits the access. Returns 1 when the page is present and usable
  * for that access afterwards, 0 otherwise , including when it is already

@@ -45,8 +45,11 @@ static int lookup(struct vfs_inode *dir, const char *name, struct vfs_inode **ou
 static int getattr(struct vfs_inode *inode, struct vfs_stat *out) {
   u8 attr  = attributes(inode);
   u64 size = inode->private_data ? fat_impl_entry_get_size(inode->private_data) : 0;
-  u32 mode = attr & FAT_ATTR_READ_ONLY ? 0444u : 0666u;
-  mode |= inode->type == VFS_NODE_DIRECTORY ? 0040000u | 0111u : 0100000u;
+  /* FAT stores no permission bits. Execute is granted to everything, as
+   * Linux's vfat does by default (no showexec), so access(X_OK) and execve
+   * accept programs stored here; read-only entries lose only write. */
+  u32 mode = attr & FAT_ATTR_READ_ONLY ? 0555u : 0777u;
+  mode |= inode->type == VFS_NODE_DIRECTORY ? 0040000u : 0100000u;
   *out = (struct vfs_stat){.inode      = inode->number,
                            .size       = size,
                            .blocks     = (size + 511u) / 512u,
@@ -88,17 +91,45 @@ static int cursor(struct vfs_inode *inode, u64 position, struct fat_file *out) {
   return fat_seek(out, (u32)position);
 }
 
+static u64 entry_size(struct vfs_inode *inode) {
+  return inode->private_data ? fat_impl_entry_get_size(inode->private_data) : 0;
+}
+
 static size_t read(struct vfs_file *file, void *buffer, size_t length) {
   struct fat_file fat;
+  /* At or past EOF: nothing to read, and the position stays put. */
+  if (file->position >= entry_size(file->node))
+    return 0;
   if (cursor(file->node, file->position, &fat))
     return 0;
   size_t count   = fat_read(&fat, buffer, length);
   file->position = fat.pos;
   return count;
 }
+/* Zero-fill from EOF up to `position`: a write after a seek past the end
+ * must leave the gap reading as zeroes, as POSIX has it. FAT cannot store a
+ * hole, so the zeroes are written out. */
+static int fill_gap(struct vfs_inode *inode, u64 position) {
+  static const u8 zeros[512];
+  u64 size = entry_size(inode);
+  if (position <= size)
+    return 0;
+  struct fat_file fat;
+  if (cursor(inode, size, &fat))
+    return -1;
+  for (u64 gap = position - size; gap;) {
+    size_t n = gap < sizeof(zeros) ? (size_t)gap : sizeof(zeros);
+    if (fat_write(&fat, zeros, n) != n)
+      return -1;
+    gap -= n;
+  }
+  return 0;
+}
+
 static size_t write(struct vfs_file *file, const void *buffer, size_t length) {
   struct fat_file fat;
-  if ((attributes(file->node) & FAT_ATTR_READ_ONLY) || cursor(file->node, file->position, &fat))
+  if ((attributes(file->node) & FAT_ATTR_READ_ONLY) || fill_gap(file->node, file->position) ||
+      cursor(file->node, file->position, &fat))
     return 0;
   if (length > UINT32_MAX - fat.pos)
     length = UINT32_MAX - fat.pos;
@@ -106,11 +137,15 @@ static size_t write(struct vfs_file *file, const void *buffer, size_t length) {
   file->position = fat.pos;
   return count;
 }
+/* Any position a FAT size can describe is legal, including past EOF; the
+ * cluster cursor is rebuilt on each read and write, so nothing is walked
+ * here. Clamping instead made lseek report one offset and the next write
+ * land at another , BFD writes its section headers that way, and every
+ * object file the assembler produced came out truncated. */
 static int seek(struct vfs_file *file, u64 position) {
-  struct fat_file fat;
-  if (cursor(file->node, position, &fat))
+  if (!file->node->private_data || position > UINT32_MAX)
     return -1;
-  file->position = fat.pos;
+  file->position = position;
   return 0;
 }
 static int truncate(struct vfs_inode *inode) {

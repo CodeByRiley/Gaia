@@ -104,3 +104,42 @@ syscall_entry:
   ; only the NMI IST entry is prepared for that window.
   swapgs
   iretq
+
+; void syscall_resume_frame(struct syscall_frame *f) , noreturn.
+;
+; The return half of syscall_entry, for a task that never made the call: a
+; vfork child's first run returns to ring 3 through a copy of its parent's
+; frame, so it resumes after the parent's SYSCALL with every register the
+; parent had and rax = 0. The frame must already have passed
+; syscall_prepare_return, and must sit on this task's kernel stack.
+global syscall_resume_frame
+syscall_resume_frame:
+  cli
+  mov rsp, rdi
+
+  mov ax, GDT_USER_DATA_RPL3
+  mov ds, ax
+  mov es, ax
+
+  mov rax, [gs:CPU_LOCAL_CURRENT_OFF]
+  mov rax, [rax + TASK_CONTEXT_OFF]
+  fxrstor64 [rax + TASK_CONTEXT_USER_FX_OFF]
+
+  pop r15
+  pop r14
+  pop r13
+  pop r12
+  pop r11
+  pop rbx
+  pop rbp
+  pop r10
+  pop r9
+  pop r8
+  pop rcx
+  pop rdx
+  pop rsi
+  pop rdi
+  pop rax
+
+  swapgs
+  iretq

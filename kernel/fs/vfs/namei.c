@@ -199,7 +199,54 @@ int vfs_stat(const char *path, struct vfs_stat *out) {
   return result;
 }
 
+static int setmode_locked(struct vfs_inode *inode, uint32_t permissions) {
+  vfs_assert_locked();
+  if (!inode)
+    return -EINVAL;
+  if (!inode->operations || !inode->operations->setmode)
+    return -EPERM;
+  return inode->operations->setmode(inode, permissions & 07777) ? -EIO : 0;
+}
+
+int vfs_chmod(const char *path, uint32_t permissions) {
+  VFS_GUARD();
+  struct vfs_path found;
+  int result = vfs_lookup(path, &found);
+  if (result)
+    return result;
+  result = setmode_locked(found.entry->inode, permissions);
+  vfs_path_put(&found);
+  return result;
+}
+
+int vfs_file_chmod(struct vfs_file *file, uint32_t permissions) {
+  VFS_GUARD();
+  if (!file || !file->node)
+    return -EBADF;
+  return setmode_locked(file->node, permissions);
+}
+
 enum name_operation { CREATE_DIRECTORY, REMOVE_FILE, REMOVE_DIRECTORY };
+
+/* Does directory `dir` hold anything besides "." and ".."? Answered here,
+ * before the backend is asked, because backends report a refused rmdir as a
+ * bare failure and the caller deserves ENOTEMPTY rather than EIO. Returns 1,
+ * 0, or a negative errno when the directory cannot be read. */
+static int directory_has_entries(struct vfs_inode *dir) {
+  if (!dir->file_operations || !dir->file_operations->iterate)
+    return 0; /* the backend's rmdir will have to decide */
+  uint32_t index = 0;
+  struct vfs_dirent entry;
+  for (;;) {
+    long rc = dir->file_operations->iterate(dir, &index, &entry);
+    if (rc == 0)
+      return 0;
+    if (rc < 0)
+      return -EIO;
+    if (strcmp(entry.name, ".") && strcmp(entry.name, ".."))
+      return 1;
+  }
+}
 
 static int change_name(const char *path, enum name_operation operation) {
   VFS_GUARD();
@@ -214,7 +261,11 @@ static int change_name(const char *path, enum name_operation operation) {
   struct vfs_inode *target               = 0;
   result                                 = -EROFS;
   if (operation == CREATE_DIRECTORY) {
-    if (ops->mkdir)
+    /* Same reasoning as directory_has_entries: an existing name is EEXIST,
+     * which a backend's bare failure cannot say. */
+    if (ops->lookup && !ops->lookup(dir, name, &target))
+      result = -EEXIST;
+    else if (ops->mkdir)
       result = ops->mkdir(dir, name) ? -EIO : 0;
   } else if (ops->lookup && !ops->lookup(dir, name, &target)) {
     /* Defer POSIX unlink-open semantics until backends support orphaned
@@ -231,8 +282,11 @@ static int change_name(const char *path, enum name_operation operation) {
       else if (ops->unlink)
         result = ops->unlink(dir, name) ? -EIO : 0;
     } else {
+      int occupied = target->type == VFS_NODE_DIRECTORY ? directory_has_entries(target) : 0;
       if (target->type != VFS_NODE_DIRECTORY)
         result = -ENOTDIR;
+      else if (occupied)
+        result = occupied < 0 ? occupied : -ENOTEMPTY;
       else if (ops->rmdir)
         result = ops->rmdir(dir, name) ? -EIO : 0;
     }

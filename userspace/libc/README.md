@@ -72,6 +72,11 @@ musl programs to run unchanged:
 - signal disposition registration and lookup through `rt_sigaction`; Gaia does
   not yet deliver asynchronous userspace signal handlers
 
+The per-call status, the access policy and the native toolchain results are
+in [SYSCALLS.md](SYSCALLS.md); it supersedes the summary above and the gap
+list below (access, readlink, dup and pipe now exist, as do vfork, execve and
+the clone shape posix_spawn uses).
+
 This is still a bootstrap layer, not a full Linux personality. The important
 known gaps before large ports like Vim are broader terminal behavior, more
 filesystem calls (`access`, `readlink`, `dup`, `pipe`, etc. as needed), signal

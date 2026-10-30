@@ -97,6 +97,15 @@ enum task_fd_type {
   TASK_FD_PIPE_WRITE,
 };
 
+/* task_fd.flags bits.
+ *
+ * TASK_FD_CLOEXEC is the descriptor flag FD_CLOEXEC: it belongs to the slot,
+ * not to the shared object, so dup() never copies it and execve() closes the
+ * slots that carry it. The O_NONBLOCK bit (TASK_FD_NONBLOCK, in syscall.c)
+ * lives in the same byte; Linux keeps that one on the open file description,
+ * which Gaia approximates per slot. */
+#define TASK_FD_CLOEXEC 0x2
+
 struct task_fd {
   enum task_fd_type type;
   u8 flags;
@@ -113,9 +122,15 @@ struct task_fd {
   char *dir_path; /* allocated only for directory FDs */
 };
 
+/* The file-creation mask is process state that travels with the cwd: both
+ * are inherited by every child and kept across exec. A table that was
+ * never given a parent's starts at Linux's default, 022. */
+#define TASK_DEFAULT_UMASK 022
+
 struct task_files {
   struct task_fd fd[TASK_MAX_FDS];
   char cwd[TASK_CWD_MAX];
+  u32 umask;
 };
 
 /* IPC and input state */
@@ -252,6 +267,14 @@ struct task {
    * not interruptible and never see these set. */
   int block_interruptible;
   int block_interrupted;
+
+  /* vfork-style clone (CLONE_VM | CLONE_VFORK). A child created that way
+   * runs on its parent's address space, so the parent stays parked until the
+   * child either execs a new image or exits; vfork_parent is the parked
+   * parent's pid until then and 0 otherwise. resume_frame is the child's
+   * copy of the parent's syscall frame, consumed by its first run. */
+  int vfork_parent;
+  void *resume_frame;
 
   /* Signals, see sched/signal.h. Bit (sig - 1) of each. */
   u64 sig_pending;
@@ -391,6 +414,29 @@ void task_fail_reserved_user(struct task *t, long code);
 
 struct task *task_spawn_thread(u64 entry, u64 user_stack);
 
+/* Create a vfork child of the current task: a new process (own pid, own
+ * copy of every descriptor, cwd, tty, signal state and FPU image) that runs
+ * on the caller's address space. `resume` is the child's first kernel code;
+ * it finds `resume_frame` on the task and returns to ring 3 through it. The
+ * caller must then task_vfork_wait on the child. Returns NULL with nothing
+ * allocated when the table or the heap is full. */
+struct task *task_spawn_vfork(void (*resume)(void), void *resume_frame);
+
+/* Park the current task until vfork child `child_pid` releases the shared
+ * address space by exec or exit. Not interruptible: returning early would
+ * let the parent run on a stack the child is still using. */
+void task_vfork_wait(int child_pid);
+
+/* Release a vfork parent, if `t` has one. Idempotent. */
+void task_vfork_release(struct task *t);
+
+/* Give the current task a fresh address space, as execve does. Drops the
+ * old one (freed when this was its last user, kept when a vfork parent or a
+ * sibling thread still runs on it), switches CR3, resets brk to `brk_base`,
+ * and releases a waiting vfork parent. Cannot fail once called; the caller
+ * allocated everything beforehand. */
+void task_exec_address_space(u64 *user_pml4, int *pml4_refs, struct task_vm *vm, u64 brk_base);
+
 void task_yield(void);
 void sched_preempt_tick(void);
 
@@ -426,6 +472,8 @@ u64 task_get_fs_base(void);
 
 int sched_set_priority(struct task *t, int prio);
 
+/* Copy the parent's cwd and umask, or give the child "/" and the default
+ * mask when there is no parent to copy. */
 void task_inherit_cwd(struct task *child, struct task *parent);
 
 /* Copy the parent's TTY channel to the child. Called from the same places
