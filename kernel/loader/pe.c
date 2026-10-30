@@ -416,8 +416,12 @@ u64 pe_load_process(const char *path, u64 *pml4, struct pe_process **out) {
   memcpy(p->directory, path, d);
   if (discover(p, path, base) != 0)
     goto fail;
-  int windows =
-      p->modules[0].image.nt.optionalHeader.dataDirectory[1].size != 0;
+  struct IMAGE_DATA_DIRECTORY imports = p->modules[0].image.nt.optionalHeader.dataDirectory[1];
+  u32 descriptor[5] = {0};
+  if (imports.size >= sizeof(descriptor))
+    memcpy(descriptor, p->modules[0].memory + imports.virtualAddress, sizeof(descriptor));
+  /* MinGW emits an empty import directory even for self-contained Gaia PE. */
+  int windows = (descriptor[0] | descriptor[1] | descriptor[2] | descriptor[3] | descriptor[4]) != 0;
   int nt = windows ? module_named(p, "ntdll.dll") : -1;
   if (windows && nt < 0)
     goto fail;
