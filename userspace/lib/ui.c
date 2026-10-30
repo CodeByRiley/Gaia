@@ -539,3 +539,34 @@ int ui_slider_id(struct ui_context *c, int id, struct gfx_rect r, int min, int m
     gfx_bevel(c->s, thumb, t->light, t->dark, t->border);
   return changed;
 }
+
+void ui_group_box(struct ui_context *c, struct gfx_rect r, const char *title) {
+  if (!c || !c->s || gfx_rect_empty(r))
+    return;
+
+  const struct ui_theme *t = c->theme;
+  struct gfx_surface *s    = c->s;
+
+  int scale  = t->scale > 0 ? t->scale : 1;
+  int text_w = 0;
+  int text_h = 0;
+
+  if (title)
+    gfx_text_size(title, scale, &text_w, &text_h);
+
+  int top = r.y + text_h / 2;
+
+  struct gfx_rect frame = gfx_rect_make(r.x, top, r.w, r.h - text_h / 2);
+
+  gfx_frame(s, frame, t->dark, 1);
+
+  if (title && title[0]) {
+    int tx  = r.x + 12;
+    int gap = 4;
+
+    // Erase the border behind the heading.
+    gfx_fill(s, gfx_rect_make(tx - gap, r.y, text_w + gap * 2, text_h), t->face);
+
+    gfx_text(s, tx, r.y, title, t->text, scale);
+  }
+}

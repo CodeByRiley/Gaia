@@ -180,4 +180,6 @@ int ui_slider_id(struct ui_context *c, int id, struct gfx_rect r, int min, int m
 /* Horizontal rule centred in `r`. */
 void ui_separator(struct ui_context *c, struct gfx_rect r);
 
+void ui_group_box(struct ui_context *c, struct gfx_rect r, const char *title);
+
 #endif
