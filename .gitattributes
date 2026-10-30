@@ -25,5 +25,10 @@ configure text eol=lf
 *.png binary
 *.ttf binary
 *.pcap binary
+# An empty ar archive (musl's libm.a is just "!<arch>
+") has no NUL
+# byte, so autocrlf takes it for text and corrupts it on checkout.
+*.a binary
+*.o binary
 rootfs/system/libexec/gcc/** filter=lfs diff=lfs merge=lfs -text
 rootfs/system/lib/libstdc++.a filter=lfs diff=lfs merge=lfs -text
