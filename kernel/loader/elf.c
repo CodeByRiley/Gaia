@@ -25,7 +25,9 @@
  * the mmap arena so a segment can never land on mmap or shmem, and it
  * doubles as the bound that keeps p_vaddr + p_memsz from wrapping. */
 
-u64 elf_load(const char *path, u64 *pml4) {
+u64 elf_load(const char *path,u64 *pml4){struct elf_metadata metadata;return elf_load_with_metadata(path,pml4,&metadata);}
+u64 elf_load_with_metadata(const char *path, u64 *pml4,struct elf_metadata *metadata) {
+  memset(metadata,0,sizeof(*metadata));
   int open_error = 0;
   FILE *fp = fopen_ex(path, "rb", &open_error);
   if (!fp) {
@@ -47,12 +49,13 @@ u64 elf_load(const char *path, u64 *pml4) {
     fclose(fp);
     return 0;
   }
-  if (eh.e_machine != 62) {
+  if (eh.e_machine != 62 || eh.e_ident[4] != 2 || eh.e_ident[5] != 1 || eh.e_type != 2 || eh.e_phentsize != sizeof(struct Elf64_Phdr) || eh.e_phnum > 128) {
     log_write("elf: not x86_64", KERNEL, LOG_ERROR);
     fclose(fp);
     return 0;
   }
 
+  metadata->phnum=eh.e_phnum;metadata->phent=eh.e_phentsize;metadata->entry=eh.e_entry;
   log_write_hex("elf_load: e_entry =", eh.e_entry, KERNEL, LOG_ERROR);
   for (int i = 0; i < eh.e_phnum; i++) {
     struct Elf64_Phdr ph;
@@ -62,6 +65,13 @@ u64 elf_load(const char *path, u64 *pml4) {
       fclose(fp);
       return 0;
     }
+    if (ph.p_type == 3) {
+      log_write("elf: dynamic interpreter is not supported",KERNEL,LOG_ERROR);
+      fclose(fp);return 0;
+    }
+    if(ph.p_type==6)metadata->phdr=ph.p_vaddr;
+    if(ph.p_type==PT_LOAD && eh.e_phoff>=ph.p_offset && eh.e_phoff-ph.p_offset<ph.p_filesz)
+      metadata->phdr=ph.p_vaddr+eh.e_phoff-ph.p_offset;
     if (ph.p_type != PT_LOAD)
       continue;
 
@@ -91,6 +101,10 @@ u64 elf_load(const char *path, u64 *pml4) {
       return 0;
     }
 
+    if(ph.p_memsz && ph.p_vaddr < 0x40000000ULL) {
+      if(ph.p_vaddr < 4096 || process_pml4_enable_low_elf(pml4)) {fclose(fp);return 0;}
+    }
+    if(ph.p_vaddr+ph.p_memsz>metadata->end)metadata->end=ph.p_vaddr+ph.p_memsz;
     u64 va_start = ph.p_vaddr & ~0xFFFULL;
     u64 va_end = (ph.p_vaddr + ph.p_memsz + 0xFFF) & ~0xFFFULL;
 

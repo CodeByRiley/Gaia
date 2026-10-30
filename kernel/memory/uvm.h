@@ -61,9 +61,11 @@ struct user_vma {
  * syscalls, not by this module.
  */
 struct task_vm {
+    struct pe_process *pe_process;
     u64 *user_pml4;
     int *pml4_ref_count;
 
+    u64 brk_base,brk_current;
     u64 shmem_next_va;
     u64 mmap_next_va;
 

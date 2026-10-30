@@ -153,23 +153,12 @@ struct PACKED IMAGE_SECTION_HEADER {
     u32 characteristics;          ///< Section flags (analogous to p_flags): executable, readable, writable, etc.
 };
 
-/**
- * @brief Load a PE image from disk and prepare it for execution.
- *
- * Reads the PE file located at @p path, parses its headers, allocates
- * memory for the image, maps each section to its proper virtual address,
- * applies base relocations, resolves imports, and returns the entry
- * point address.
- *
- * @param path  Filesystem path of the PE binary to load.
- * @param pml4   Pointer to a 64-bit value that will receive the address
- *               of the top-level (PML4) page table constructed for the
- *               new address space. May be `NULL` if the caller does not
- *               need this information.
- *
- * @return The virtual address of the image's entry point, or `0` on
- *         failure.
- */
-u64 pe_load(const char* path, u64 *pml4);
-
-#endif // PE_H
+/* A process owns its module graph. Partial mappings are reclaimed with its PML4. */
+struct pe_process;
+u64 pe_load(const char *path, u64 *pml4);
+u64 pe_load_process(const char *path, u64 *pml4, struct pe_process **process);
+void pe_process_free(struct pe_process *process);
+u64 pe_process_module(struct pe_process *process, const char *name, int load);
+u64 pe_process_symbol(struct pe_process *process, u64 module, const char *name, u32 ordinal);
+int pe_process_command_line(struct pe_process *process, const char *command);
+#endif

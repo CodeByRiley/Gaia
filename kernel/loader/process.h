@@ -73,5 +73,6 @@ long process_kill(long pid, int signal);
  * shared. Returns the new PML4 through the HHDM,
  * or NULL on failure. */
 u64 *process_pml4_create(void);
+int process_pml4_enable_low_elf(u64 *pml4);
 
 #endif

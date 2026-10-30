@@ -14,9 +14,11 @@
  * and queues the expensive image work on the BSP loader task before returning.
  */
 #include <display/tty.h>
+#include <cpuid.h>
 #include <fs/stdio.h>
 #include <loader/elf.h>
 #include <loader/pe.h>
+#include <arch/win32_abi.h>
 #include <loader/process.h>
 #include <memory/heap.h>
 #include <memory/hhdm.h>
@@ -40,6 +42,17 @@
 
 #ifndef PROCESS_PML4_HOST_TEST
 extern u64 *kernel_pml4;
+#endif
+
+#define PML4_PRIVATE_LOW (1ULL << 10)
+#ifndef PROCESS_PML4_HOST_TEST
+int process_pml4_enable_low_elf(u64 *pml4) {
+  if(pml4[0]&PML4_PRIVATE_LOW)return 0;
+  u64 *pdpt=phys_to_virt(pml4[0]&ADDR_MASK);
+  pdpt[0]=0; /* Private low-user mappings replace supervisor identity aliases. */
+  pml4[0]|=PML4_PRIVATE_LOW;
+  return 0;
+}
 #endif
 
 /* Walk one PDPT subtree and free every present user frame underneath, plus
@@ -91,7 +104,7 @@ void free_user_pml4(u64 *pml4) {
 
   u64 pml4_0 = pml4[0];
   if (pml4_0 & VMM_PRESENT) {
-    free_pdpt_subtree(pml4_0 & ADDR_MASK, /*start_idx=*/1);
+    free_pdpt_subtree(pml4_0 & ADDR_MASK, /*start_idx=*/(pml4_0 & PML4_PRIVATE_LOW) ? 0 : 1);
   }
 
   for (int p = 1; p < 256; p++) {
@@ -217,6 +230,9 @@ struct loaded_image {
   u64 *pml4;
   u64 entry;
   u64 user_rsp;
+  struct pe_process *pe_process;
+  int personality;
+  struct elf_metadata elf;
 };
 
 static struct spawn_request *load_head;
@@ -273,6 +289,18 @@ static void set_process_name(struct task *task, const char *path) {
   task_set_name(task, name);
 }
 
+/* RDRAND supplies startup guard bytes when available. The timing fallback is
+ * a boot nonce for this prototype, not a cryptographic entropy service. */
+static void startup_random(u64 out[2]) {
+  unsigned a,b,c,d; int hardware=__get_cpuid(1,&a,&b,&c,&d) && (c&(1u<<30));
+  static u64 sequence;u64 seed=__atomic_add_fetch(&sequence,0x9e3779b97f4a7c15ULL,__ATOMIC_RELAXED);
+  for(int i=0;i<2;i++){
+    unsigned char ok=0;
+    if(hardware)for(int retry=0;retry<10&&!ok;retry++)__asm__ volatile("rdrand %0; setc %1":"=r"(out[i]),"=qm"(ok));
+    if(!ok){u32 lo,hi;__asm__ volatile("rdtsc":"=a"(lo),"=d"(hi));seed^=((u64)hi<<32)|lo;seed^=seed<<13;seed^=seed>>7;seed^=seed<<17;out[i]=seed;}
+  }
+}
+
 static int load_request_image(struct spawn_request *req,
                               struct loaded_image *image) {
   memset(image, 0, sizeof(*image));
@@ -296,12 +324,14 @@ static int load_request_image(struct spawn_request *req,
   fclose(sniff);
 
   if (read == sizeof(magic) && magic[0] == 'M' && magic[1] == 'Z') {
-    image->entry = pe_load(req->path, image->pml4);
+    image->entry = pe_load_process(req->path, image->pml4, &image->pe_process);
+    image->personality = image->pe_process ? 2 : 0;
     log_write_hex("process_spawn: using pe entry =", image->entry, KERNEL,
                   LOG_INFO);
   } else if (read == sizeof(magic) && magic[0] == 0x7f && magic[1] == 'E' &&
              magic[2] == 'L' && magic[3] == 'F') {
-    image->entry = elf_load(req->path, image->pml4);
+    image->entry = elf_load_with_metadata(req->path, image->pml4,&image->elf);
+    image->personality = 1;
     log_write_hex("process_spawn: using elf entry =", image->entry, KERNEL,
                   LOG_INFO);
   } else {
@@ -314,7 +344,21 @@ static int load_request_image(struct spawn_request *req,
   if (user_stack_alloc_in(image->pml4) != 0 || req->cancelled)
     goto fail;
 
+  if (image->pe_process) {
+    char command[2048]; usize n=0;
+    for (int i=0;i<req->argc;i++) {
+      if (i) command[n++]=' ';
+      usize k=strlen(req->args[i]);
+      if(n+k+3>=sizeof(command))goto fail;
+      command[n++]='"'; memcpy(command+n,req->args[i],k);n+=k;command[n++]='"';
+    }
+    command[n]=0;
+    if(pe_process_command_line(image->pe_process,command))goto fail;
+  }
   image->user_rsp = USER_STACK_TOP;
+  u64 random_address=0;
+  if(image->personality==1){u64 random[2];startup_random(random);image->user_rsp-=sizeof(random);random_address=image->user_rsp;
+    if(copy_to_user_pml4(image->pml4,random_address,random,sizeof(random)))goto fail;}
   u64 arg_ptrs[ARGV_MAX];
   for (int i = 0; i < req->argc; i++) {
     usize len = strlen(req->args[i]) + 1;
@@ -335,16 +379,23 @@ static int load_request_image(struct spawn_request *req,
    * The original Gaia crt0 only consumes argc/argv, but musl's crt1 scans
    * envp and auxv before calling main. Supplying explicit terminators keeps
    * both startup paths on the same ABI. */
-  u64 initial_stack[ARGV_MAX + 5];
+  u64 initial_stack[ARGV_MAX + 32];
   initial_stack[0] = (u64)req->argc;
   for (int i = 0; i < req->argc; i++)
     initial_stack[i + 1] = arg_ptrs[i];
   initial_stack[req->argc + 1] = 0;
   initial_stack[req->argc + 2] = 0;
-  initial_stack[req->argc + 3] = 0;
-  initial_stack[req->argc + 4] = 0;
-
-  usize initial_bytes = (usize)(req->argc + 5) * sizeof(u64);
+  usize words=req->argc+3;
+  if(image->personality==1){
+    u64 aux[]={6,4096,9,image->elf.entry,11,0,12,0,13,0,14,0,23,0,25,random_address};
+    memcpy(initial_stack+words,aux,sizeof(aux));words+=sizeof(aux)/sizeof(aux[0]);
+    if(image->elf.phdr){
+      u64 phaux[]={3,image->elf.phdr,4,image->elf.phent,5,image->elf.phnum};
+      memcpy(initial_stack+words,phaux,sizeof(phaux));words+=sizeof(phaux)/sizeof(phaux[0]);
+    }
+  }
+  initial_stack[words++]=0;initial_stack[words++]=0;
+  usize initial_bytes = words * sizeof(u64);
   if (initial_bytes & 0xF)
     image->user_rsp -= sizeof(u64);
   image->user_rsp -= initial_bytes;
@@ -354,6 +405,7 @@ static int load_request_image(struct spawn_request *req,
   return 0;
 
 fail:
+  pe_process_free(image->pe_process);
   free_user_pml4(image->pml4);
   memset(image, 0, sizeof(*image));
   return -1;
@@ -365,9 +417,18 @@ static int spawn_request_now(struct spawn_request *req) {
     return -1;
 
   struct task *parent = task_current();
-  struct task *child = task_spawn_user(image.pml4, image.entry, image.user_rsp,
-                                       parent ? parent->pid : 0);
+  struct task *child = task_reserve_user(parent ? parent->pid : 0);
+  if (child) {
+    child->context->gs_base = image.pe_process ? GAIA_WIN32_TEB : 0;
+    child->context->abi_personality = image.personality;
+    child->vm->pe_process = image.pe_process;
+    child->vm->brk_base = child->vm->brk_current = (image.elf.end+4095)&~4095ULL;
+    if (task_activate_reserved_user(child,image.pml4,image.entry,image.user_rsp)) {
+      child->vm->pe_process=0;task_fail_reserved_user(child,-1);child=0;
+    }
+  }
   if (!child) {
+    pe_process_free(image.pe_process);
     free_user_pml4(image.pml4);
     return -1;
   }
@@ -391,7 +452,14 @@ static void loader_worker(void) {
 
     struct loaded_image image;
     int loaded = load_request_image(req, &image);
+    if (loaded == 0) {
+      req->reserved->context->gs_base = image.pe_process ? GAIA_WIN32_TEB : 0;
+      req->reserved->context->abi_personality = image.personality;
+      req->reserved->vm->pe_process = image.pe_process;
+      req->reserved->vm->brk_base = req->reserved->vm->brk_current = (image.elf.end+4095)&~4095ULL;
+    }
     if (req->cancelled) {
+      if (loaded == 0) { pe_process_free(image.pe_process); req->reserved->vm->pe_process=0; }
       if (loaded == 0)
         free_user_pml4(image.pml4);
       task_fail_reserved_user(req->reserved, req->cancel_code);
@@ -399,6 +467,7 @@ static void loader_worker(void) {
       task_fail_reserved_user(req->reserved, -1);
     } else if (task_activate_reserved_user(req->reserved, image.pml4,
                                            image.entry, image.user_rsp) != 0) {
+      pe_process_free(image.pe_process); req->reserved->vm->pe_process=0;
       free_user_pml4(image.pml4);
       task_fail_reserved_user(req->reserved, -1);
     } else {

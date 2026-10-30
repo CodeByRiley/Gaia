@@ -53,6 +53,8 @@ struct PACKED Elf64_Phdr {
  *
  * On failure the target PML4 may hold partial mappings. The caller owns
  * cleanup , free_user_pml4() reclaims every frame this function mapped. */
+struct elf_metadata {u64 phdr,phnum,phent,entry,end;};
 u64 elf_load(const char *path, u64 *pml4);
+u64 elf_load_with_metadata(const char *,u64 *,struct elf_metadata *);
 
 #endif

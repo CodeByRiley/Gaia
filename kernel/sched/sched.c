@@ -28,6 +28,7 @@
 #include <drivers/sound/sb16.h>
 #include <fs/vfs/vfs.h>
 #include <loader/process.h>
+#include <loader/pe.h>
 #include <memory/heap.h>
 #include <memory/hhdm.h>
 #include <msg/msg.h>
@@ -639,7 +640,7 @@ static u64 kstack_aligned_top(void *kstack_base) {
 }
 
 /* Build a kernel-stack frame matching context_switch's epilogue, which
- * pops r15, r14, r13, r12, rbp, rbx, ret. So we lay out (low → high):
+ * pops r15, r14, r13, r12, rbp, rbx, ret. So we lay out (low Ã¢â€ â€™ high):
  * [r15][r14][r13][r12][rbp][rbx][ret]. saved_rsp points at r15. */
 static u64 build_initial_frame(void *kstack_base, void (*trampoline)(void)) {
   /* context_switch enters a fresh task with ret, not call. After that ret,
@@ -966,20 +967,18 @@ struct task *task_spawn_thread(u64 entry, u64 user_stack) {
     return 0;
   }
 
-  /* A thread shares its parent's address space rather than owning one, so
-   * take a reference , whoever exits last frees the PML4.
-   *
-   * It gets its own vm *record* rather than sharing the parent's, which is
-   * what the inline layout did too: the arena cursors and VMA list were
-   * per-task there, so sharing them here would be a behaviour change, not a
-   * refactor. Only the page tables and their refcount are shared. */
-  t->vm->user_pml4 = parent->vm->user_pml4;
-  t->vm->pml4_ref_count = parent->vm->pml4_ref_count;
+  /* Threads share reservations as well as page tables. A private VMA list
+   * makes a child's first access to a demand-paged parent allocation fault,
+   * and lets two threads reserve the same address independently. The PML4
+   * reference count owns this shared VM record until the last thread exits. */
+  kfree(t->vm);
+  t->vm = parent->vm;
   __atomic_add_fetch(t->vm->pml4_ref_count, 1, __ATOMIC_ACQ_REL);
 
   t->context->user_entry = entry;
   t->context->user_rsp_initial = user_stack;
   t->context->fs_base = parent->context->fs_base;
+  t->context->abi_personality = parent->context->abi_personality;
   memcpy(t->context->signal_actions, parent->context->signal_actions,
          sizeof(t->context->signal_actions));
 
@@ -999,6 +998,9 @@ static void stage_for(struct task *next, struct task *prev) {
   struct cpu_local *cpu = percpu_this();
   cpu->kernel_rsp_top = next->syscall_kstack_top;
   cpu->current = next;
+  /* In ring 0, KERNEL_GS_BASE holds the swapped-out user GS. */
+  if (prev) prev->context->gs_base = sched_rdmsr(0xC0000102u);
+  sched_wrmsr(0xC0000102u, next->context->gs_base);
   u64 next_fs = next->context->fs_base;
   if (prev) {
     u64 active_fs = sched_rdmsr(MSR_FS_BASE);
@@ -1554,7 +1556,12 @@ static void task_release_address_space(struct task *t) {
     log_write("sched: pml4 refcount underflow", KERNEL, LOG_ERROR);
   }
 
+  if (new_count > 0) {
+    t->vm = 0; /* Another task owns the still-live VM record. */
+    return;
+  }
   if (new_count <= 0) {
+    pe_process_free(t->vm->pe_process);
     free_user_pml4(t->vm->user_pml4);
     kfree(refs);
   }

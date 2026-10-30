@@ -44,6 +44,7 @@
 #include <input/keyboard.h>
 #include <input/mouse.h>
 #include <loader/process.h>
+#include <loader/pe.h>
 #include <memory/heap.h>
 #include <memory/hhdm.h>
 #include <memory/pmm.h>
@@ -111,6 +112,7 @@ _Static_assert(SYSRET_STAR_BASE + 16 == (GDT_USER_CODE | GDT_RPL_USER),
 #define MAX_SHMEM_PAGES 4096 /* per-call cap; 16 MiB */
 #define AUDIO_WRITE_MAX (1024 * 1024)
 
+#define O_EXCL 0x80
 #define O_CREAT 0x40
 #define O_TRUNC 0x200
 #define O_NONBLOCK 04000
@@ -199,6 +201,11 @@ struct linux_kstat {
   int64_t st_ctime_nsec;
   int64_t __unused[3];
 };
+
+/* TCGETS uses the kernel's 36-byte x86-64 layout, not libc's larger
+ * termios structure. Writing 64 bytes overwrites glibc's stack guard. */
+struct linux_termios {u32 iflag,oflag,cflag,lflag;u8 line,cc[19];};
+_Static_assert(sizeof(struct linux_termios)==36,"Linux TCGETS ABI");
 
 struct linux_timespec {
   int64_t tv_sec;
@@ -1238,6 +1245,9 @@ static long sys_open(const char *path, int flags) {
   memset(f, 0, sizeof(*f));
 
   int rc = vfs_open(resolved, f);
+  if(rc==0 && (flags & (O_CREAT|O_EXCL))==(O_CREAT|O_EXCL)) {
+    vfs_close(f);kfree(f);return -EEXIST;
+  }
   if (rc == 0 && f->type == VFS_NODE_DIRECTORY) {
     if ((flags & (O_CREAT | O_TRUNC)) != 0) {
       vfs_close(f);
@@ -1721,8 +1731,15 @@ static long sys_getdents64(int fd, void *user_buf, usize len) {
 }
 
 static long sys_brk(u64 addr) {
-  (void)addr;
-  return -ENOSYS;
+  struct task *t=task_current();
+  if(!t||!t->vm||!t->vm->brk_base)return -ENOSYS;
+  struct task_vm *vm=t->vm;
+  if(!addr)return vm->brk_current;
+  if(addr<vm->brk_base||addr>=USER_FB_BASE)return vm->brk_current;
+  u64 old=(vm->brk_current+4095)&~4095ULL,new_end=(addr+4095)&~4095ULL;
+  if(new_end>old && !uvm_reserve(vm,old,new_end-old,VMM_PRESENT|VMM_USER|VMM_WRITE|VMM_NX,1))return vm->brk_current;
+  if(new_end<old && uvm_release(vm,new_end,old-new_end))return vm->brk_current;
+  vm->brk_current=addr;return addr;
 }
 
 static long sys_readv(int fd, const struct linux_iovec *iov, long iovcnt) {
@@ -1977,9 +1994,9 @@ static long sys_ioctl(int fd, long request, void *arg) {
   if (request == TCGETS) {
     if (!task_fd_is_console(t, fd))
       return -ENOTTY;
-    if (!user_buffer_ok(arg, 64, 1))
+    if (!user_buffer_ok(arg, sizeof(struct linux_termios), 1))
       return -EFAULT;
-    memset(arg, 0, 64);
+    memset(arg, 0, sizeof(struct linux_termios));
     return 0;
   }
 
@@ -2098,7 +2115,7 @@ static long sys_set_tid_address(u64 clear_tid_addr) {
 
 static long sys_linux_futex(u32 *addr, int op, u32 val,
                             const struct linux_timespec *timeout) {
-  (void)timeout;
+  if(timeout && (op & FUTEX_CMD_MASK)==FUTEX_WAIT)return -ENOSYS;
   switch (op & FUTEX_CMD_MASK) {
   case FUTEX_WAIT:
     return sys_futex_wait(addr, val);
@@ -2586,6 +2603,15 @@ static long sys_net_ping(struct net_ping *req) {
 
 static long sys_arch_prctl(long code, u64 addr) {
   switch (code) {
+  case 0x1001: /* ARCH_SET_GS: swapgs protects kernel cpu_local state. */
+    if (addr >= USER_VA_MAX) return -EINVAL;
+    task_current()->context->gs_base=addr;
+    wrmsr(0xC0000102u,addr);
+    return 0;
+  case 0x1004: /* ARCH_GET_GS */
+    if (!user_buffer_ok((void *)(uintptr_t)addr,8,1)) return -EFAULT;
+    *(u64 *)(uintptr_t)addr=task_current()->context->gs_base;
+    return 0;
   case ARCH_SET_FS:
     if (addr >= USER_VA_MAX)
       return -EINVAL;
@@ -2707,7 +2733,9 @@ long syscall_dispatch(struct syscall_frame *f) {
   long a5 = (long)f->r8;
   long a6 = (long)f->r9;
 
-  long ret = -1;
+  long ret = -ENOSYS;
+
+
   switch (num) {
   case SYS_WRITE:
     ret = sys_write((uintptr_t)a1, (const void *)(uintptr_t)a2, (uintptr_t)a3);
@@ -2724,6 +2752,12 @@ long syscall_dispatch(struct syscall_frame *f) {
   case SYS_READ:
     ret = sys_read((uintptr_t)a1, (void *)(uintptr_t)a2, (uintptr_t)a3);
     break;
+  case SYS_OPENAT: {
+    const char *path=(const char *)(uintptr_t)a2;
+    if(!path || !user_buffer_ok(path,1,0)) {ret=-EFAULT;break;}
+    if((int)a1!=AT_FDCWD && *path!='/') {ret=-ENOSYS;break;}
+    ret=sys_open(path,(int)a3);break;
+  }
   case SYS_OPEN:
     ret = sys_open((const char *)(uintptr_t)a1, (uintptr_t)a2);
     break;
@@ -3042,6 +3076,23 @@ long syscall_dispatch(struct syscall_frame *f) {
   case SYS_CON_POP:
     ret = sys_con_pop();
     break;
+  case SYS_PE_MODULE:
+  case SYS_PE_SYMBOL: {
+    struct task *t=task_current();
+    const char *input=(const char *)(uintptr_t)(num==SYS_PE_MODULE?a1:a2);
+    char name[128]; usize i=0;
+    if(input) {
+      for(;i<sizeof(name);i++) {
+        if(!user_buffer_ok(input+i,1,0))break;
+        name[i]=input[i];if(!name[i])break;
+      }
+      if(i==sizeof(name) || !user_buffer_ok(input+i,1,0)) {ret=-EFAULT;break;}
+    }
+    if(!t || !t->vm || !t->vm->pe_process){ret=-EINVAL;break;}
+    ret=num==SYS_PE_MODULE ? (long)pe_process_module(t->vm->pe_process,input?name:0,(int)a2) :
+        (long)pe_process_symbol(t->vm->pe_process,(u64)a1,input?name:0,(u32)a3);
+    break;
+  }
   case SYS_THREAD_CREATE:
     ret = sys_thread_create((uintptr_t)a1, (uintptr_t)a2, (uintptr_t)a3);
     break;

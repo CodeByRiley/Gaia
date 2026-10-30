@@ -161,6 +161,8 @@ struct task_context {
    * IA32_FS_BASE for userspace TLS.
    */
   u64 fs_base;
+  u64 gs_base; /* User GS; kernel GS remains cpu_local through swapgs. */
+  int abi_personality; /* 0 Gaia, 1 Linux ELF, 2 Win32 DLL runtime. */
 
   /* Indexed by signal-1. Fresh processes start with SIG_DFL (all zero).
    * User threads copy their creator's dispositions at creation time. */
