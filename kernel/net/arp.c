@@ -101,14 +101,14 @@ static struct arp_pending *arp_pending_alloc_locked(void) {
 
 /* ---------------- transmit --------------------------------------------- */
 
-static void arp_fill(struct arp_ipv4 *pkt, const struct netif *nif,
-                     u16 oper, const u8 *tha, const u8 *tpa) {
+static void arp_fill(struct arp_ipv4 *pkt, const struct netif *nif, u16 oper, const u8 *tha,
+                     const u8 *tpa) {
   memset(pkt, 0, sizeof(*pkt));
   pkt->htype = to_be16(ARP_HTYPE_ETHERNET);
   pkt->ptype = to_be16(ETH_TYPE_IPV4);
-  pkt->hlen = ETH_ALEN;
-  pkt->plen = IPV4_ALEN;
-  pkt->oper = to_be16(oper);
+  pkt->hlen  = ETH_ALEN;
+  pkt->plen  = IPV4_ALEN;
+  pkt->oper  = to_be16(oper);
   memcpy(pkt->sha, nif->mac, ETH_ALEN);
   memcpy(pkt->spa, nif->ipv4, IPV4_ALEN);
   if (tha)
@@ -157,8 +157,8 @@ static void arp_flush_pending(int entry_index, const u8 mac[ETH_ALEN]) {
   for (;;) {
     u8 frame[ETH_FRAME_MAX];
     u16 payload_len = 0;
-    u16 type = 0;
-    int found = 0;
+    u16 type        = 0;
+    int found       = 0;
 
     u64 flags = spin_lock_irqsave(&arp.lock);
     for (int i = 0; i < ARP_PENDING_SLOTS; i++) {
@@ -167,9 +167,9 @@ static void arp_flush_pending(int entry_index, const u8 mac[ETH_ALEN]) {
         continue;
       memcpy(frame, p->frame, (usize)ETH_HDR_LEN + p->payload_len);
       payload_len = p->payload_len;
-      type = p->type;
-      p->in_use = 0;
-      found = 1;
+      type        = p->type;
+      p->in_use   = 0;
+      found       = 1;
       break;
     }
     spin_unlock_irqrestore(&arp.lock, flags);
@@ -184,9 +184,9 @@ int arp_lookup(const u8 ip[IPV4_ALEN], u8 mac_out[ETH_ALEN]) {
   if (!ip || !mac_out)
     return -1;
 
-  u64 flags = spin_lock_irqsave(&arp.lock);
+  u64 flags           = spin_lock_irqsave(&arp.lock);
   struct arp_entry *e = arp_find_locked(ip);
-  int hit = e && e->state == ARP_VALID;
+  int hit             = e && e->state == ARP_VALID;
   if (hit)
     memcpy(mac_out, e->mac, ETH_ALEN);
   spin_unlock_irqrestore(&arp.lock, flags);
@@ -194,8 +194,7 @@ int arp_lookup(const u8 ip[IPV4_ALEN], u8 mac_out[ETH_ALEN]) {
   return hit ? 0 : -1;
 }
 
-int arp_send_or_queue(const u8 ip[IPV4_ALEN], u8 *frame,
-                      u16 payload_len, u16 type) {
+int arp_send_or_queue(const u8 ip[IPV4_ALEN], u8 *frame, u16 payload_len, u16 type) {
   struct netif *nif = netif_get();
   if (!nif || !ip || !frame)
     return -1;
@@ -204,9 +203,9 @@ int arp_send_or_queue(const u8 ip[IPV4_ALEN], u8 *frame,
 
   u8 mac[ETH_ALEN];
   int resolved = 0;
-  int ask = 0;
+  int ask      = 0;
 
-  u64 flags = spin_lock_irqsave(&arp.lock);
+  u64 flags           = spin_lock_irqsave(&arp.lock);
   struct arp_entry *e = arp_find_locked(ip);
 
   if (e && e->state == ARP_VALID) {
@@ -216,19 +215,19 @@ int arp_send_or_queue(const u8 ip[IPV4_ALEN], u8 *frame,
     if (!e) {
       e = arp_alloc_locked();
       memcpy(e->ip, ip, IPV4_ALEN);
-      e->state = ARP_PENDING;
-      e->retries = 0;
+      e->state    = ARP_PENDING;
+      e->retries  = 0;
       e->deadline = arp_deadline(ARP_RETRY_MS);
       /* Only the first miss asks; arp_tick owns the retransmits. */
       ask = 1;
     }
 
     struct arp_pending *p = arp_pending_alloc_locked();
-    p->in_use = 1;
-    p->entry = (int)(e - arp.cache);
-    p->type = type;
-    p->payload_len = payload_len;
-    p->queued_at = pit_ticks();
+    p->in_use             = 1;
+    p->entry              = (int)(e - arp.cache);
+    p->type               = type;
+    p->payload_len        = payload_len;
+    p->queued_at          = pit_ticks();
     memcpy(p->frame, frame, (usize)ETH_HDR_LEN + payload_len);
   }
   spin_unlock_irqrestore(&arp.lock, flags);
@@ -250,15 +249,15 @@ int arp_send_or_queue(const u8 ip[IPV4_ALEN], u8 *frame,
 static void arp_learn(const u8 *ip, const u8 *mac, int may_create) {
   int entry_index = -1;
 
-  u64 flags = spin_lock_irqsave(&arp.lock);
+  u64 flags           = spin_lock_irqsave(&arp.lock);
   struct arp_entry *e = arp_find_locked(ip);
   if (!e && may_create)
     e = arp_alloc_locked();
   if (e) {
     memcpy(e->ip, ip, IPV4_ALEN);
     memcpy(e->mac, mac, ETH_ALEN);
-    e->state = ARP_VALID;
-    e->retries = 0;
+    e->state    = ARP_VALID;
+    e->retries  = 0;
     e->deadline = arp_deadline(ARP_ENTRY_TTL_MS);
     entry_index = (int)(e - arp.cache);
   }
@@ -268,10 +267,13 @@ static void arp_learn(const u8 *ip, const u8 *mac, int may_create) {
     arp_flush_pending(entry_index, mac);
 }
 
-void arp_input(const struct eth_hdr *eth, const u8 *payload,
-               u16 len) {
-  log_write_fmt(KERNEL, LOG_INFO, "ARP: input eth=%p payload=%p len=%u",
-                (const void *)eth, (const void *)payload, len);
+void arp_input(const struct eth_hdr *eth, const u8 *payload, u16 len) {
+  log_write_fmt(KERNEL,
+                LOG_INFO,
+                "ARP: input eth=%p payload=%p len=%u",
+                (const void *)eth,
+                (const void *)payload,
+                len);
 
   struct netif *nif = netif_get();
   if (!nif) {
@@ -290,8 +292,10 @@ void arp_input(const struct eth_hdr *eth, const u8 *payload,
   }
 
   if (len < sizeof(struct arp_ipv4)) {
-    log_write_fmt(KERNEL, LOG_INFO,
-                  "ARP: dropped: packet too short len=%u required=%u", len,
+    log_write_fmt(KERNEL,
+                  LOG_INFO,
+                  "ARP: dropped: packet too short len=%u required=%u",
+                  len,
                   (unsigned)sizeof(struct arp_ipv4));
     return;
   }
@@ -301,92 +305,94 @@ void arp_input(const struct eth_hdr *eth, const u8 *payload,
   u16 htype = from_be16(pkt->htype);
   u16 ptype = from_be16(pkt->ptype);
 
-  log_write_fmt(KERNEL, LOG_INFO,
-                "ARP: header htype=0x%04x ptype=0x%04x hlen=%u plen=%u", htype,
-                ptype, pkt->hlen, pkt->plen);
+  log_write_fmt(KERNEL,
+                LOG_INFO,
+                "ARP: header htype=0x%04x ptype=0x%04x hlen=%u plen=%u",
+                htype,
+                ptype,
+                pkt->hlen,
+                pkt->plen);
 
   if (htype != ARP_HTYPE_ETHERNET) {
-    log_write_fmt(KERNEL, LOG_INFO,
-                  "ARP: dropped: unsupported hardware type=0x%04x", htype);
+    log_write_fmt(KERNEL, LOG_INFO, "ARP: dropped: unsupported hardware type=0x%04x", htype);
     return;
   }
 
   if (ptype != ETH_TYPE_IPV4) {
-    log_write_fmt(KERNEL, LOG_INFO,
-                  "ARP: dropped: unsupported protocol type=0x%04x", ptype);
+    log_write_fmt(KERNEL, LOG_INFO, "ARP: dropped: unsupported protocol type=0x%04x", ptype);
     return;
   }
 
   if (pkt->hlen != ETH_ALEN) {
-    log_write_fmt(KERNEL, LOG_INFO,
+    log_write_fmt(KERNEL,
+                  LOG_INFO,
                   "ARP: dropped: invalid hardware length=%u expected=%u",
-                  pkt->hlen, ETH_ALEN);
+                  pkt->hlen,
+                  ETH_ALEN);
     return;
   }
 
   if (pkt->plen != IPV4_ALEN) {
-    log_write_fmt(KERNEL, LOG_INFO,
+    log_write_fmt(KERNEL,
+                  LOG_INFO,
                   "ARP: dropped: invalid protocol length=%u expected=%u",
-                  pkt->plen, IPV4_ALEN);
+                  pkt->plen,
+                  IPV4_ALEN);
     return;
   }
 
   u16 oper = from_be16(pkt->oper);
 
-  log_write_fmt(KERNEL, LOG_INFO, "ARP: operation=0x%04x%s", oper,
+  log_write_fmt(KERNEL,
+                LOG_INFO,
+                "ARP: operation=0x%04x%s",
+                oper,
                 oper == ARP_OP_REQUEST ? " request"
                 : oper == ARP_OP_REPLY ? " reply"
                                        : " unsupported");
 
   if (oper != ARP_OP_REQUEST && oper != ARP_OP_REPLY) {
-    log_write_fmt(KERNEL, LOG_INFO,
-                  "ARP: dropped: unsupported operation=0x%04x", oper);
+    log_write_fmt(KERNEL, LOG_INFO, "ARP: dropped: unsupported operation=0x%04x", oper);
     return;
   }
 
   int for_us = ipv4_addr_equal(pkt->tpa, nif->ipv4);
 
-  log_write_fmt(KERNEL, LOG_INFO, "ARP: target is %s",
-                for_us ? "local interface" : "not local interface");
+  log_write_fmt(
+      KERNEL, LOG_INFO, "ARP: target is %s", for_us ? "local interface" : "not local interface");
 
   /*
    * A zero sender address means an ARP probe: the sender has no address
    * yet, so caching it would map 0.0.0.0 onto a real MAC.
    */
   if (ipv4_addr_is_zero(pkt->spa)) {
-    log_write_fmt(KERNEL, LOG_INFO,
-                  "ARP: sender address is zero; skipping ARP cache update");
+    log_write_fmt(KERNEL, LOG_INFO, "ARP: sender address is zero; skipping ARP cache update");
   } else {
     log_write_fmt(KERNEL, LOG_INFO, "ARP: learning sender address");
     arp_learn(pkt->spa, pkt->sha, for_us);
   }
 
   if (oper != ARP_OP_REQUEST) {
-    log_write_fmt(KERNEL, LOG_INFO,
-                  "ARP: received reply; no response required");
+    log_write_fmt(KERNEL, LOG_INFO, "ARP: received reply; no response required");
     return;
   }
 
   if (!for_us) {
-    log_write_fmt(KERNEL, LOG_INFO,
-                  "ARP: request is not for this interface; no response");
+    log_write_fmt(KERNEL, LOG_INFO, "ARP: request is not for this interface; no response");
     return;
   }
 
   if (ipv4_addr_is_zero(nif->ipv4)) {
-    log_write_fmt(KERNEL, LOG_INFO,
-                  "ARP: interface has no IPv4 address; no response");
+    log_write_fmt(KERNEL, LOG_INFO, "ARP: interface has no IPv4 address; no response");
     return;
   }
 
-  log_write_fmt(KERNEL, LOG_INFO,
-                "ARP: request is for local IPv4 address; building reply");
+  log_write_fmt(KERNEL, LOG_INFO, "ARP: request is for local IPv4 address; building reply");
 
   struct arp_ipv4 reply;
   arp_fill(&reply, nif, ARP_OP_REPLY, pkt->sha, pkt->spa);
 
-  log_write_fmt(KERNEL, LOG_INFO, "ARP: sending reply len=%u",
-                (unsigned)sizeof(reply));
+  log_write_fmt(KERNEL, LOG_INFO, "ARP: sending reply len=%u", (unsigned)sizeof(reply));
 
   eth_output(eth->src, ETH_TYPE_ARP, &reply, sizeof(reply));
 
@@ -401,7 +407,7 @@ void arp_tick(void) {
 
   u8 retry_ips[ARP_CACHE_ENTRIES][IPV4_ALEN];
   int retry_count = 0;
-  u64 now = pit_ticks();
+  u64 now         = pit_ticks();
 
   u64 flags = spin_lock_irqsave(&arp.lock);
   for (int i = 0; i < ARP_CACHE_ENTRIES; i++) {

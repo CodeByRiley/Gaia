@@ -1,8 +1,5 @@
 #define _GNU_SOURCE
-#include <unistd.h>
 #include "syscall.h"
+#include <unistd.h>
 
-int vhangup(void)
-{
-	return syscall(SYS_vhangup);
-}
+int vhangup(void) { return syscall(SYS_vhangup); }

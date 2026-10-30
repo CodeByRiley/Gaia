@@ -8,7 +8,15 @@
 #include <include/setjmp.h>
 
 /* Always returns 0 on the (single) "initial" call. */
-int setjmp(jmp_buf env) { (void)env; return 0; }
+int setjmp(jmp_buf env) {
+  (void)env;
+  return 0;
+}
 
 /* Never returns , spins. Caller must treat longjmp() as terminal. */
-void longjmp(jmp_buf env, int val) { (void)env; (void)val; for(;;); }
+void longjmp(jmp_buf env, int val) {
+  (void)env;
+  (void)val;
+  for (;;)
+    ;
+}

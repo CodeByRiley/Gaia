@@ -37,48 +37,48 @@ u32 cluster_bytes(void) {
   return (u32)fat_volume.sectors_per_cluster * fat_volume.bytes_per_sector;
 }
 
-u8 *sector(u32 lba) {
-  return fat_volume.image + (u64)lba * fat_volume.bytes_per_sector;
-}
+u8 *sector(u32 lba) { return fat_volume.image + (u64)lba * fat_volume.bytes_per_sector; }
 
-int cluster_is_valid(u32 cluster) {
-  return cluster >= 2 && cluster < fat_volume.cluster_limit;
-}
+int cluster_is_valid(u32 cluster) { return cluster >= 2 && cluster < fat_volume.cluster_limit; }
 
 u32 cluster_eoc(void) {
   switch (fat_volume.type) {
-    case FAT_TYPE_32:  return 0x0FFFFFFFu;
-    default:           return 0xFFFFu;
+  case FAT_TYPE_32:
+    return 0x0FFFFFFFu;
+  default:
+    return 0xFFFFu;
   }
 }
 
 int cluster_is_eoc(u32 value) {
   switch (fat_volume.type) {
-    case FAT_TYPE_32:  return value >= 0x0FFFFFF8u;
-    default:           return value >= 0xFFF8u;
+  case FAT_TYPE_32:
+    return value >= 0x0FFFFFF8u;
+  default:
+    return value >= 0xFFF8u;
   }
 }
 
 u32 fat_get(u32 cluster) {
   u8 *table = sector(fat_volume.fat_start_sector);
   switch (fat_volume.type) {
-    case FAT_TYPE_32:
-      return ((u32 *)table)[cluster] & 0x0FFFFFFFu;
-    default:
-      return ((u16 *)table)[cluster];
+  case FAT_TYPE_32:
+    return ((u32 *)table)[cluster] & 0x0FFFFFFFu;
+  default:
+    return ((u16 *)table)[cluster];
   }
 }
 
 static void fat_put(u8 *table, u32 cluster, u32 value) {
   switch (fat_volume.type) {
-    case FAT_TYPE_32: {
-      u32 *slots = (u32 *)table;
-      slots[cluster] = (slots[cluster] & 0xF0000000u) | (value & 0x0FFFFFFFu);
-      break;
-    }
-    default:
-      ((u16 *)table)[cluster] = (u16)value;
-      break;
+  case FAT_TYPE_32: {
+    u32 *slots     = (u32 *)table;
+    slots[cluster] = (slots[cluster] & 0xF0000000u) | (value & 0x0FFFFFFFu);
+    break;
+  }
+  default:
+    ((u16 *)table)[cluster] = (u16)value;
+    break;
   }
 }
 
@@ -91,25 +91,16 @@ void fat_set(u32 cluster, u32 value) {
   }
 }
 
-int fat_type_bits(void) {
-  return (int)fat_volume.type;
-}
+int fat_type_bits(void) { return (int)fat_volume.type; }
 
-void fat_set_sector_writer(fat_sector_writer writer) {
-  fat_volume.write_sector = writer;
-}
+void fat_set_sector_writer(fat_sector_writer writer) { fat_volume.write_sector = writer; }
 
-int fat_write_through_enabled(void) {
-  return fat_volume.write_sector != 0;
-}
+int fat_write_through_enabled(void) { return fat_volume.write_sector != 0; }
 
-static u16 read_le16(const u8 *bytes) {
-  return (u16)bytes[0] | ((u16)bytes[1] << 8);
-}
+static u16 read_le16(const u8 *bytes) { return (u16)bytes[0] | ((u16)bytes[1] << 8); }
 
 static u32 read_le32(const u8 *bytes) {
-  return (u32)bytes[0] | ((u32)bytes[1] << 8) |
-         ((u32)bytes[2] << 16) | ((u32)bytes[3] << 24);
+  return (u32)bytes[0] | ((u32)bytes[1] << 8) | ((u32)bytes[2] << 16) | ((u32)bytes[3] << 24);
 }
 
 usize fat_volume_size(const void *boot_sector, u32 *bytes_per_sector_out) {
@@ -125,7 +116,7 @@ usize fat_volume_size(const void *boot_sector, u32 *bytes_per_sector_out) {
   const u8 *boot = boot_sector;
 
   u32 bytes_per_sector = read_le16(boot + 11);
-  u32 total_sectors = read_le16(boot + 19);
+  u32 total_sectors    = read_le16(boot + 19);
   if (!total_sectors)
     total_sectors = read_le32(boot + 32);
   if (bytes_per_sector < 512 || bytes_per_sector > 4096 ||
@@ -169,11 +160,12 @@ void fat_flush_sector(u32 lba) {
 }
 
 void fat_flush_bytes(const void *start, usize len) {
-  if (!fat_volume.image || !fat_volume.write_sector || !start || len == 0 || !fat_volume.bytes_per_sector)
+  if (!fat_volume.image || !fat_volume.write_sector || !start || len == 0 ||
+      !fat_volume.bytes_per_sector)
     return;
 
   u64 base = (u64)(uintptr_t)fat_volume.image;
-  u64 at = (u64)(uintptr_t)start;
+  u64 at   = (u64)(uintptr_t)start;
   if (at < base || at >= base + fat_volume.image_size)
     return;
 
@@ -182,51 +174,42 @@ void fat_flush_bytes(const void *start, usize len) {
     len = (usize)(fat_volume.image_size - off);
 
   u32 first = (u32)(off / fat_volume.bytes_per_sector);
-  u32 last = (u32)((off + len - 1) / fat_volume.bytes_per_sector);
+  u32 last  = (u32)((off + len - 1) / fat_volume.bytes_per_sector);
   for (u32 lba = first; lba <= last; lba++)
     fat_flush_sector(lba);
 }
 
 struct fat_dir root_directory(void) {
-  struct fat_dir dir = { .is_root = 1, .first_cluster = 0 };
+  struct fat_dir dir = {.is_root = 1, .first_cluster = 0};
   if (fat_volume.type != FAT_TYPE_16)
     dir.first_cluster = fat_volume.root_cluster;
   return dir;
 }
 
-int dir_is_fixed_root(struct fat_dir dir) {
-  return dir.is_root && fat_volume.type == FAT_TYPE_16;
-}
+int dir_is_fixed_root(struct fat_dir dir) { return dir.is_root && fat_volume.type == FAT_TYPE_16; }
 
 static int fat_mount_format(u8 *image, usize size) {
   if (!image || size < 512)
     return -1;
 
-  struct bpb *b = (struct bpb *)image;
-  u32 total_sectors =
-      b->total_sectors_16 ? b->total_sectors_16 : b->total_sectors_32;
-  u32 fat_sectors =
-      b->sectors_per_fat_16 ? b->sectors_per_fat_16 : b->sectors_per_fat_32;
+  struct bpb *b     = (struct bpb *)image;
+  u32 total_sectors = b->total_sectors_16 ? b->total_sectors_16 : b->total_sectors_32;
+  u32 fat_sectors   = b->sectors_per_fat_16 ? b->sectors_per_fat_16 : b->sectors_per_fat_32;
 
   if (b->bytes_per_sector < 512 || b->bytes_per_sector > 4096 ||
-      (b->bytes_per_sector & (b->bytes_per_sector - 1)) != 0 ||
-      b->sectors_per_cluster == 0 || b->reserved_sectors == 0 ||
-      b->num_fats == 0 || fat_sectors == 0 || total_sectors == 0 ||
+      (b->bytes_per_sector & (b->bytes_per_sector - 1)) != 0 || b->sectors_per_cluster == 0 ||
+      b->reserved_sectors == 0 || b->num_fats == 0 || fat_sectors == 0 || total_sectors == 0 ||
       (u64)total_sectors * b->bytes_per_sector > size)
     return -1;
 
-  u32 root_sectors =
-      ((u32)b->root_entries * 32 + b->bytes_per_sector - 1) /
-      b->bytes_per_sector;
-  u32 fat_start = b->reserved_sectors;
-  u32 root_start = fat_start + (u32)b->num_fats * fat_sectors;
-  u32 data_start = root_start + root_sectors;
-  if (root_start < fat_start || data_start < root_start ||
-      data_start >= total_sectors)
+  u32 root_sectors = ((u32)b->root_entries * 32 + b->bytes_per_sector - 1) / b->bytes_per_sector;
+  u32 fat_start    = b->reserved_sectors;
+  u32 root_start   = fat_start + (u32)b->num_fats * fat_sectors;
+  u32 data_start   = root_start + root_sectors;
+  if (root_start < fat_start || data_start < root_start || data_start >= total_sectors)
     return -1;
 
-  u32 data_clusters =
-      (total_sectors - data_start) / b->sectors_per_cluster;
+  u32 data_clusters = (total_sectors - data_start) / b->sectors_per_cluster;
 
   enum fat_type type;
   if (data_clusters < 4085)
@@ -238,7 +221,7 @@ static int fat_mount_format(u8 *image, usize size) {
 
   u32 entry_bytes = type == FAT_TYPE_32 ? 4 : 2;
   u32 fat_entries = (u32)((u64)fat_sectors * b->bytes_per_sector / entry_bytes);
-  u32 limit = data_clusters + 2;
+  u32 limit       = data_clusters + 2;
   if (limit > fat_entries)
     limit = fat_entries;
   if (limit <= 2)
@@ -256,19 +239,19 @@ static int fat_mount_format(u8 *image, usize size) {
       return -1;
   }
 
-  fat_volume.image = image;
-  fat_volume.image_size = size;
-  fat_volume.bytes_per_sector = b->bytes_per_sector;
+  fat_volume.image               = image;
+  fat_volume.image_size          = size;
+  fat_volume.bytes_per_sector    = b->bytes_per_sector;
   fat_volume.sectors_per_cluster = b->sectors_per_cluster;
-  fat_volume.fat_count = b->num_fats;
-  fat_volume.sectors_per_fat = fat_sectors;
-  fat_volume.fat_start_sector = fat_start;
-  fat_volume.root_start_sector = root_start;
-  fat_volume.data_start_sector = data_start;
-  fat_volume.root_entries = b->root_entries;
-  fat_volume.type = type;
-  fat_volume.cluster_limit = limit;
-  fat_volume.root_cluster = type == FAT_TYPE_32 ? b->root_cluster : 0;
+  fat_volume.fat_count           = b->num_fats;
+  fat_volume.sectors_per_fat     = fat_sectors;
+  fat_volume.fat_start_sector    = fat_start;
+  fat_volume.root_start_sector   = root_start;
+  fat_volume.data_start_sector   = data_start;
+  fat_volume.root_entries        = b->root_entries;
+  fat_volume.type                = type;
+  fat_volume.cluster_limit       = limit;
+  fat_volume.root_cluster        = type == FAT_TYPE_32 ? b->root_cluster : 0;
 
   log_write_hex("FAT: type          =", (u64)fat_volume.type, KERNEL, LOG_INFO);
   log_write_hex("FAT: bytes/sector  =", fat_volume.bytes_per_sector, KERNEL, LOG_INFO);

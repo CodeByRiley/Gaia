@@ -1,7 +1,7 @@
 #include <arch/irq.h>
+#include <drivers/base/vendors/pci_ids.h>
 #include <drivers/driver.h>
 #include <drivers/network/eth/e1000/e1000.h>
-#include <drivers/base/vendors/pci_ids.h>
 #include <interrupts/idt.h>
 #include <interrupts/pic.h>
 #include <memory/heap.h>
@@ -25,10 +25,10 @@
 
 /* QEMU's slirp gateway is 10.0.2.2 and it serves a /24. Static addressing
  * until DHCP lands, at which point netif_set_ipv4 replaces all three. */
-static const u8 e1000_ipv4_addr[IPV4_ALEN] = {10, 0, 2, 30}; // 10.0.2.30 default we probe later
-static const u8 e1000_ipv4_mask[IPV4_ALEN] = {255, 255, 255, 0};
+static const u8 e1000_ipv4_addr[IPV4_ALEN]    = {10, 0, 2, 30}; // 10.0.2.30 default we probe later
+static const u8 e1000_ipv4_mask[IPV4_ALEN]    = {255, 255, 255, 0};
 static const u8 e1000_ipv4_gateway[IPV4_ALEN] = {10, 0, 2, 2};
-static u64 next_mmio_virt = MMIO_VIRT_BASE;
+static u64 next_mmio_virt                     = MMIO_VIRT_BASE;
 
 /* Causes that mean "the poll pass has something to do". */
 #define E1000_IRQ_CAUSES (ICR_RXT0 | ICR_RXO | ICR_RXDMT0 | ICR_LSC)
@@ -39,8 +39,7 @@ static u64 next_mmio_virt = MMIO_VIRT_BASE;
 static struct e1000_dev *e1000_irq_nics[E1000_MAX_NICS];
 static int e1000_irq_nic_count;
 
-static int e1000_wait_clear(struct e1000_dev *nic, u32 reg,
-                            u32 mask) {
+static int e1000_wait_clear(struct e1000_dev *nic, u32 reg, u32 mask) {
   for (u32 i = 0; i < E1000_POLL_LIMIT; i++) {
     if ((E1000_READ(nic, reg) & mask) == 0)
       return 0;
@@ -48,9 +47,7 @@ static int e1000_wait_clear(struct e1000_dev *nic, u32 reg,
   return -1;
 }
 
-
-static int e1000_eeprom_read(struct e1000_dev *nic, u8 word_offset,
-                             u16 *out) {
+static int e1000_eeprom_read(struct e1000_dev *nic, u8 word_offset, u16 *out) {
   u32 eerd = ((u32)word_offset << 8) | EERD_START;
   E1000_WRITE(nic, REG_EERD, eerd);
 
@@ -66,8 +63,8 @@ static int e1000_eeprom_read(struct e1000_dev *nic, u8 word_offset,
 }
 
 static void e1000_read_mac_from_registers(struct e1000_dev *nic) {
-  u32 ral = E1000_READ(nic, REG_RAL);
-  u32 rah = E1000_READ(nic, REG_RAH);
+  u32 ral          = E1000_READ(nic, REG_RAL);
+  u32 rah          = E1000_READ(nic, REG_RAH);
   nic->mac_addr[0] = (u8)(ral & 0xFF);
   nic->mac_addr[1] = (u8)((ral >> 8) & 0xFF);
   nic->mac_addr[2] = (u8)((ral >> 16) & 0xFF);
@@ -79,8 +76,7 @@ static void e1000_read_mac_from_registers(struct e1000_dev *nic) {
 static int e1000_read_mac_address(struct e1000_dev *nic) {
   u16 word0, word1, word2;
 
-  if (e1000_eeprom_read(nic, 0, &word0) == 0 &&
-      e1000_eeprom_read(nic, 1, &word1) == 0 &&
+  if (e1000_eeprom_read(nic, 0, &word0) == 0 && e1000_eeprom_read(nic, 1, &word1) == 0 &&
       e1000_eeprom_read(nic, 2, &word2) == 0) {
     nic->mac_addr[0] = (u8)(word0 & 0xFF);
     nic->mac_addr[1] = (u8)(word0 >> 8);
@@ -89,21 +85,26 @@ static int e1000_read_mac_address(struct e1000_dev *nic) {
     nic->mac_addr[4] = (u8)(word2 & 0xFF);
     nic->mac_addr[5] = (u8)(word2 >> 8);
   } else {
-    log_write("e1000: EEPROM read timed out, using receive address", KERNEL,
-              LOG_WARN);
+    log_write("e1000: EEPROM read timed out, using receive address", KERNEL, LOG_WARN);
     e1000_read_mac_from_registers(nic);
   }
 
-  u32 mac_low = nic->mac_addr[0] | (nic->mac_addr[1] << 8) |
-                     (nic->mac_addr[2] << 16) | (nic->mac_addr[3] << 24);
+  u32 mac_low  = nic->mac_addr[0] | (nic->mac_addr[1] << 8) | (nic->mac_addr[2] << 16) |
+                 (nic->mac_addr[3] << 24);
   u32 mac_high = nic->mac_addr[4] | (nic->mac_addr[5] << 8);
 
   E1000_WRITE(nic, 0x5400, mac_low);
   E1000_WRITE(nic, 0x5404, mac_high | (1 << 31)); // Set AV bit
 
-  log_write_fmt(KERNEL, LOG_INFO, "MAC Address: %02x:%02x:%02x:%02x:%02x:%02x",
-                nic->mac_addr[0], nic->mac_addr[1], nic->mac_addr[2],
-                nic->mac_addr[3], nic->mac_addr[4], nic->mac_addr[5]);
+  log_write_fmt(KERNEL,
+                LOG_INFO,
+                "MAC Address: %02x:%02x:%02x:%02x:%02x:%02x",
+                nic->mac_addr[0],
+                nic->mac_addr[1],
+                nic->mac_addr[2],
+                nic->mac_addr[3],
+                nic->mac_addr[4],
+                nic->mac_addr[5]);
   return 0;
 }
 
@@ -126,9 +127,9 @@ static int e1000_alloc_rx_buffers(struct e1000_dev *nic) {
       return -1;
 
     nic->rx_buffer_phys[i] = phys;
-    nic->rx_buffers[i] = phys_to_virt(phys);
+    nic->rx_buffers[i]     = phys_to_virt(phys);
     memset(nic->rx_buffers[i], 0, FRAME_SIZE);
-    nic->rx_ring_virt[i].addr = phys;
+    nic->rx_ring_virt[i].addr   = phys;
     nic->rx_ring_virt[i].status = 0;
   }
   return 0;
@@ -138,8 +139,7 @@ static void e1000_setup_rx_registers(struct e1000_dev *nic) {
   E1000_WRITE(nic, REG_RCTL, 0);
   E1000_WRITE(nic, REG_RXDESCLO, (u32)(nic->rx_ring_phys & 0xFFFFFFFF));
   E1000_WRITE(nic, REG_RXDESCHI, (u32)((nic->rx_ring_phys >> 32) & 0xFFFFFFFF));
-  E1000_WRITE(nic, REG_RXDESCLEN,
-              E1000_NUM_RX_DESC * sizeof(struct e1000_rx_desc));
+  E1000_WRITE(nic, REG_RXDESCLEN, E1000_NUM_RX_DESC * sizeof(struct e1000_rx_desc));
   E1000_WRITE(nic, REG_RXDESCHEAD, 0);
   E1000_WRITE(nic, REG_RXDESCTAIL, E1000_NUM_RX_DESC - 1);
 
@@ -165,9 +165,9 @@ static int e1000_alloc_tx_ring(struct e1000_dev *nic) {
       return -1;
 
     nic->tx_buffer_phys[i] = buf_phys;
-    nic->tx_buffers[i] = phys_to_virt(buf_phys);
+    nic->tx_buffers[i]     = phys_to_virt(buf_phys);
     memset(nic->tx_buffers[i], 0, FRAME_SIZE);
-    nic->tx_ring_virt[i].addr = buf_phys;
+    nic->tx_ring_virt[i].addr   = buf_phys;
     nic->tx_ring_virt[i].status = TXD_STATUS_DD;
   }
 
@@ -178,15 +178,13 @@ static void e1000_setup_tx_registers(struct e1000_dev *nic) {
   E1000_WRITE(nic, REG_TCTRL, 0);
   E1000_WRITE(nic, REG_TXDESCLO, (u32)(nic->tx_ring_phys & 0xFFFFFFFF));
   E1000_WRITE(nic, REG_TXDESCHI, (u32)((nic->tx_ring_phys >> 32) & 0xFFFFFFFF));
-  E1000_WRITE(nic, REG_TXDESCLEN,
-              E1000_NUM_TX_DESC * sizeof(struct e1000_tx_desc));
+  E1000_WRITE(nic, REG_TXDESCLEN, E1000_NUM_TX_DESC * sizeof(struct e1000_tx_desc));
   E1000_WRITE(nic, REG_TXDESCHEAD, 0);
   E1000_WRITE(nic, REG_TXDESCTAIL, 0);
 
   E1000_WRITE(nic, REG_TIPG, 10 | (8 << 10) | (6 << 20));
 
-  u32 tctl =
-      TCTL_EN | TCTL_PSP | (0x10 << TCTL_CT_SHIFT) | (0x40 << TCTL_COLD_SHIFT);
+  u32 tctl = TCTL_EN | TCTL_PSP | (0x10 << TCTL_CT_SHIFT) | (0x40 << TCTL_COLD_SHIFT);
   E1000_WRITE(nic, REG_TCTRL, tctl);
 }
 
@@ -204,7 +202,7 @@ static int e1000_tx(void *driver_data, const void *frame, u16 len) {
   if (!nic || !frame || len > E1000_FRAME_MAX)
     return -1;
 
-  u32 idx = nic->tx_current;
+  u32 idx                    = nic->tx_current;
   struct e1000_tx_desc *desc = &nic->tx_ring_virt[idx];
   if (!(desc->status & TXD_STATUS_DD)) {
     log_write("e1000: TX ring full! Cannot send reply", KERNEL, LOG_ERROR);
@@ -217,12 +215,12 @@ static int e1000_tx(void *driver_data, const void *frame, u16 len) {
     memset((u8 *)nic->tx_buffers[idx] + len, 0, wire_len - len);
   }
 
-  desc->addr = nic->tx_buffer_phys[idx];
-  desc->len = wire_len;
-  desc->cso = 0;
-  desc->cmd = TXD_CMD_EOP | TXD_CMD_IFCS | TXD_CMD_RS;
-  desc->status = 0;
-  desc->css = 0;
+  desc->addr    = nic->tx_buffer_phys[idx];
+  desc->len     = wire_len;
+  desc->cso     = 0;
+  desc->cmd     = TXD_CMD_EOP | TXD_CMD_IFCS | TXD_CMD_RS;
+  desc->status  = 0;
+  desc->css     = 0;
   desc->special = 0;
 
   nic->tx_current = (idx + 1) % E1000_NUM_TX_DESC;
@@ -291,9 +289,9 @@ static int e1000_init_hardware(struct e1000_dev *nic) {
   memcpy(nif.ipv4, e1000_ipv4_addr, IPV4_ALEN);
   memcpy(nif.netmask, e1000_ipv4_mask, IPV4_ALEN);
   memcpy(nif.gateway, e1000_ipv4_gateway, IPV4_ALEN);
-  nif.mtu = E1000_FRAME_MAX - ETH_HDR_LEN;
+  nif.mtu         = E1000_FRAME_MAX - ETH_HDR_LEN;
   nif.driver_data = nic;
-  nif.tx = e1000_tx;
+  nif.tx          = e1000_tx;
   netif_register(&nif);
 
   /* Announce the binding now that transmit is live, and resolve the
@@ -303,14 +301,14 @@ static int e1000_init_hardware(struct e1000_dev *nic) {
 
   log_write("e1000: RX/TX ready at 10.0.2.30", KERNEL, LOG_INFO);
 
-  //e1000_send_test_ping(nic);
+  // e1000_send_test_ping(nic);
 
   return 0;
 }
 
 /* STATUS bit 1 is Link Up; bits 7:6 encode 10 / 100 / 1000 Mb/s. */
 static void e1000_report_link(struct e1000_dev *nic) {
-  u32 status = E1000_READ(nic, REG_STATUS);
+  u32 status                 = E1000_READ(nic, REG_STATUS);
   static const u32 speeds[4] = {10, 100, 1000, 1000};
   netmon_set_link((status & 0x2u) != 0, speeds[(status >> 6) & 0x3u]);
 }
@@ -340,16 +338,18 @@ static int e1000_poll_rx(struct device *dev) {
      * receiving past the first frame. One line per frame, not a flood -
      * silence it and that test reports a wedged ring that is fine. */
     log_write_fmt(KERNEL, LOG_INFO, "[e1000] Received packet! Length: %d bytes", packet_len);
-    // log_write_fmt(KERNEL, LOG_INFO, "        rx_current: %d, rx_ring_phys: %p, rx_buffers[rx_current]: %p\n", nic->rx_current, nic->rx_ring_phys, nic->rx_buffers[nic->rx_current]);
+    // log_write_fmt(KERNEL, LOG_INFO, "        rx_current: %d, rx_ring_phys:
+    // %p, rx_buffers[rx_current]: %p\n", nic->rx_current, nic->rx_ring_phys,
+    // nic->rx_buffers[nic->rx_current]);
 
-    netmon_record(NETMON_DIR_RX, nic->rx_buffers[nic->rx_current],
-                  packet_len);
+    netmon_record(NETMON_DIR_RX, nic->rx_buffers[nic->rx_current], packet_len);
 
     // Hand the frame to the stack. netmon above saw it either way; the
     // address filter and protocol demux live in eth_input now.
     log_write_fmt(KERNEL, LOG_INFO, "[e1000] Packet length: %d expecting <= 1514", packet_len);
     if (packet_len <= E1000_FRAME_MAX) {
-      log_write_fmt(KERNEL, LOG_INFO, "[e1000] Packet length is less than max, we accept", packet_len);
+      log_write_fmt(
+          KERNEL, LOG_INFO, "[e1000] Packet length is less than max, we accept", packet_len);
       eth_input((const u8 *)nic->rx_buffers[nic->rx_current], packet_len);
     } else {
       log_write_fmt(KERNEL, LOG_WARN, "[e1000] Dropping oversized frame of length %d", packet_len);
@@ -364,8 +364,8 @@ static int e1000_poll_rx(struct device *dev) {
     // this did -- collapses RDH and RDT onto the same index after the
     // very first frame, so the NIC decides it has nowhere to put anything
     // and silently drops every packet from then on.
-    desc->status = 0; // Clear DD bit
-    u32 consumed = nic->rx_current;
+    desc->status    = 0; // Clear DD bit
+    u32 consumed    = nic->rx_current;
     nic->rx_current = (nic->rx_current + 1) % E1000_NUM_RX_DESC;
     E1000_WRITE(nic, REG_RXDESCTAIL, consumed);
     handled++;
@@ -399,8 +399,7 @@ static void e1000_irq_handler(void) {
 static void e1000_enable_irq(struct e1000_dev *nic, struct pci_device *pci) {
   u8 line = pci->int_line;
   if (pci->int_pin == 0 || line == 0 || line >= 16 || line == 2) {
-    log_write_int("e1000: no usable INTx line, RX is polled; line =", line,
-                  KERNEL, LOG_WARN);
+    log_write_int("e1000: no usable INTx line, RX is polled; line =", line, KERNEL, LOG_WARN);
     return;
   }
   if (e1000_irq_nic_count >= E1000_MAX_NICS) {
@@ -409,7 +408,7 @@ static void e1000_enable_irq(struct e1000_dev *nic, struct pci_device *pci) {
   }
 
   e1000_irq_nics[e1000_irq_nic_count++] = nic;
-  nic->irq_line = line;
+  nic->irq_line                         = line;
   irq_install(line, e1000_irq_handler);
 
   u16 cmd = pci_read16(pci->addr, PCI_CFG_COMMAND);
@@ -454,9 +453,9 @@ static int e1000_probe(struct device *dev) {
 
   nic->mmio_base = (volatile u8 *)mmio_virt;
   nic->mmio_virt = mmio_virt;
-  nic->bus = dev->bus_info.pci.addr.bus;
-  nic->device = dev->bus_info.pci.addr.dev;
-  nic->function = dev->bus_info.pci.addr.fn;
+  nic->bus       = dev->bus_info.pci.addr.bus;
+  nic->device    = dev->bus_info.pci.addr.dev;
+  nic->function  = dev->bus_info.pci.addr.fn;
 
   dev->driver_data = nic;
   e1000_enable_bus_master(&dev->bus_info.pci);
@@ -480,11 +479,11 @@ static void e1000_disable_irq(struct e1000_dev *nic) {
   if (!nic->irq_line)
     return;
 
-  u64 flags = irq_save();
+  u64 flags         = irq_save();
   int still_on_line = 0;
   for (int i = 0; i < e1000_irq_nic_count; i++) {
     if (e1000_irq_nics[i] == nic) {
-      e1000_irq_nics[i] = e1000_irq_nics[--e1000_irq_nic_count];
+      e1000_irq_nics[i]                   = e1000_irq_nics[--e1000_irq_nic_count];
       e1000_irq_nics[e1000_irq_nic_count] = 0;
       i--;
     } else if (e1000_irq_nics[i]->irq_line == nic->irq_line) {
@@ -545,9 +544,9 @@ static void e1000_remove(struct device *dev) {
   log_write("e1000: removed", KERNEL, LOG_INFO);
 }
 
-const struct driver e1000_driver = {.name = "e1000 Ethernet",
-                                    .bus = DEVICE_BUS_PCI,
-                                    .match = e1000_match,
-                                    .probe = e1000_probe,
-                                    .poll = e1000_poll_rx,
+const struct driver e1000_driver = {.name   = "e1000 Ethernet",
+                                    .bus    = DEVICE_BUS_PCI,
+                                    .match  = e1000_match,
+                                    .probe  = e1000_probe,
+                                    .poll   = e1000_poll_rx,
                                     .remove = e1000_remove};

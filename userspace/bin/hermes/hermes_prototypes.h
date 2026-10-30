@@ -66,8 +66,8 @@
 #define WIN98_SELECT 0x00000080u
 
 struct file_entry {
-    char name[MAX_NAME];
-    int is_dir;
+  char name[MAX_NAME];
+  int is_dir;
 };
 
 extern char cwd[MAX_PATH];
@@ -107,7 +107,6 @@ const char *path_component(int wanted, char *out, size_t capacity);
 void go_to_tree_depth(int depth);
 int is_program_name(const char *name);
 
-int draw_frame(struct ui_context *ui, struct gfx_surface *surface,
-               int *running);
+int draw_frame(struct ui_context *ui, struct gfx_surface *surface, int *running);
 
 #endif

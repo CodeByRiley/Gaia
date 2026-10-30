@@ -3,13 +3,14 @@
 #include <utilities/string.h>
 
 int fat_truncate(struct fat_file *file) {
-  if (!file || !file->dir_ent) return -1;
+  if (!file || !file->dir_ent)
+    return -1;
   if (file->first_cluster)
     fat_impl_free_chain(file->first_cluster);
   file->first_cluster = 0;
-  file->cur_cluster = 0;
-  file->size = 0;
-  file->pos = 0;
+  file->cur_cluster   = 0;
+  file->size          = 0;
+  file->pos           = 0;
   fat_impl_entry_set_cluster(file->dir_ent, 0);
   fat_impl_entry_set_size(file->dir_ent, 0);
   fat_impl_set_timestamp(file->dir_ent);
@@ -21,9 +22,9 @@ int fat_truncate(struct fat_file *file) {
 usize fat_read(struct fat_file *file, void *buffer, usize length) {
   if (!file || !buffer)
     return 0;
-  u8 *out = (u8 *)buffer;
+  u8 *out     = (u8 *)buffer;
   usize total = 0;
-  u32 bytes = cluster_bytes();
+  u32 bytes   = cluster_bytes();
 
   while (length > 0 && file->pos < file->size) {
     u8 *data = cluster_data(file->cur_cluster);
@@ -31,10 +32,10 @@ usize fat_read(struct fat_file *file, void *buffer, usize length) {
       break;
 
     /* Limit the transfer to this cluster and the remaining file data. */
-    u32 offset = file->pos % bytes;
+    u32 offset     = file->pos % bytes;
     u32 in_cluster = bytes - offset;
-    u32 in_file = file->size - file->pos;
-    usize chunk = length;
+    u32 in_file    = file->size - file->pos;
+    usize chunk    = length;
     if (chunk > in_cluster)
       chunk = in_cluster;
     if (chunk > in_file)
@@ -70,7 +71,7 @@ int fat_seek(struct fat_file *file, u32 position) {
   }
 
   u32 bytes = cluster_bytes();
-  u32 skip = position / bytes;
+  u32 skip  = position / bytes;
   /* At an exact-boundary EOF, retain the preceding cluster for appends. */
   if (position == file->size && position % bytes == 0)
     skip--;
@@ -90,21 +91,20 @@ usize fat_write(struct fat_file *file, const void *buffer, usize length) {
   if (!file || !file->dir_ent || !buffer)
     return 0;
   const u8 *in = (const u8 *)buffer;
-  usize total = 0;
-  u32 bytes = cluster_bytes();
+  usize total  = 0;
+  u32 bytes    = cluster_bytes();
 
   if (file->first_cluster == 0) {
     u32 cluster = fat_impl_alloc_cluster();
     if (!cluster)
       return 0;
     file->first_cluster = cluster;
-    file->cur_cluster = cluster;
+    file->cur_cluster   = cluster;
     fat_impl_entry_set_cluster(file->dir_ent, cluster);
   }
 
   /* Allocate or select the next cluster for a boundary append. */
-  if (length > 0 && file->pos > 0 && file->pos == file->size &&
-      file->pos % bytes == 0) {
+  if (length > 0 && file->pos > 0 && file->pos == file->size && file->pos % bytes == 0) {
     u32 next;
     int status = next_cluster(file->cur_cluster, &next);
     if (status == 1) {
@@ -123,9 +123,9 @@ usize fat_write(struct fat_file *file, const void *buffer, usize length) {
     u8 *data = cluster_data(file->cur_cluster);
     if (!data)
       break;
-    u32 offset = file->pos % bytes;
+    u32 offset    = file->pos % bytes;
     u32 available = bytes - offset;
-    usize chunk = length < available ? length : available;
+    usize chunk   = length < available ? length : available;
     memcpy(data + offset, in, chunk);
     fat_flush_bytes(data + offset, chunk);
 

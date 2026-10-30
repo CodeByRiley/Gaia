@@ -33,7 +33,8 @@ double sqrt(double x) {
 double fabs(double x) { return x < 0 ? -x : x; }
 
 double floor(double x) {
-  if (x != x) return x; /* NaN check */
+  if (x != x)
+    return x; /* NaN check */
   if (x >= (double)LLONG_MAX || x <= (double)LLONG_MIN)
     return x;
   long long n = (long long)x;
@@ -41,7 +42,8 @@ double floor(double x) {
 }
 
 double ceil(double x) {
-  if (x != x) return x; /* NaN check */
+  if (x != x)
+    return x; /* NaN check */
   if (x >= (double)LLONG_MAX || x <= (double)LLONG_MIN)
     return x;
   long long n = (long long)x;
@@ -65,8 +67,8 @@ static double cbrt_newton(double x) {
     return 0.0;
 
   double sign = x < 0.0 ? -1.0 : 1.0;
-  double ax = fabs(x);
-  double g = ax >= 1.0 ? ax : 1.0;
+  double ax   = fabs(x);
+  double g    = ax >= 1.0 ? ax : 1.0;
 
   for (int i = 0; i < 32; i++)
     g = (2.0 * g + ax / (g * g)) / 3.0;
@@ -81,7 +83,7 @@ static double ipow(double base, long long expn) {
     if (base == 0.0)
       return HUGE_VAL;
     base = 1.0 / base;
-    e = -(unsigned long long)expn;
+    e    = -(unsigned long long)expn;
   } else {
     e = (unsigned long long)expn;
   }
@@ -109,10 +111,10 @@ double log(double x) {
     k--;
   }
 
-  double z = (x - 1.0) / (x + 1.0);
-  double z2 = z * z;
+  double z    = (x - 1.0) / (x + 1.0);
+  double z2   = z * z;
   double term = z;
-  double sum = 0.0;
+  double sum  = 0.0;
 
   for (int n = 1; n <= 39; n += 2) {
     sum += term / (double)n;
@@ -139,7 +141,7 @@ double exp(double x) {
   }
 
   double term = 1.0;
-  double sum = 1.0;
+  double sum  = 1.0;
   for (int i = 1; i <= 24; i++) {
     term *= x / (double)i;
     sum += term;
@@ -184,19 +186,17 @@ static double reduce_angle(double x) {
 }
 
 double sin(double x) {
-  x = reduce_angle(x);
+  x         = reduce_angle(x);
   double x2 = x * x;
   return x * (1.0 - x2 / 6.0 + (x2 * x2) / 120.0 - (x2 * x2 * x2) / 5040.0 +
-              (x2 * x2 * x2 * x2) / 362880.0 -
-              (x2 * x2 * x2 * x2 * x2) / 39916800.0);
+              (x2 * x2 * x2 * x2) / 362880.0 - (x2 * x2 * x2 * x2 * x2) / 39916800.0);
 }
 
 double cos(double x) {
-  x = reduce_angle(x);
+  x         = reduce_angle(x);
   double x2 = x * x;
   return 1.0 - x2 / 2.0 + (x2 * x2) / 24.0 - (x2 * x2 * x2) / 720.0 +
-         (x2 * x2 * x2 * x2) / 40320.0 -
-         (x2 * x2 * x2 * x2 * x2) / 3628800.0;
+         (x2 * x2 * x2 * x2) / 40320.0 - (x2 * x2 * x2 * x2 * x2) / 3628800.0;
 }
 
 double tan(double x) {
@@ -214,9 +214,9 @@ static double atan_unit(double x) {
   if (x > 0.5)
     return M_PI_4 + atan_unit((x - 1.0) / (x + 1.0));
 
-  double x2 = x * x;
+  double x2   = x * x;
   double term = x;
-  double sum = x;
+  double sum  = x;
 
   for (int n = 3; n <= 31; n += 2) {
     term *= x2;

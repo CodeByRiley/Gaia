@@ -12,33 +12,33 @@
 #ifndef STDIO_H
 #define STDIO_H
 
-#include <stddef.h>
 #include <fs/vfs/vfs.h>
+#include <stddef.h>
 
 #define SEEK_SET 0
 #define SEEK_CUR 1
 #define SEEK_END 2
 
 typedef struct {
-    struct vfs_file f;
-    int             valid;
-    int             can_read;  /* Opened with 'r' or '+'. */
-    int             can_write; /* Opened with 'w', 'a', or '+'. */
-    int             append;    /* Writes always seek to EOF. */
+  struct vfs_file f;
+  int valid;
+  int can_read;  /* Opened with 'r' or '+'. */
+  int can_write; /* Opened with 'w', 'a', or '+'. */
+  int append;    /* Writes always seek to EOF. */
 } FILE;
 
-FILE  *fopen(const char *name, const char *mode);
+FILE *fopen(const char *name, const char *mode);
 /* Extended kernel-internal open. On failure, `error_out` receives a positive
  * errno-style reason; plain fopen() remains available to callers that only
  * need a FILE pointer. */
-FILE  *fopen_ex(const char *name, const char *mode, int *error_out);
+FILE *fopen_ex(const char *name, const char *mode, int *error_out);
 const char *fopen_error_string(int error);
-int    fclose(FILE *fp);
+int fclose(FILE *fp);
 size_t fread(void *buf, size_t sz, size_t nmemb, FILE *fp);
 size_t fwrite(const void *buf, size_t size, size_t count, FILE *fp);
-int    fseek(FILE *fp, long off, int whence);
-long   ftell(FILE *fp);
-int    fgetc(FILE *fp);
-int    feof(FILE *fp);
+int fseek(FILE *fp, long off, int whence);
+long ftell(FILE *fp);
+int fgetc(FILE *fp);
+int feof(FILE *fp);
 
 #endif

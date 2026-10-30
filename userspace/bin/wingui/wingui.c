@@ -20,9 +20,14 @@ static LRESULT CALLBACK procedure(HWND h, UINT m, WPARAM w, LPARAM l) {
     SetBkMode(dc, TRANSPARENT);
     TextOutA(dc, 24, 24, "Win32 on Heimdall", 17);
     Rectangle(dc, 16, 16, 220, 64);
-    BITMAPINFO bitmap={0};bitmap.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);bitmap.bmiHeader.biWidth=2;bitmap.bmiHeader.biHeight=-2;bitmap.bmiHeader.biPlanes=1;bitmap.bmiHeader.biBitCount=32;
-    DWORD pixels[4]={0xff0000,0x00ff00,0x0000ff,0xffffff};
-    SetDIBitsToDevice(dc,24,80,2,2,0,0,0,2,pixels,&bitmap,DIB_RGB_COLORS);
+    BITMAPINFO bitmap           = {0};
+    bitmap.bmiHeader.biSize     = sizeof(BITMAPINFOHEADER);
+    bitmap.bmiHeader.biWidth    = 2;
+    bitmap.bmiHeader.biHeight   = -2;
+    bitmap.bmiHeader.biPlanes   = 1;
+    bitmap.bmiHeader.biBitCount = 32;
+    DWORD pixels[4]             = {0xff0000, 0x00ff00, 0x0000ff, 0xffffff};
+    SetDIBitsToDevice(dc, 24, 80, 2, 2, 0, 0, 0, 2, pixels, &bitmap, DIB_RGB_COLORS);
     EndPaint(h, &p);
     report("wingui: painted\n");
     return 0;
@@ -45,15 +50,24 @@ static LRESULT CALLBACK procedure(HWND h, UINT m, WPARAM w, LPARAM l) {
   return DefWindowProcA(h, m, w, l);
 }
 void mainCRTStartup(void) {
-  WNDCLASSA c = {0};
-  c.lpfnWndProc = procedure;
-  c.hInstance = GetModuleHandleA(NULL);
+  WNDCLASSA c     = {0};
+  c.lpfnWndProc   = procedure;
+  c.hInstance     = GetModuleHandleA(NULL);
   c.lpszClassName = "GaiaWin32Fixture";
   if (!RegisterClassA(&c))
     ExitProcess(1);
-  HWND h = CreateWindowExA(0, c.lpszClassName, "Win32 compatibility",
-                           WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                           400, 240, NULL, NULL, c.hInstance, NULL);
+  HWND h = CreateWindowExA(0,
+                           c.lpszClassName,
+                           "Win32 compatibility",
+                           WS_OVERLAPPEDWINDOW,
+                           CW_USEDEFAULT,
+                           CW_USEDEFAULT,
+                           400,
+                           240,
+                           NULL,
+                           NULL,
+                           c.hInstance,
+                           NULL);
   if (!h)
     ExitProcess(2);
   ShowWindow(h, SW_SHOW);

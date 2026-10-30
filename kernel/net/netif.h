@@ -57,8 +57,7 @@ void netif_unregister(const void *driver_data);
 struct netif *netif_get(void);
 
 /* Replace the addressing without disturbing the driver binding. */
-void netif_set_ipv4(const u8 ipv4[IPV4_ALEN],
-                    const u8 netmask[IPV4_ALEN],
+void netif_set_ipv4(const u8 ipv4[IPV4_ALEN], const u8 netmask[IPV4_ALEN],
                     const u8 gateway[IPV4_ALEN]);
 
 /* Send one framed Ethernet frame. Returns 0 or -1. */

@@ -35,8 +35,8 @@ static int copy_name(char *out, usize cap, const char *s) {
   while (s[n]) {
     char c = s[n];
     if (n + 1 >= cap || c == '/' || c == '\\' || c == ':' || c == ' ' ||
-        !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-          (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-'))
+        !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' ||
+          c == '_' || c == '-'))
       return -1;
     out[n] = c >= 'A' && c <= 'Z' ? c + 32 : c;
     n++;
@@ -96,14 +96,12 @@ static void unmap_module(struct pe_process *p, struct pe_module *m) {
   }
 }
 static int range_free(struct pe_process *p, u64 base, u32 size) {
-  if ((base & 65535) || base < 0x40000000ULL || size > USER_VA_MAX ||
-      base > USER_VA_MAX - size ||
+  if ((base & 65535) || base < 0x40000000ULL || size > USER_VA_MAX || base > USER_VA_MAX - size ||
       (base < GAIA_WIN32_TEB + 0x10000 && base + size > GAIA_WIN32_TEB))
     return 0;
   for (u32 i = 0; i < p->count; i++) {
     struct pe_module *m = &p->modules[i];
-    if (base < m->base + m->image.nt.optionalHeader.sizeOfImage &&
-        m->base < base + size)
+    if (base < m->base + m->image.nt.optionalHeader.sizeOfImage && m->base < base + size)
       return 0;
   }
   for (u64 i = 0; i < size; i += 4096)
@@ -136,7 +134,7 @@ static int read_image(const char *path, u8 **out, usize *size) {
     kfree(data);
     return -1;
   }
-  *out = data;
+  *out  = data;
   *size = length;
   return 0;
 }
@@ -158,7 +156,7 @@ static int module_named(struct pe_process *p, const char *name) {
   if (result != -2)
     return result;
   const char *prefix = "/system/win32/";
-  d = strlen(prefix);
+  d                  = strlen(prefix);
   memcpy(path, prefix, d);
   memcpy(path + d, lower, n + 1);
   return discover(p, path, lower);
@@ -166,7 +164,7 @@ static int module_named(struct pe_process *p, const char *name) {
 static int discover(struct pe_process *p, const char *path, const char *name) {
   if (p->count == GAIA_WIN32_MAX_MODULES)
     return -1;
-  u8 *file = 0;
+  u8 *file     = 0;
   usize length = 0;
   struct pe_image image;
   int read_result = read_image(path, &file, &length);
@@ -203,18 +201,17 @@ static int discover(struct pe_process *p, const char *path, const char *name) {
     kfree(memory);
     return -1;
   }
-  int index = p->count++;
+  int index           = p->count++;
   struct pe_module *m = &p->modules[index];
   memset(m, 0, sizeof(*m));
-  m->image = image;
+  m->image  = image;
   m->memory = memory;
-  m->base = base;
+  m->base   = base;
   if (copy_name(m->name, sizeof(m->name), name)) {
     kfree(file);
     return -1;
   }
-  m->image.file =
-      memory; /* Header/section table offsets are identical after mapping. */
+  m->image.file = memory; /* Header/section table offsets are identical after mapping. */
   kfree(file);
   struct IMAGE_DATA_DIRECTORY d = image.nt.optionalHeader.dataDirectory[1];
   if (!d.size)
@@ -228,29 +225,27 @@ static int discover(struct pe_process *p, const char *path, const char *name) {
       break;
     }
     const char *dll = pe_image_string(memory, size, imp[3]);
-    int dep = dll ? module_named(p, dll) : -1;
+    int dep         = dll ? module_named(p, dll) : -1;
     if (dep < 0) {
-      log_write_string("pe: missing dependency", dll ? dll : "invalid name",
-                       KERNEL, LOG_ERROR);
+      log_write_string("pe: missing dependency", dll ? dll : "invalid name", KERNEL, LOG_ERROR);
       return -1;
     }
     m->dependencies |= 1u << dep;
   }
   return terminated ? index : -1;
 }
-static u64 resolve(struct pe_process *p, int index, const char *name,
-                   u32 ordinal, int depth) {
+static u64 resolve(struct pe_process *p, int index, const char *name, u32 ordinal, int depth) {
   if (index < 0 || (u32)index >= p->count || depth > 32)
     return 0;
   struct pe_module *m = &p->modules[index];
   const char *forward = 0;
-  u32 rva = pe_image_export(&m->image, m->memory, name, ordinal, &forward);
+  u32 rva             = pe_image_export(&m->image, m->memory, name, ordinal, &forward);
   if (!rva)
     return 0;
   if (!forward)
     return m->base + rva;
   char dll[64];
-  usize len = 0;
+  usize len       = 0;
   const char *dot = 0;
   for (const char *s = forward; *s; s++)
     if (*s == '.')
@@ -268,7 +263,7 @@ static u64 resolve(struct pe_process *p, int index, const char *name,
     return 0;
   m->dependencies |= 1u << dep;
   if (dot[1] == '#') {
-    u32 n = 0;
+    u32 n         = 0;
     const char *s = dot + 2;
     if (!*s)
       return 0;
@@ -285,7 +280,7 @@ static int link_module(struct pe_process *p, u32 index) {
   struct pe_module *m = &p->modules[index];
   if (m->linked)
     return 0;
-  u32 size = m->image.nt.optionalHeader.sizeOfImage;
+  u32 size                      = m->image.nt.optionalHeader.sizeOfImage;
   struct IMAGE_DATA_DIRECTORY d = m->image.nt.optionalHeader.dataDirectory[1];
   for (u32 at = 0; at + 20 <= d.size; at += 20) {
     u32 imp[5];
@@ -293,10 +288,10 @@ static int link_module(struct pe_process *p, u32 index) {
     if (!(imp[0] | imp[1] | imp[2] | imp[3] | imp[4]))
       break;
     const char *dll = pe_image_string(m->memory, size, imp[3]);
-    int dep = dll ? module_named(p, dll) : -1;
+    int dep         = dll ? module_named(p, dll) : -1;
     if (dep < 0 || !imp[4])
       return -1;
-    u32 lookup = imp[0] ? imp[0] : imp[4];
+    u32 lookup     = imp[0] ? imp[0] : imp[4];
     int terminated = 0;
     for (u64 slot = 0; slot < size / 8; slot++) {
       u64 from = (u64)lookup + slot * 8, to = (u64)imp[4] + slot * 8;
@@ -310,7 +305,7 @@ static int link_module(struct pe_process *p, u32 index) {
         break;
       }
       const char *name = 0;
-      u32 ordinal = 0;
+      u32 ordinal      = 0;
       if (value >> 63)
         ordinal = (u16)value;
       else {
@@ -322,8 +317,7 @@ static int link_module(struct pe_process *p, u32 index) {
       }
       u64 address = resolve(p, dep, name, ordinal, 0);
       if (!address) {
-        log_write_string("pe: unresolved import", name ? name : "ordinal",
-                         KERNEL, LOG_ERROR);
+        log_write_string("pe: unresolved import", name ? name : "ordinal", KERNEL, LOG_ERROR);
         return -1;
       }
       memcpy(m->memory + to, &address, 8);
@@ -341,10 +335,8 @@ static int map_module(struct pe_process *p, struct pe_module *m) {
     for (u32 j = 0; j < m->image.nt.fileHeader.numberOfSections; j++) {
       struct IMAGE_SECTION_HEADER sh;
       memcpy(&sh, m->memory + m->image.sections_offset + j * 40, 40);
-      u32 n =
-          sh.virtualSize > sh.sizeOfRawData ? sh.virtualSize : sh.sizeOfRawData;
-      if (i >= sh.virtualAddress &&
-          i < ((u64)sh.virtualAddress + n + 4095) / 4096 * 4096) {
+      u32 n = sh.virtualSize > sh.sizeOfRawData ? sh.virtualSize : sh.sizeOfRawData;
+      if (i >= sh.virtualAddress && i < ((u64)sh.virtualAddress + n + 4095) / 4096 * 4096) {
         if (sh.characteristics & 0x80000000)
           flags |= VMM_WRITE;
         if (sh.characteristics & 0x20000000)
@@ -380,12 +372,11 @@ static int finalize(struct pe_process *p) {
       return -1;
   p->boot.module_count = p->count;
   for (u32 i = 0; i < p->count; i++) {
-    struct pe_module *m = &p->modules[i];
-    p->boot.modules[i].base = m->base;
-    p->boot.modules[i].entry =
-        m->image.nt.optionalHeader.addressOfEntryPoint
-            ? m->base + m->image.nt.optionalHeader.addressOfEntryPoint
-            : 0;
+    struct pe_module *m      = &p->modules[i];
+    p->boot.modules[i].base  = m->base;
+    p->boot.modules[i].entry = m->image.nt.optionalHeader.addressOfEntryPoint
+                                   ? m->base + m->image.nt.optionalHeader.addressOfEntryPoint
+                                   : 0;
     memcpy(p->boot.modules[i].name, m->name, 64);
   }
   for (u32 i = 0; i < p->count; i++)
@@ -400,12 +391,12 @@ void pe_process_free(struct pe_process *p) {
   kfree(p);
 }
 u64 pe_load_process(const char *path, u64 *pml4, struct pe_process **out) {
-  *out = 0;
+  *out                 = 0;
   struct pe_process *p = kmalloc(sizeof(*p));
   if (!p)
     return 0;
   memset(p, 0, sizeof(*p));
-  p->pml4 = pml4;
+  p->pml4          = pml4;
   const char *base = path;
   for (const char *s = path; *s; s++)
     if (*s == '/')
@@ -417,16 +408,16 @@ u64 pe_load_process(const char *path, u64 *pml4, struct pe_process **out) {
   if (discover(p, path, base) != 0)
     goto fail;
   struct IMAGE_DATA_DIRECTORY imports = p->modules[0].image.nt.optionalHeader.dataDirectory[1];
-  u32 descriptor[5] = {0};
+  u32 descriptor[5]                   = {0};
   if (imports.size >= sizeof(descriptor))
     memcpy(descriptor, p->modules[0].memory + imports.virtualAddress, sizeof(descriptor));
   /* MinGW emits an empty import directory even for self-contained Gaia PE. */
-  int windows = (descriptor[0] | descriptor[1] | descriptor[2] | descriptor[3] | descriptor[4]) != 0;
+  int windows =
+      (descriptor[0] | descriptor[1] | descriptor[2] | descriptor[3] | descriptor[4]) != 0;
   int nt = windows ? module_named(p, "ntdll.dll") : -1;
   if (windows && nt < 0)
     goto fail;
-  u64 entry = p->modules[0].base +
-              p->modules[0].image.nt.optionalHeader.addressOfEntryPoint;
+  u64 entry = p->modules[0].base + p->modules[0].image.nt.optionalHeader.addressOfEntryPoint;
   if (!p->modules[0].image.nt.optionalHeader.addressOfEntryPoint)
     goto fail;
   u64 startup = windows ? resolve(p, nt, "GaiaProcessStart", 0, 0) : entry;
@@ -457,11 +448,12 @@ u64 pe_load_process(const char *path, u64 *pml4, struct pe_process **out) {
   memcpy(peb + 0x10, &v, 8);
   v = GAIA_WIN32_BOOT;
   memcpy(peb + 0x100, &v, 8);
-  if (map_bytes(pml4, GAIA_WIN32_TEB, teb, 8192,
-                VMM_PRESENT | VMM_USER | VMM_WRITE | VMM_NX) ||
-      map_bytes(pml4, GAIA_WIN32_PEB, peb, 4096,
-                VMM_PRESENT | VMM_USER | VMM_WRITE | VMM_NX) ||
-      map_bytes(pml4, GAIA_WIN32_BOOT, &p->boot, sizeof(p->boot),
+  if (map_bytes(pml4, GAIA_WIN32_TEB, teb, 8192, VMM_PRESENT | VMM_USER | VMM_WRITE | VMM_NX) ||
+      map_bytes(pml4, GAIA_WIN32_PEB, peb, 4096, VMM_PRESENT | VMM_USER | VMM_WRITE | VMM_NX) ||
+      map_bytes(pml4,
+                GAIA_WIN32_BOOT,
+                &p->boot,
+                sizeof(p->boot),
                 VMM_PRESENT | VMM_USER | VMM_WRITE | VMM_NX)) {
     kfree(teb);
     kfree(peb);
@@ -472,14 +464,13 @@ u64 pe_load_process(const char *path, u64 *pml4, struct pe_process **out) {
   *out = p;
   return startup;
 fail:
-  log_write_string("pe: image/dependency validation failed", path, KERNEL,
-                   LOG_ERROR);
+  log_write_string("pe: image/dependency validation failed", path, KERNEL, LOG_ERROR);
   pe_process_free(p);
   return 0;
 }
 u64 pe_load(const char *path, u64 *pml4) {
   struct pe_process *p = 0;
-  u64 entry = pe_load_process(path, pml4, &p);
+  u64 entry            = pe_load_process(path, pml4, &p);
   /* Legacy callers cannot install a Windows personality. */
   if (p) {
     pe_process_free(p);
@@ -512,8 +503,7 @@ u64 pe_process_module(struct pe_process *p, const char *name, int load) {
   p->busy = 1;
   u32 old = p->count, old_init = p->boot.init_count;
   int index = module_named(p, lower);
-  if (index < 0 || finalize(p) ||
-      user_copy(p->pml4, GAIA_WIN32_BOOT, &p->boot, sizeof(p->boot))) {
+  if (index < 0 || finalize(p) || user_copy(p->pml4, GAIA_WIN32_BOOT, &p->boot, sizeof(p->boot))) {
     for (u32 i = old; i < p->count; i++) {
       unmap_module(p, &p->modules[i]);
       kfree(p->modules[i].memory);
@@ -521,24 +511,23 @@ u64 pe_process_module(struct pe_process *p, const char *name, int load) {
     }
     for (u32 i = 0; i < old; i++)
       p->modules[i].dependencies &= old == 32 ? ~0u : ((1u << old) - 1);
-    p->count = old;
+    p->count             = old;
     p->boot.module_count = old;
-    p->boot.init_count = old_init;
-    p->busy = 0;
+    p->boot.init_count   = old_init;
+    p->busy              = 0;
     return 0;
   }
   p->busy = 0;
   return p->modules[index].base;
 }
-u64 pe_process_symbol(struct pe_process *p, u64 module, const char *name,
-                      u32 ordinal) {
+u64 pe_process_symbol(struct pe_process *p, u64 module, const char *name, u32 ordinal) {
   if (!p || p->busy)
     return 0;
   for (u32 i = 0; i < p->count; i++)
     if (p->modules[i].base == module) {
       /* Forwarders must target the already-linked graph during GetProcAddress.
        */
-      u32 old = p->count;
+      u32 old    = p->count;
       u64 result = resolve(p, i, name, ordinal, 0);
       if (p->count != old) {
         for (u32 j = old; j < p->count; j++)

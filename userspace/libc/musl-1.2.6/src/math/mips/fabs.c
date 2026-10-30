@@ -2,11 +2,10 @@
 
 #include <math.h>
 
-double fabs(double x)
-{
-	double r;
-	__asm__("abs.d %0,%1" : "=f"(r) : "f"(x));
-	return r;
+double fabs(double x) {
+  double r;
+  __asm__("abs.d %0,%1" : "=f"(r) : "f"(x));
+  return r;
 }
 
 #else

@@ -29,20 +29,16 @@
  * through an "i" constraint so it must be a compile-time constant, and %c0
  * prints it without the AT&T immediate prefix. Nothing ever assembles this
  * text , the build stops at -S. */
-#define ASM_DEFINE(name, value)                                                \
-  __asm__ __volatile__("\n.ascii \"@ASMDEF@ " #name " %c0\""                   \
-                       :                                                       \
-                       : "i"((long)(value)))
+#define ASM_DEFINE(name, value)                                                                    \
+  __asm__ __volatile__("\n.ascii \"@ASMDEF@ " #name " %c0\"" : : "i"((long)(value)))
 
 void asm_offsets(void);
 
 void asm_offsets(void) {
   /* struct cpu_local , reached through GS on every privilege entry. */
   ASM_DEFINE(CPU_LOCAL_SELF_OFF, offsetof(struct cpu_local, self));
-  ASM_DEFINE(CPU_LOCAL_KERNEL_RSP_TOP_OFF,
-             offsetof(struct cpu_local, kernel_rsp_top));
-  ASM_DEFINE(CPU_LOCAL_USER_RSP_SAVE_OFF,
-             offsetof(struct cpu_local, user_rsp_save));
+  ASM_DEFINE(CPU_LOCAL_KERNEL_RSP_TOP_OFF, offsetof(struct cpu_local, kernel_rsp_top));
+  ASM_DEFINE(CPU_LOCAL_USER_RSP_SAVE_OFF, offsetof(struct cpu_local, user_rsp_save));
   ASM_DEFINE(CPU_LOCAL_CURRENT_OFF, offsetof(struct cpu_local, current));
   ASM_DEFINE(CPU_LOCAL_SIZE, sizeof(struct cpu_local));
 
@@ -59,10 +55,8 @@ void asm_offsets(void) {
 
   /* struct interrupt_frame , built by isr_common. Offsets are from the base
    * of the register image, i.e. from RSP right after the last push. */
-  ASM_DEFINE(INTERRUPT_FRAME_INT_NUM_OFF,
-             offsetof(struct interrupt_frame, int_num));
-  ASM_DEFINE(INTERRUPT_FRAME_ERR_CODE_OFF,
-             offsetof(struct interrupt_frame, err_code));
+  ASM_DEFINE(INTERRUPT_FRAME_INT_NUM_OFF, offsetof(struct interrupt_frame, int_num));
+  ASM_DEFINE(INTERRUPT_FRAME_ERR_CODE_OFF, offsetof(struct interrupt_frame, err_code));
   ASM_DEFINE(INTERRUPT_FRAME_RIP_OFF, offsetof(struct interrupt_frame, rip));
   ASM_DEFINE(INTERRUPT_FRAME_CS_OFF, offsetof(struct interrupt_frame, cs));
   ASM_DEFINE(INTERRUPT_FRAME_SIZE, sizeof(struct interrupt_frame));
@@ -71,17 +65,15 @@ void asm_offsets(void) {
    * once the register pops are done. This is the displacement the return-path
    * privilege test uses. */
   ASM_DEFINE(INTERRUPT_EXIT_CS_OFF,
-             offsetof(struct interrupt_frame, cs) -
-                 offsetof(struct interrupt_frame, int_num));
+             offsetof(struct interrupt_frame, cs) - offsetof(struct interrupt_frame, int_num));
   /* Bytes of vector + error code the stub must discard before iretq. */
   ASM_DEFINE(INTERRUPT_EXIT_VEC_ERR_BYTES,
-             offsetof(struct interrupt_frame, rip) -
-                 offsetof(struct interrupt_frame, int_num));
+             offsetof(struct interrupt_frame, rip) - offsetof(struct interrupt_frame, int_num));
   /* And once more from the base of the CPU-pushed iretq image, which is where
    * RSP sits after those bytes are dropped. Lets the return-path privilege
    * test run with swapgs still adjacent to iretq. */
-  ASM_DEFINE(INTERRUPT_IRETQ_CS_OFF, offsetof(struct interrupt_frame, cs) -
-                                         offsetof(struct interrupt_frame, rip));
+  ASM_DEFINE(INTERRUPT_IRETQ_CS_OFF,
+             offsetof(struct interrupt_frame, cs) - offsetof(struct interrupt_frame, rip));
 
   /* GDT selectors. RPL 3 is folded in here so no .asm file open-codes an
    * or-3 on a selector value. */

@@ -12,45 +12,40 @@
 
 /* File / I/O */
 long write(int fd, const void *buf, size_t n) {
-    return syscall_result(syscall3(SYS_WRITE, fd, (sysarg_t)(uintptr_t)buf,
-                                  (sysarg_t)(uintptr_t)n));
+  return syscall_result(syscall3(SYS_WRITE, fd, (sysarg_t)(uintptr_t)buf, (sysarg_t)(uintptr_t)n));
 }
 long read(int fd, void *buf, size_t n) {
-    return syscall_result(syscall3(SYS_READ, fd, (sysarg_t)(uintptr_t)buf,
-                                  (sysarg_t)(uintptr_t)n));
+  return syscall_result(syscall3(SYS_READ, fd, (sysarg_t)(uintptr_t)buf, (sysarg_t)(uintptr_t)n));
 }
 long open(const char *path, int flags) {
-    return syscall_result(syscall2(SYS_OPEN, (sysarg_t)(uintptr_t)path, flags));
+  return syscall_result(syscall2(SYS_OPEN, (sysarg_t)(uintptr_t)path, flags));
 }
-long close(int fd) {
-    return syscall_result(syscall1(SYS_CLOSE, fd));
-}
+long close(int fd) { return syscall_result(syscall1(SYS_CLOSE, fd)); }
 long lseek(int fd, long off, int whence) {
-    return syscall_result(syscall3(SYS_LSEEK, fd, off, whence));
+  return syscall_result(syscall3(SYS_LSEEK, fd, off, whence));
 }
 long chdir(const char *path) {
-    return syscall_result(syscall1(SYS_CHDIR, (sysarg_t)(uintptr_t)path));
+  return syscall_result(syscall1(SYS_CHDIR, (sysarg_t)(uintptr_t)path));
 }
 /* Mounting. musl declares these, so like the rest of this file they exist
  * only for the hand-rolled libc; a musl binary reaches the same syscalls
  * through musl's own wrappers. See lib/syscall.h for what Gaia accepts. */
 int mount(const char *source, const char *target, const char *filesystemtype,
           unsigned long mountflags, const void *data) {
-    return (int)syscall_result(syscall5(SYS_MOUNT, (sysarg_t)(uintptr_t)source,
-                                        (sysarg_t)(uintptr_t)target,
-                                        (sysarg_t)(uintptr_t)filesystemtype,
-                                        (sysarg_t)mountflags,
-                                        (sysarg_t)(uintptr_t)data));
+  return (int)syscall_result(syscall5(SYS_MOUNT,
+                                      (sysarg_t)(uintptr_t)source,
+                                      (sysarg_t)(uintptr_t)target,
+                                      (sysarg_t)(uintptr_t)filesystemtype,
+                                      (sysarg_t)mountflags,
+                                      (sysarg_t)(uintptr_t)data));
 }
 int umount2(const char *target, int flags) {
-    return (int)syscall_result(syscall2(SYS_UMOUNT, (sysarg_t)(uintptr_t)target,
-                                        (sysarg_t)flags));
+  return (int)syscall_result(syscall2(SYS_UMOUNT, (sysarg_t)(uintptr_t)target, (sysarg_t)flags));
 }
 int umount(const char *target) { return umount2(target, 0); }
 char *getcwd(char *buf, size_t size) {
-    long rc = syscall_result(
-        syscall2(SYS_GETCWD, (sysarg_t)(uintptr_t)buf, (sysarg_t)size));
-    return rc < 0 ? 0 : buf;
+  long rc = syscall_result(syscall2(SYS_GETCWD, (sysarg_t)(uintptr_t)buf, (sysarg_t)size));
+  return rc < 0 ? 0 : buf;
 }
 /* Memory
  *
@@ -58,31 +53,29 @@ char *getcwd(char *buf, size_t size) {
  * that only checks `!= NULL`, and a fixed mapping at a low address would
  * be indistinguishable from failure. */
 void *mmap(void *addr, size_t len, int prot, int flags) {
-    long rc = syscall_result(
-        syscall4(SYS_MMAP, (sysarg_t)(uintptr_t)addr, (sysarg_t)len, prot, flags));
-    return rc < 0 ? MAP_FAILED : (void *)(uintptr_t)rc;
+  long rc =
+      syscall_result(syscall4(SYS_MMAP, (sysarg_t)(uintptr_t)addr, (sysarg_t)len, prot, flags));
+  return rc < 0 ? MAP_FAILED : (void *)(uintptr_t)rc;
 }
 int mprotect(void *addr, size_t len, int prot) {
-    return (int)syscall_result(
-        syscall3(SYS_MPROTECT, (sysarg_t)(uintptr_t)addr, (sysarg_t)len, prot));
+  return (int)syscall_result(
+      syscall3(SYS_MPROTECT, (sysarg_t)(uintptr_t)addr, (sysarg_t)len, prot));
 }
 int munmap(void *addr, size_t len) {
-    return (int)syscall_result(
-        syscall2(SYS_MUNMAP, (sysarg_t)(uintptr_t)addr, (sysarg_t)len));
+  return (int)syscall_result(syscall2(SYS_MUNMAP, (sysarg_t)(uintptr_t)addr, (sysarg_t)len));
 }
 long readdir(unsigned *index, char *buf, size_t n) {
-    return syscall_result(syscall3(SYS_READDIR_INDEX, (sysarg_t)(uintptr_t)index,
-                                   (sysarg_t)(uintptr_t)buf, (sysarg_t)n));
+  return syscall_result(syscall3(
+      SYS_READDIR_INDEX, (sysarg_t)(uintptr_t)index, (sysarg_t)(uintptr_t)buf, (sysarg_t)n));
 }
 long unlink(const char *path) {
-    return syscall_result(syscall1(SYS_UNLINK, (sysarg_t)(uintptr_t)path));
+  return syscall_result(syscall1(SYS_UNLINK, (sysarg_t)(uintptr_t)path));
 }
 /* Process control */
 /* Never returns; the for-loop is dead code that quiets warnings. */
 void exit(int code) {
-    syscall1(SYS_EXIT, code);
-    for (;;);
+  syscall1(SYS_EXIT, code);
+  for (;;)
+    ;
 }
-long kill(long pid, int signal) {
-    return syscall_result(syscall2(SYS_KILL, pid, signal));
-}
+long kill(long pid, int signal) { return syscall_result(syscall2(SYS_KILL, pid, signal)); }

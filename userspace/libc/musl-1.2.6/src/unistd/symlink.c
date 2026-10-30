@@ -1,12 +1,11 @@
-#include <unistd.h>
-#include <fcntl.h>
 #include "syscall.h"
+#include <fcntl.h>
+#include <unistd.h>
 
-int symlink(const char *existing, const char *new)
-{
+int symlink(const char *existing, const char *new) {
 #ifdef SYS_symlink
-	return syscall(SYS_symlink, existing, new);
+  return syscall(SYS_symlink, existing, new);
 #else
-	return syscall(SYS_symlinkat, existing, AT_FDCWD, new);
+  return syscall(SYS_symlinkat, existing, AT_FDCWD, new);
 #endif
 }

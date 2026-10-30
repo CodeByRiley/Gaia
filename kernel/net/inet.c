@@ -18,7 +18,7 @@
  * x86_64-only, like the rest of the kernel. */
 u16 inet_checksum(const void *data, u32 len) {
   const u8 *bytes = (const u8 *)data;
-  u32 sum = 0;
+  u32 sum         = 0;
 
   while (len > 1) {
     u16 word;

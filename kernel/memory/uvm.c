@@ -10,8 +10,8 @@
 void uvm_init(struct task_vm *vm) {
   if (!vm)
     return;
-  vm->shmem_next_va = USER_SHMEM_BASE;
-  vm->mmap_next_va = USER_MMAP_BASE;
+  vm->shmem_next_va    = USER_SHMEM_BASE;
+  vm->mmap_next_va     = USER_MMAP_BASE;
   vm->shmem_shared_out = 0;
   memset(vm->mmap_holes, 0, sizeof(vm->mmap_holes));
   memset(vm->vmas, 0, sizeof(vm->vmas));
@@ -84,7 +84,7 @@ static void hole_add(struct task_vm *vm, u64 base, u64 bytes) {
     if (hole_end > end)
       end = hole_end;
     h->base = 0;
-    h->len = 0;
+    h->len  = 0;
     /* The expanded range may now touch a hole visited earlier. */
     i = -1;
   }
@@ -92,7 +92,7 @@ static void hole_add(struct task_vm *vm, u64 base, u64 bytes) {
   for (int i = 0; i < TASK_MMAP_HOLES; i++) {
     if (!vm->mmap_holes[i].len) {
       vm->mmap_holes[i].base = base;
-      vm->mmap_holes[i].len = end - base;
+      vm->mmap_holes[i].len  = end - base;
       return;
     }
   }
@@ -154,10 +154,10 @@ static int vma_remove_range(struct task_vm *vm, u64 start, u64 end) {
       vma->end = start;
     } else {
       *split = (struct user_vma){
-          .start = end,
-          .end = vma->end,
+          .start     = end,
+          .end       = vma->end,
           .pte_flags = vma->pte_flags,
-          .used = 1,
+          .used      = 1,
       };
       vma->end = start;
     }
@@ -169,15 +169,14 @@ int uvm_fault_in(struct task_vm *vm, u64 addr, int writable) {
   if (!vm || !vm->user_pml4)
     return 0;
 
-  u64 page = addr & ~4095ULL;
+  u64 page  = addr & ~4095ULL;
   u64 entry = vmm_entry_in(vm->user_pml4, page);
   if (entry) {
     return (entry & VMM_USER) && (!writable || (entry & VMM_WRITE));
   }
 
   struct user_vma *vma = vma_at(vm, page);
-  if (!vma || !(vma->pte_flags & VMM_USER) ||
-      (writable && !(vma->pte_flags & VMM_WRITE))) {
+  if (!vma || !(vma->pte_flags & VMM_USER) || (writable && !(vma->pte_flags & VMM_WRITE))) {
     return 0;
   }
 
@@ -192,15 +191,14 @@ int uvm_fault_in(struct task_vm *vm, u64 addr, int writable) {
   return 1;
 }
 
-int uvm_buffer_ok(struct task_vm *vm, const void *pointer, u64 bytes,
-                  int writable) {
+int uvm_buffer_ok(struct task_vm *vm, const void *pointer, u64 bytes, int writable) {
   if (bytes == 0)
     return 1;
   if (!vm || !vm->user_pml4)
     return 0;
 
   u64 base = (u64)(uintptr_t)pointer;
-  u64 end = base + bytes;
+  u64 end  = base + bytes;
   if (base < USER_VA_MIN || end < base)
     return 0;
 
@@ -208,7 +206,7 @@ int uvm_buffer_ok(struct task_vm *vm, const void *pointer, u64 bytes,
    * must never allocate over it; ordinary syscall buffers may still live
    * there, so the stack is admitted explicitly here. */
   int in_general_range = end <= USER_VA_MAX;
-  int in_stack = base >= USER_STACK_LOW && end <= USER_STACK_TOP;
+  int in_stack         = base >= USER_STACK_LOW && end <= USER_STACK_TOP;
   if (!in_general_range && !in_stack)
     return 0;
 
@@ -224,8 +222,7 @@ int uvm_buffer_ok(struct task_vm *vm, const void *pointer, u64 bytes,
   return 1;
 }
 
-u64 uvm_reserve(struct task_vm *vm, u64 addr, u64 bytes, u64 pte_flags,
-                int fixed) {
+u64 uvm_reserve(struct task_vm *vm, u64 addr, u64 bytes, u64 pte_flags, int fixed) {
   if (!vm || !vm->user_pml4 || !bytes || (bytes & 4095) || !pte_flags)
     return 0;
 
@@ -249,10 +246,10 @@ u64 uvm_reserve(struct task_vm *vm, u64 addr, u64 bytes, u64 pte_flags,
   }
 
   *vma = (struct user_vma){
-      .start = base,
-      .end = base + bytes,
+      .start     = base,
+      .end       = base + bytes,
       .pte_flags = pte_flags,
-      .used = 1,
+      .used      = 1,
   };
   return base;
 }
@@ -287,7 +284,7 @@ int uvm_release(struct task_vm *vm, u64 addr, u64 bytes) {
     return -1;
 
   for (u64 off = 0; off < bytes; off += 4096) {
-    u64 va = addr + off;
+    u64 va    = addr + off;
     u64 entry = vmm_entry_in(vm->user_pml4, va);
     if (!entry)
       continue;

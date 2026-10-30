@@ -1,8 +1,8 @@
 #ifndef AHCI_H
 #define AHCI_H
 
-#include <utilities/types.h>
 #include <sync/spinlock.h>
+#include <utilities/types.h>
 #ifndef QEMU
 
 #else
@@ -48,21 +48,21 @@
 #define AHCI_SIG_ATAPI 0xEB140101u
 
 enum FIS_TYPE {
-  FIS_TYPE_REG_H2D = 0x27,   // Register FIS - host to device
-  FIS_TYPE_REG_D2H = 0x34,   // Register FIS - device to host
-  FIS_TYPE_DMA_ACT = 0x39,   // DMA activate FIS - device to host
+  FIS_TYPE_REG_H2D   = 0x27, // Register FIS - host to device
+  FIS_TYPE_REG_D2H   = 0x34, // Register FIS - device to host
+  FIS_TYPE_DMA_ACT   = 0x39, // DMA activate FIS - device to host
   FIS_TYPE_DMA_SETUP = 0x41, // DMA setup FIS - bidirectional
-  FIS_TYPE_DATA = 0x46,      // Data FIS - bidirectional
-  FIS_TYPE_BIST = 0x58,      // BIST activate FIS - bidirectional
+  FIS_TYPE_DATA      = 0x46, // Data FIS - bidirectional
+  FIS_TYPE_BIST      = 0x58, // BIST activate FIS - bidirectional
   FIS_TYPE_PIO_SETUP = 0x5F, // PIO setup FIS - device to host
-  FIS_TYPE_DEV_BITS = 0xA1,  // Set device bits FIS - device to host
+  FIS_TYPE_DEV_BITS  = 0xA1, // Set device bits FIS - device to host
 };
 
 struct FIS_REG_H2D {
   u8 fis_type;   // FIS_TYPE_REG_H2D
   u8 pmport : 4; // Port multiplier
-  u8 rsv0 : 3;   // Reserved
-  u8 c : 1;      // 1: Command, 0: Control
+  u8 rsv0   : 3; // Reserved
+  u8 c      : 1; // 1: Command, 0: Control
   u8 command;    // Command register
   u8 featurel;   // Feature register, 7:0
   u8 lba0;       // LBA low register, 7:0
@@ -83,9 +83,9 @@ struct FIS_REG_H2D {
 struct FIS_REG_D2H {
   u8 fis_type;   // FIS_TYPE_REG_D2H
   u8 pmport : 4; // Port multiplier
-  u8 rsv0 : 2;   // Reserved
-  u8 i : 1;      // Interrupt bit
-  u8 rsv1 : 1;   // Reserved
+  u8 rsv0   : 2; // Reserved
+  u8 i      : 1; // Interrupt bit
+  u8 rsv1   : 1; // Reserved
   u8 status;     // Status register
   u8 error;      // Error register
   u8 lba0;       // LBA low register, 7:0
@@ -105,7 +105,7 @@ struct FIS_REG_D2H {
 struct FIS_DATA {
   u8 fis_type;   // FIS_TYPE_DATA
   u8 pmport : 4; // Port multiplier
-  u8 rsv0 : 4;   // Reserved
+  u8 rsv0   : 4; // Reserved
   u8 rsv1[2];    // Reserved
   u32 data[1];   // Payload
 };
@@ -113,10 +113,10 @@ struct FIS_DATA {
 struct FIS_PIO_SETUP {
   u8 fis_type;   // FIS_TYPE_PIO_SETUP
   u8 pmport : 4; // Port multiplier
-  u8 rsv0 : 1;   // Reserved
-  u8 d : 1;      // Data transfer direction, 1 - device to host
-  u8 i : 1;      // Interrupt bit
-  u8 rsv1 : 1;
+  u8 rsv0   : 1; // Reserved
+  u8 d      : 1; // Data transfer direction, 1 - device to host
+  u8 i      : 1; // Interrupt bit
+  u8 rsv1   : 1;
   u8 status;   // Status register
   u8 error;    // Error register
   u8 lba0;     // LBA low register, 7:0
@@ -138,10 +138,10 @@ struct FIS_PIO_SETUP {
 struct FIS_DMA_SETUP {
   u8 fis_type;       // FIS_TYPE_DMA_SETUP
   u8 pmport : 4;     // Port multiplier
-  u8 rsv0 : 1;       // Reserved
-  u8 d : 1;          // Data transfer direction, 1 - device to host
-  u8 i : 1;          // Interrupt bit
-  u8 a : 1;          // Auto-activate. Specifies if DMA Activate FIS is needed
+  u8 rsv0   : 1;     // Reserved
+  u8 d      : 1;     // Data transfer direction, 1 - device to host
+  u8 i      : 1;     // Interrupt bit
+  u8 a      : 1;     // Auto-activate. Specifies if DMA Activate FIS is needed
   u8 rsved[2];       // Reserved
   u64 DMAbufferID;   // DMA Buffer Identifier. Used to Identify DMA buffer in
                      // host memory. SATA Spec says host specific and not in
@@ -171,18 +171,18 @@ struct AHCI_PHYS_DESC {
  *   DW1 PRDBC, DW2/DW3 CTBA/CTBAU, DW4-DW7 reserved. */
 struct AHCI_CMD_HEADER {
   /* DW0 */
-  u8 cfl : 5;    // Command FIS Length (in DWORDs)
-  u8 atapi : 1;
-  u8 write : 1;  // 1 = Write to device, 0 = Read from device
+  u8 cfl      : 5; // Command FIS Length (in DWORDs)
+  u8 atapi    : 1;
+  u8 write    : 1; // 1 = Write to device, 0 = Read from device
   u8 prefetch : 1;
 
-  u8 reset : 1;
-  u8 bist : 1;
-  u8 c : 1;      // Clear busy upon R_OK
-  u8 rsv0 : 1;
-  u8 pmp : 4;    // Port multiplier
+  u8 reset    : 1;
+  u8 bist     : 1;
+  u8 c        : 1; // Clear busy upon R_OK
+  u8 rsv0     : 1;
+  u8 pmp      : 4; // Port multiplier
 
-  u16 prdt_length;    // Number of PRDT entries
+  u16 prdt_length; // Number of PRDT entries
   /* DW1 */
   volatile u32 prdbc; // Bytes transferred; written by the HBA
   /* DW2-DW3 */
@@ -202,10 +202,10 @@ _Static_assert(sizeof(struct AHCI_CMD_HEADER) == 32,
  * Eight PRDT entries round the whole thing to 256 bytes, so a 4 KiB frame
  * holds 16 of them and every one lands on the required 128-byte alignment. */
 struct AHCI_CMD_TABLE {
-  struct FIS_REG_H2D command_fis; // 0x00, 20 bytes
-  u8 rsv0[44];                    // Pad the CFIS area out to 64 bytes
-  u8 acmd[16];                    // 0x40, ATAPI command
-  u8 rsv1[48];                    // 0x50..0x7F reserved
+  struct FIS_REG_H2D command_fis;                // 0x00, 20 bytes
+  u8 rsv0[44];                                   // Pad the CFIS area out to 64 bytes
+  u8 acmd[16];                                   // 0x40, ATAPI command
+  u8 rsv1[48];                                   // 0x50..0x7F reserved
   struct AHCI_PHYS_DESC prdt[AHCI_PRDT_ENTRIES]; // 0x80
 } PACKED;
 
@@ -220,30 +220,30 @@ _Static_assert(sizeof(struct AHCI_CMD_TABLE) == 256,
 
 /* State and memory allocations for a single SATA port */
 struct AHCI_PORT {
-    struct spinlock io_lock; // Serialize commands, including cache barriers.
-    int is_active;          // 1 if a drive is present and initialized
-    u32 signature;     // 0x00000101 for SATA, 0xEB140101 for ATAPI
+  struct spinlock io_lock; // Serialize commands, including cache barriers.
+  int is_active;           // 1 if a drive is present and initialized
+  u32 signature;           // 0x00000101 for SATA, 0xEB140101 for ATAPI
 
-    void *cmd_list_virt;    // Virtual address of the 1KB Command List
-    u64 cmd_list_phys; // Physical address of the Command List
+  void *cmd_list_virt; // Virtual address of the 1KB Command List
+  u64 cmd_list_phys;   // Physical address of the Command List
 
-    void *fis_virt;         // Virtual address of the 256B Received FIS
-    u64 fis_phys;      // Physical address of the Received FIS
+  void *fis_virt; // Virtual address of the 256B Received FIS
+  u64 fis_phys;   // Physical address of the Received FIS
 
-    void *cmd_table_virt;   // Virtual base of the AHCI_SLOTS_PER_PORT tables
-    u64 cmd_table_phys;// Physical base of the Command Table array
+  void *cmd_table_virt; // Virtual base of the AHCI_SLOTS_PER_PORT tables
+  u64 cmd_table_phys;   // Physical base of the Command Table array
 
-    u32 slots;              // Usable command slots (min of HBA NCS and array)
+  u32 slots; // Usable command slots (min of HBA NCS and array)
 };
 
 /* Main device structure holding HBA state and all ports */
 struct AHCI_DEVICE_DATA {
-    uptr abar_phys;                 // Physical address of AHCI Base Address (BAR5)
-    void *abar_virtual;             // Virtual memory mapping of ABAR
-    u32 ports_implemented;     // Bitmap of ports implemented by HBA
-    int irq;                        // IRQ number (if using legacy interrupts)
+  uptr abar_phys;        // Physical address of AHCI Base Address (BAR5)
+  void *abar_virtual;    // Virtual memory mapping of ABAR
+  u32 ports_implemented; // Bitmap of ports implemented by HBA
+  int irq;               // IRQ number (if using legacy interrupts)
 
-    struct AHCI_PORT ports[AHCI_MAX_PORTS]; // Array of port states
+  struct AHCI_PORT ports[AHCI_MAX_PORTS]; // Array of port states
 };
 
 struct driver;
@@ -256,13 +256,11 @@ extern struct AHCI_DEVICE_DATA *g_ahci_dev;
 
 /* Read `count` 512-byte sectors starting at `lba` into the physical buffer
  * `buf_phys`. Returns 0 on success, -1 on error or timeout. */
-int ahci_read_sector(struct AHCI_DEVICE_DATA *dev, int port, u64 lba,
-                     u32 count, void *buf_phys);
+int ahci_read_sector(struct AHCI_DEVICE_DATA *dev, int port, u64 lba, u32 count, void *buf_phys);
 
 /* Write `count` 512-byte sectors starting at `lba` from the physical buffer
  * `buf_phys`. Returns 0 on success, -1 on error or timeout. */
-int ahci_write_sector(struct AHCI_DEVICE_DATA *dev, int port, u64 lba,
-                      u32 count, void *buf_phys);
+int ahci_write_sector(struct AHCI_DEVICE_DATA *dev, int port, u64 lba, u32 count, void *buf_phys);
 
 int ahci_identify(struct AHCI_DEVICE_DATA *dev, int port, void *buf_phys);
 int ahci_flush_cache(struct AHCI_DEVICE_DATA *dev, int port);

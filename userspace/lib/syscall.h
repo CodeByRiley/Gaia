@@ -111,10 +111,9 @@ sysarg_t syscall1(sysarg_t n, sysarg_t a);
 sysarg_t syscall2(sysarg_t n, sysarg_t a, sysarg_t b);
 sysarg_t syscall3(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c);
 sysarg_t syscall4(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d);
-sysarg_t syscall5(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d,
-                  sysarg_t e);
-sysarg_t syscall6(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d,
-                  sysarg_t e, sysarg_t f);
+sysarg_t syscall5(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d, sysarg_t e);
+sysarg_t syscall6(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d, sysarg_t e,
+                  sysarg_t f);
 
 /* Convert the kernel's negative errno result into the conventional
  * userspace pair: errno is set and the caller receives -1. Musl performs
@@ -189,10 +188,8 @@ long yield(void);
 long blockdev_list(struct blockdev_info *out, long max);
 /* Raw I/O is for maintenance tools. A request holds at most 64 512-byte
  * sectors, and writes to mounted volumes are rejected by the kernel. */
-long blockdev_read(const char *source, uint64_t lba, uint32_t sectors,
-                   void *out);
-long blockdev_write(const char *source, uint64_t lba, uint32_t sectors,
-                    const void *in);
+long blockdev_read(const char *source, uint64_t lba, uint32_t sectors, void *out);
+long blockdev_write(const char *source, uint64_t lba, uint32_t sectors, const void *in);
 long blockdev_flush(const char *source);
 long fs_sync(void);
 #ifndef GAIA_USE_MUSL
@@ -289,8 +286,7 @@ long audio_resume(void);
  * receiver side; senders may leave it zero. */
 long ipc_send(int target_pid, const struct ipc_msg *m);
 long ipc_recv(struct ipc_msg *out);
-long shmem_share(int target_pid, uint64_t in_va, long npages,
-                 uint64_t *out_target_va);
+long shmem_share(int target_pid, uint64_t in_va, long npages, uint64_t *out_target_va);
 long shmem_unshare(int target_pid, uint64_t in_va, long npages);
 
 /* Heimdall registration / discovery. The pid of the WM is not cached because

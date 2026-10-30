@@ -27,23 +27,21 @@ struct usb_pipe;
 /* Issue one control transfer to the pipe's device. `in` is 1 for
  * device-to-host. Returns bytes transferred, or negative on failure , the
  * convention both controllers already use. */
-typedef int (*usb_control_fn)(const struct usb_pipe *pipe,
-                              const struct usb_setup_packet *setup, void *data,
-                              u16 length, int in);
+typedef int (*usb_control_fn)(const struct usb_pipe *pipe, const struct usb_setup_packet *setup,
+                              void *data, u16 length, int in);
 
 struct usb_pipe {
-    /* Controller-private, handed back to `control` untouched. */
-    void *hc;
-    usb_control_fn control;
-    u8 address;      /* 0 until SET_ADDRESS is accepted */
-    u16 maxpacket;   /* endpoint 0 packet size */
-    int low_speed;   /* UHCI puts this in its TDs; EHCI ignores it */
-    const char *tag; /* "UHCI" / "EHCI", prefixes log lines */
+  /* Controller-private, handed back to `control` untouched. */
+  void *hc;
+  usb_control_fn control;
+  u8 address;      /* 0 until SET_ADDRESS is accepted */
+  u16 maxpacket;   /* endpoint 0 packet size */
+  int low_speed;   /* UHCI puts this in its TDs; EHCI ignores it */
+  const char *tag; /* "UHCI" / "EHCI", prefixes log lines */
 };
 
 /* Standard device requests. Each returns what the transfer returned. */
-int usb_get_descriptor(const struct usb_pipe *pipe, u8 type, u8 index,
-                       void *out, u16 length);
+int usb_get_descriptor(const struct usb_pipe *pipe, u8 type, u8 index, void *out, u16 length);
 int usb_set_address(const struct usb_pipe *pipe, u8 address);
 int usb_set_configuration(const struct usb_pipe *pipe, u8 configuration);
 
@@ -55,8 +53,7 @@ int usb_hid_set_boot_protocol(const struct usb_pipe *pipe, u8 interface);
 /* Read a configuration block into `buffer`: the 9-byte header first for
  * wTotalLength, then the whole block. A device claiming more than `capacity`
  * is truncated rather than allowed to overrun. Returns bytes read, or -1. */
-int usb_read_config(const struct usb_pipe *pipe, u8 index, u8 *buffer,
-                    u16 capacity);
+int usb_read_config(const struct usb_pipe *pipe, u8 index, u8 *buffer, u16 capacity);
 
 /* What kind of pointing device an interrupt endpoint belongs to. */
 #define USB_INT_KIND_NONE 0
@@ -64,9 +61,9 @@ int usb_read_config(const struct usb_pipe *pipe, u8 index, u8 *buffer,
 #define USB_INT_KIND_HID_TABLET 2
 
 struct usb_hid_pointer {
-    u8 interface_number;
-    u8 kind;
-    struct usb_endpoint_descriptor endpoint;
+  u8 interface_number;
+  u8 kind;
+  struct usb_endpoint_descriptor endpoint;
 };
 
 /* Walk a configuration block for the first interrupt-IN endpoint belonging to
@@ -82,7 +79,7 @@ struct usb_hid_pointer {
  * its HID report descriptor is exactly the 74 bytes QEMU's usb-tablet reports,
  * because there is no HID report parser yet and guessing turns every vendor
  * HID device into a mouse. */
-int usb_find_hid_pointer(const u8 *config, int length, u16 max_packet_limit,
-                         const char *tag, struct usb_hid_pointer *out);
+int usb_find_hid_pointer(const u8 *config, int length, u16 max_packet_limit, const char *tag,
+                         struct usb_hid_pointer *out);
 
 #endif /* USB_DEVICE_H */

@@ -1,8 +1,7 @@
-static inline uintptr_t __get_tp()
-{
-	uintptr_t tp;
-	__asm__ ("stc gbr,%0" : "=r" (tp) );
-	return tp;
+static inline uintptr_t __get_tp() {
+  uintptr_t tp;
+  __asm__("stc gbr,%0" : "=r"(tp));
+  return tp;
 }
 
 #define TLS_ABOVE_TP
@@ -12,5 +11,5 @@ static inline uintptr_t __get_tp()
 
 #ifdef __FDPIC__
 #define MC_GOT gregs[12]
-#define CANCEL_GOT (*(uintptr_t *)((char *)__syscall_cp_asm+sizeof(uintptr_t)))
+#define CANCEL_GOT (*(uintptr_t *)((char *)__syscall_cp_asm + sizeof(uintptr_t)))
 #endif

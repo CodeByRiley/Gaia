@@ -1,7 +1,7 @@
 #include <lib/services.h>
 #include <shims/win32/handles.h>
 #include <shims/win32/windows.h>
-BOOL WINAPI RtlFreeHeap(HANDLE,ULONG,void *);
+BOOL WINAPI RtlFreeHeap(HANDLE, ULONG, void *);
 void GaiaCloseThreadHandle(int64_t);
 struct slot {
   uint32_t generation;
@@ -20,14 +20,13 @@ HANDLE GaiaHandleCreate(unsigned type, int64_t value, unsigned flags) {
   for (unsigned i = 0; i < 256; i++)
     if (!slots[i].type) {
       struct slot *s = slots + i;
-      s->generation = (s->generation + 1) & 0x7fffff;
+      s->generation  = (s->generation + 1) & 0x7fffff;
       if (!s->generation)
         s->generation = 1;
       s->value = value;
       s->flags = flags;
-      s->type = type;
-      HANDLE h =
-          (void *)(uintptr_t)(((uint64_t)s->generation << 16) | (i + 256));
+      s->type  = type;
+      HANDLE h = (void *)(uintptr_t)(((uint64_t)s->generation << 16) | (i + 256));
       release();
       return h;
     }
@@ -35,10 +34,9 @@ HANDLE GaiaHandleCreate(unsigned type, int64_t value, unsigned flags) {
   SetLastError(ERROR_NOT_ENOUGH_MEMORY);
   return INVALID_HANDLE_VALUE;
 }
-BOOL GaiaHandleLookup(HANDLE h, unsigned type, int64_t *value,
-                      unsigned *flags) {
+BOOL GaiaHandleLookup(HANDLE h, unsigned type, int64_t *value, unsigned *flags) {
   uintptr_t n = (uintptr_t)h;
-  unsigned i = (n & 65535) - 256;
+  unsigned i  = (n & 65535) - 256;
   acquire();
   BOOL ok = i < 256 && slots[i].type && (!type || slots[i].type == type) &&
             slots[i].generation == (n >> 16);
@@ -55,7 +53,7 @@ BOOL GaiaHandleLookup(HANDLE h, unsigned type, int64_t *value,
 }
 BOOL GaiaHandleClose(HANDLE h) {
   uintptr_t n = (uintptr_t)h;
-  unsigned i = (n & 65535) - 256;
+  unsigned i  = (n & 65535) - 256;
   acquire();
   if (i >= 256 || !slots[i].type || slots[i].generation != (n >> 16)) {
     release();
@@ -73,9 +71,18 @@ BOOL GaiaHandleClose(HANDLE h) {
       return FALSE;
     }
   }
-  if(type==GH_EVENT)RtlFreeHeap((HANDLE)1,0,(void *)(uintptr_t)value);
-  if(type==GH_THREAD)GaiaCloseThreadHandle(value);
+  if (type == GH_EVENT)
+    RtlFreeHeap((HANDLE)1, 0, (void *)(uintptr_t)value);
+  if (type == GH_THREAD)
+    GaiaCloseThreadHandle(value);
   return TRUE;
 }
 
-unsigned GaiaHandleType(HANDLE h){uintptr_t n=(uintptr_t)h;unsigned i=(n&65535)-256;acquire();unsigned type=i<256&&slots[i].generation==(n>>16)?slots[i].type:0;release();return type;}
+unsigned GaiaHandleType(HANDLE h) {
+  uintptr_t n = (uintptr_t)h;
+  unsigned i  = (n & 65535) - 256;
+  acquire();
+  unsigned type = i < 256 && slots[i].generation == (n >> 16) ? slots[i].type : 0;
+  release();
+  return type;
+}

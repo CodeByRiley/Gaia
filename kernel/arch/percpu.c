@@ -44,15 +44,15 @@ static void arm_kernel_gs(struct cpu_local *c) {
 void percpu_init_bsp(u8 bsp_lapic_id) {
   memset(cpus, 0, sizeof(cpus));
   struct cpu_local *c = &cpus[0];
-  c->self = c;
-  c->cpu_id = 0;
-  c->lapic_id = bsp_lapic_id;
-  c->kernel_rsp_top = 0;
-  c->user_rsp_save = 0;
-  c->current = 0;
-  c->idle_task = 0;
-  c->tss = 0;
-  c->online = 1;
+  c->self             = c;
+  c->cpu_id           = 0;
+  c->lapic_id         = bsp_lapic_id;
+  c->kernel_rsp_top   = 0;
+  c->user_rsp_save    = 0;
+  c->current          = 0;
+  c->idle_task        = 0;
+  c->tss              = 0;
+  c->online           = 1;
   arm_kernel_gs(c);
   log_write_hex("PERCPU: bsp gs_base   =", (u64)c, KERNEL, LOG_INFO);
   log_write_hex("PERCPU: bsp lapic_id  =", bsp_lapic_id, KERNEL, LOG_INFO);
@@ -66,10 +66,10 @@ void percpu_init_ap(int cpu_id, u8 lapic_id) {
     return;
   struct cpu_local *c = &cpus[cpu_id];
   memset(c, 0, sizeof(*c));
-  c->self = c;
-  c->cpu_id = cpu_id;
+  c->self     = c;
+  c->cpu_id   = cpu_id;
   c->lapic_id = lapic_id;
-  c->online = 0;
+  c->online   = 0;
 }
 
 void percpu_arm_gs_this(int cpu_id) {

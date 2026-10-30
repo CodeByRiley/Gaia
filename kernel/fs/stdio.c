@@ -18,165 +18,194 @@
 #include <utilities/log.h>
 
 static void set_open_error(int *error_out, int error) {
-    if (error_out)
-        *error_out = error;
+  if (error_out)
+    *error_out = error;
 }
 
 const char *fopen_error_string(int error) {
-    switch (error) {
-    case ENOENT: return "No such file or directory";
-    case ENOMEM: return "Out of memory";
-    case EINVAL: return "Invalid path or mode";
-    case EIO: return "Filesystem I/O error";
-    default: return "Unable to open file";
-    }
+  switch (error) {
+  case ENOENT:
+    return "No such file or directory";
+  case ENOMEM:
+    return "Out of memory";
+  case EINVAL:
+    return "Invalid path or mode";
+  case EIO:
+    return "Filesystem I/O error";
+  default:
+    return "Unable to open file";
+  }
 }
 
 FILE *fopen_ex(const char *name, const char *mode, int *error_out) {
-    set_open_error(error_out, 0);
-    if (!name || !mode) {
-        set_open_error(error_out, EINVAL);
-        return 0;
+  set_open_error(error_out, 0);
+  if (!name || !mode) {
+    set_open_error(error_out, EINVAL);
+    return 0;
+  }
+
+  int read = 0, write = 0, append = 0, truncate = 0, create = 0;
+
+  /* Only mode[0] selects the base mode. Treating every character as a
+   * flag makes "rw" , the common typo for "r+" , silently truncate a
+   * file the caller asked to read.
+   *
+   * `create` tracks the base mode rather than `write`, because "r+"
+   * opens for writing but must still fail on a missing file. */
+  switch (mode[0]) {
+  case 'r':
+    read = 1;
+    break;
+  case 'w':
+    write    = 1;
+    truncate = 1;
+    create   = 1;
+    break;
+  case 'a':
+    write  = 1;
+    append = 1;
+    create = 1;
+    break;
+  default:
+    set_open_error(error_out, EINVAL);
+    return 0;
+  }
+
+  for (int i = 1; mode[i] != '\0'; i++) {
+    switch (mode[i]) {
+    case '+':
+      read  = 1;
+      write = 1;
+      break;
+    case 'b':
+      break; /* Text and binary are equal. */
+    default:
+      set_open_error(error_out, EINVAL);
+      return 0;
     }
+  }
 
-    int read = 0, write = 0, append = 0, truncate = 0, create = 0;
+  FILE *fp = (FILE *)kmalloc(sizeof(FILE));
+  if (!fp) {
+    set_open_error(error_out, ENOMEM);
+    return 0;
+  }
 
-    /* Only mode[0] selects the base mode. Treating every character as a
-     * flag makes "rw" , the common typo for "r+" , silently truncate a
-     * file the caller asked to read.
-     *
-     * `create` tracks the base mode rather than `write`, because "r+"
-     * opens for writing but must still fail on a missing file. */
-    switch (mode[0]) {
-        case 'r': read = 1; break;
-        case 'w': write = 1; truncate = 1; create = 1; break;
-        case 'a': write = 1; append = 1; create = 1; break;
-        default:
-            set_open_error(error_out, EINVAL);
-            return 0;
-    }
+  int status = vfs_open(name, &fp->f);
 
-    for (int i = 1; mode[i] != '\0'; i++) {
-        switch (mode[i]) {
-            case '+': read = 1; write = 1; break;
-            case 'b': break;                  /* Text and binary are equal. */
-            default:
-                set_open_error(error_out, EINVAL);
-                return 0;
-        }
-    }
+  if (status == 0) {
+    /* Existing file. Truncate in place rather than unlink+create: the
+     * old sequence deleted the file before knowing whether a
+     * replacement entry could be allocated, so a failure between the
+     * two left the caller with nothing. */
+    if (truncate)
+      status = vfs_truncate(&fp->f);
+    else if (append)
+      status = vfs_seek(&fp->f, fp->f.size);
+  } else if (status == -ENOENT && create) {
+    status = vfs_create(name, &fp->f);
+  }
 
-    FILE *fp = (FILE*)kmalloc(sizeof(FILE));
-    if (!fp) {
-        set_open_error(error_out, ENOMEM);
-        return 0;
-    }
-
-    int status = vfs_open(name, &fp->f);
-
-    if (status == 0) {
-        /* Existing file. Truncate in place rather than unlink+create: the
-         * old sequence deleted the file before knowing whether a
-         * replacement entry could be allocated, so a failure between the
-         * two left the caller with nothing. */
-        if (truncate)
-            status = vfs_truncate(&fp->f);
-        else if (append)
-            status = vfs_seek(&fp->f, fp->f.size);
-    } else if (status == -ENOENT && create) {
-        status = vfs_create(name, &fp->f);
-    }
-
-    if (status != 0) {
-        vfs_close(&fp->f);
-        kfree(fp);
-        set_open_error(error_out, status < 0 ? -status : EIO);
-        return 0;
-    }
-
-    fp->can_read = read;
-    fp->can_write = write;
-    fp->append = append;
-    fp->valid = 1;
-
-    return fp;
-}
-
-FILE *fopen(const char *name, const char *mode) {
-    return fopen_ex(name, mode, 0);
-}
-
-int fclose(FILE *fp) {
-    if (!fp) return -1;
-    /* Clear the in-use bit before freeing so a stale FILE* that survives
-     * the kfree is rejected by the !valid checks instead of walking a
-     * freed VFS handle. */
-    fp->valid = 0;
+  if (status != 0) {
     vfs_close(&fp->f);
     kfree(fp);
+    set_open_error(error_out, status < 0 ? -status : EIO);
     return 0;
+  }
+
+  fp->can_read  = read;
+  fp->can_write = write;
+  fp->append    = append;
+  fp->valid     = 1;
+
+  return fp;
+}
+
+FILE *fopen(const char *name, const char *mode) { return fopen_ex(name, mode, 0); }
+
+int fclose(FILE *fp) {
+  if (!fp)
+    return -1;
+  /* Clear the in-use bit before freeing so a stale FILE* that survives
+   * the kfree is rejected by the !valid checks instead of walking a
+   * freed VFS handle. */
+  fp->valid = 0;
+  vfs_close(&fp->f);
+  kfree(fp);
+  return 0;
 }
 
 /* size * count without wrapping. An overflow would silently shrink the
  * request and report a short transfer that never happened. */
 static int span_ok(usize size, usize count) {
-    return size != 0 && count != 0 && count <= (usize)-1 / size;
+  return size != 0 && count != 0 && count <= (usize)-1 / size;
 }
 
 usize fread(void *buf, usize size, usize count, FILE *fp) {
-    if (!fp || !fp->valid || !fp->can_read) {
-        return 0;
-    }
-    if (!span_ok(size, count)) return 0;
+  if (!fp || !fp->valid || !fp->can_read) {
+    return 0;
+  }
+  if (!span_ok(size, count))
+    return 0;
 
-    /* Return the number of complete items read. */
-    return vfs_read(&fp->f, buf, size * count) / size;
+  /* Return the number of complete items read. */
+  return vfs_read(&fp->f, buf, size * count) / size;
 }
 
 usize fwrite(const void *buf, usize size, usize count, FILE *fp) {
-    if (!fp || !fp->valid || !fp->can_write) {
-        return 0;
-    }
-    if (!span_ok(size, count)) return 0;
+  if (!fp || !fp->valid || !fp->can_write) {
+    return 0;
+  }
+  if (!span_ok(size, count))
+    return 0;
 
-    /* Append means every write lands at EOF, not just the first one after
-     * open , an intervening fseek must not move where data goes. */
-    /* Return the number of complete items written. */
-    return (fp->append ? vfs_append(&fp->f, buf, size * count)
-                       : vfs_write(&fp->f, buf, size * count)) / size;
+  /* Append means every write lands at EOF, not just the first one after
+   * open , an intervening fseek must not move where data goes. */
+  /* Return the number of complete items written. */
+  return (fp->append ? vfs_append(&fp->f, buf, size * count)
+                     : vfs_write(&fp->f, buf, size * count)) /
+         size;
 }
 
 int fseek(FILE *fp, long off, int whence) {
-    if (!fp || !fp->valid) return -1;
-    u64 base;
-    if      (whence == SEEK_SET) base = 0;
-    else if (whence == SEEK_CUR) base = fp->f.position;
-    else if (whence == SEEK_END) base = fp->f.size;
-    else return -1;
-    u64 target;
-    if (off < 0) {
-        u64 distance = (u64)(-(off + 1)) + 1;
-        if (distance > base) return -1;
-        target = base - distance;
-    } else {
-        if ((u64)off > UINT64_MAX - base) return -1;
-        target = base + (u64)off;
-    }
-    return vfs_seek(&fp->f, target);
+  if (!fp || !fp->valid)
+    return -1;
+  u64 base;
+  if (whence == SEEK_SET)
+    base = 0;
+  else if (whence == SEEK_CUR)
+    base = fp->f.position;
+  else if (whence == SEEK_END)
+    base = fp->f.size;
+  else
+    return -1;
+  u64 target;
+  if (off < 0) {
+    u64 distance = (u64)(-(off + 1)) + 1;
+    if (distance > base)
+      return -1;
+    target = base - distance;
+  } else {
+    if ((u64)off > UINT64_MAX - base)
+      return -1;
+    target = base + (u64)off;
+  }
+  return vfs_seek(&fp->f, target);
 }
 
 long ftell(FILE *fp) {
-    if (!fp || !fp->valid) return -1;
-    return (long)fp->f.position;
+  if (!fp || !fp->valid)
+    return -1;
+  return (long)fp->f.position;
 }
 
 int fgetc(FILE *fp) {
-    if (!fp || !fp->valid || fp->f.position >= fp->f.size) return -1;
-    u8 c;
-    if (vfs_read(&fp->f, &c, 1) != 1) return -1;
-    return c;
+  if (!fp || !fp->valid || fp->f.position >= fp->f.size)
+    return -1;
+  u8 c;
+  if (vfs_read(&fp->f, &c, 1) != 1)
+    return -1;
+  return c;
 }
 
-int feof(FILE *fp) {
-    return !fp || !fp->valid || fp->f.position >= fp->f.size;
-}
+int feof(FILE *fp) { return !fp || !fp->valid || fp->f.position >= fp->f.size; }

@@ -8,11 +8,11 @@
 #ifndef SERIAL_H
 #define SERIAL_H
 
-#include <utilities/types.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 /* Probe + init COM1. Returns 0 if a UART responded, non-zero otherwise. */
-int  serial_init(void);
+int serial_init(void);
 
 /* Polled writers. */
 void serial_write_char(char c);

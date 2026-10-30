@@ -60,8 +60,8 @@ static int path_next(const char *path, int *cursor, char *out, int max) {
   if (!path || !cursor || *cursor < 0 || !out || max < 2)
     return 0;
 
-  int i = *cursor;
-  int n = 0;
+  int i        = *cursor;
+  int n        = 0;
   int overflow = 0;
   while (path[i] && path[i] != ':') {
     if (n + 1 < max)
@@ -147,8 +147,8 @@ static char read_char(void) {
 /* Cache across consecutive TAB presses so cycling matches doesn't rescan
  * the filesystem. Invalidated by any non-TAB key (read_line clears it). */
 static char comp_matches[COMP_MAX_MATCHES][COMP_NAME_MAX];
-static int comp_count = 0;
-static int comp_index = 0;
+static int comp_count    = 0;
+static int comp_index    = 0;
 static int comp_word_len = 0; /* length of word that was replaced */
 
 /* Index of first character of the last whitespace-delimited word in
@@ -220,11 +220,10 @@ static int comp_contains(const char *name, int length) {
   return 0;
 }
 
-static void comp_add(const char *name, int length, const char *prefix,
-                     int prefix_len) {
-  if (comp_count >= COMP_MAX_MATCHES || length <= 0 ||
-      length >= COMP_NAME_MAX || prefix_len > length ||
-      !starts_with_ci(name, prefix, prefix_len) || comp_contains(name, length))
+static void comp_add(const char *name, int length, const char *prefix, int prefix_len) {
+  if (comp_count >= COMP_MAX_MATCHES || length <= 0 || length >= COMP_NAME_MAX ||
+      prefix_len > length || !starts_with_ci(name, prefix, prefix_len) ||
+      comp_contains(name, length))
     return;
   for (int i = 0; i < length; i++)
     comp_matches[comp_count][i] = name[i];
@@ -232,8 +231,7 @@ static void comp_add(const char *name, int length, const char *prefix,
   comp_count++;
 }
 
-static void comp_scan_dir(const char *dir, const char *prefix, int prefix_len,
-                          int commands_only) {
+static void comp_scan_dir(const char *dir, const char *prefix, int prefix_len, int commands_only) {
   char dbuf[512];
   unsigned idx = 0;
   while (comp_count < COMP_MAX_MATCHES) {
@@ -243,8 +241,8 @@ static void comp_scan_dir(const char *dir, const char *prefix, int prefix_len,
     long off = 0;
     while (off < n && comp_count < COMP_MAX_MATCHES) {
       const char *name = dbuf + off;
-      int nl = (int)strlen(name);
-      int display_len = nl;
+      int nl           = (int)strlen(name);
+      int display_len  = nl;
       if (commands_only) {
         if (ends_with_ci(name, nl, ".elf") || ends_with_ci(name, nl, ".exe"))
           display_len -= 4;
@@ -280,7 +278,7 @@ static void comp_scan(const char *prefix, int prefix_len, int command_word) {
 /* Erase the previously-completed word from buf and the screen, then write
  * comp_matches[comp_index] in its place. */
 static void comp_apply(char *buf, int *n_ptr, int max) {
-  int n = *n_ptr;
+  int n      = *n_ptr;
   int wstart = n - comp_word_len;
   if (wstart < 0)
     wstart = 0;
@@ -289,7 +287,7 @@ static void comp_apply(char *buf, int *n_ptr, int max) {
     console_puts("\b \b");
 
   const char *m = comp_matches[comp_index];
-  int ml = (int)strlen(m);
+  int ml        = (int)strlen(m);
   if (wstart + ml >= max)
     ml = max - wstart - 1;
   if (ml < 0)
@@ -299,7 +297,7 @@ static void comp_apply(char *buf, int *n_ptr, int max) {
     buf[wstart + i] = m[i];
     console_putc(m[i]);
   }
-  *n_ptr = wstart + ml;
+  *n_ptr        = wstart + ml;
   comp_word_len = ml;
 }
 
@@ -337,7 +335,7 @@ static void handle_tab(char *buf, int *n_ptr, int max, int continuing) {
 /* Read a line into buf. Handles backspace + TAB locally; returns length
  * (excluding the trailing NUL). Echoes characters as it goes. */
 static int read_line(char *buf, int max) {
-  int n = 0;
+  int n            = 0;
   int last_was_tab = 0;
   while (1) {
     char c = read_char();
@@ -374,7 +372,7 @@ static int read_line(char *buf, int max) {
  * into line, which is modified (NUL inserted at each separator). */
 static int tokenize(char *line, char **argv, int max) {
   int argc = 0;
-  char *p = line;
+  char *p  = line;
   while (*p && argc < max) {
     while (*p == ' ' || *p == '\t')
       p++;
@@ -416,21 +414,21 @@ static int builtin_pwd(int argc, char **argv);
 static int builtin_export(int argc, char **argv);
 static int builtin_fault(int argc, char **argv);
 static const struct builtin builtins[] = {
-    {"help", "help", builtin_help},
-    {"clear", "clear", builtin_clear},
-    {"exit", "exit", builtin_exit},
-    {"run", "run PATH[.elf] [ARG...] [&]", builtin_run},
-    {"mkdir", "mkdir DIR", builtin_mkdir},
-    {"rm", "rm FILE", builtin_rm},
-    {"echo", "echo TEXT...", builtin_echo},
-    {"write", "write FILE TEXT...", builtin_write},
-    {"test", "test", builtin_test},
-    {"fdnstest", "fdnstest", builtin_fdnstest},
-    {"fault", "fault", builtin_fault},
-    {"cd", "cd DIR", builtin_cd},
-    {"pwd", "pwd", builtin_pwd},
-    {"export", "export PATH=DIR[:DIR...]", builtin_export},
-    {0, 0, 0},
+    {"help",     "help",                        builtin_help    },
+    {"clear",    "clear",                       builtin_clear   },
+    {"exit",     "exit",                        builtin_exit    },
+    {"run",      "run PATH[.elf] [ARG...] [&]", builtin_run     },
+    {"mkdir",    "mkdir DIR",                   builtin_mkdir   },
+    {"rm",       "rm FILE",                     builtin_rm      },
+    {"echo",     "echo TEXT...",                builtin_echo    },
+    {"write",    "write FILE TEXT...",          builtin_write   },
+    {"test",     "test",                        builtin_test    },
+    {"fdnstest", "fdnstest",                    builtin_fdnstest},
+    {"fault",    "fault",                       builtin_fault   },
+    {"cd",       "cd DIR",                      builtin_cd      },
+    {"pwd",      "pwd",                         builtin_pwd     },
+    {"export",   "export PATH=DIR[:DIR...]",    builtin_export  },
+    {0,          0,                             0               },
 };
 
 static int shell_should_exit = 0;
@@ -575,7 +573,7 @@ static int builtin_fault(int argc, char **argv) {
   printf("About to intentionally dereference a null pointer...\n");
 
   volatile int *bad_ptr = (volatile int *)0;
-  *bad_ptr = 0xDEADBEEF;
+  *bad_ptr              = 0xDEADBEEF;
 #endif
 
   return 0;
@@ -629,7 +627,7 @@ static char *prepare_argv(int argc, char **argv, char ***child_out) {
   prog_name[pn] = 0;
 
   static char *child_argv[16];
-  int n = 0;
+  int n           = 0;
   child_argv[n++] = prog_name;
   for (int j = 1; j < argc && n < 15; j++) {
     child_argv[n++] = argv[j];
@@ -682,13 +680,12 @@ static int exec_argv(int argc, char **argv, int bg) {
 static int run_pipeline(int ac, char **targs) {
   int start[PIPELINE_MAX], count[PIPELINE_MAX];
   int stages = 0;
-  int from = 0;
+  int from   = 0;
   for (int i = 0; i <= ac; i++) {
     if (i < ac && strcmp(targs[i], "|") != 0)
       continue;
     if (i == from || stages == PIPELINE_MAX) {
-      printf(i == from ? "sh: syntax error near '|'\n"
-                       : "sh: at most %d pipeline stages\n",
+      printf(i == from ? "sh: syntax error near '|'\n" : "sh: at most %d pipeline stages\n",
              PIPELINE_MAX);
       return 1;
     }
@@ -699,7 +696,7 @@ static int run_pipeline(int ac, char **targs) {
   }
 
   fflush(stdout);
-  int saved_in = dup(0);
+  int saved_in  = dup(0);
   int saved_out = dup(1);
   if (saved_in < 0 || saved_out < 0) {
     printf("sh: cannot save stdio\n");
@@ -709,11 +706,11 @@ static int run_pipeline(int ac, char **targs) {
   long pids[PIPELINE_MAX];
   for (int s = 0; s < PIPELINE_MAX; s++)
     pids[s] = -1;
-  int missing = -1;
+  int missing   = -1;
   int prev_read = -1;
   for (int s = 0; s < stages; s++) {
     int fds[2] = {-1, -1};
-    int last = s == stages - 1;
+    int last   = s == stages - 1;
     if (!last && pipe(fds) != 0) {
       pids[s] = -1;
       break;
@@ -817,7 +814,7 @@ static int builtin_fdnstest(int argc, char **argv) {
   printf("fdnstest: parent fd=%d\n", parent_fd);
 
   char *child_argv[] = {"fdchild", 0};
-  long code = exec("/usr/bin/fdchild.elf", child_argv);
+  long code          = exec("/usr/bin/fdchild.elf", child_argv);
 
   printf("fdnstest: child exited %d\n", (int)code);
   close(parent_fd);
@@ -876,10 +873,9 @@ int main(int argc, char **argv) {
     } else {
       /* No built-in matched , try filesystem lookup. A trailing
        * `&` token means launch backgrounded via spawn(). */
-      int bg = 0;
+      int bg     = 0;
       int eff_ac = ac;
-      if (eff_ac >= 1 && targs[eff_ac - 1] &&
-          strcmp(targs[eff_ac - 1], "&") == 0) {
+      if (eff_ac >= 1 && targs[eff_ac - 1] && strcmp(targs[eff_ac - 1], "&") == 0) {
         bg = 1;
         eff_ac--;
       }

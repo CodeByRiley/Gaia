@@ -16,23 +16,24 @@ extern size_t strlen(const char *);
 
 /* Print every entry under path. */
 void list_directory(const char *path) {
-    unsigned index = 0;
-    char buf[BUF_SIZE];
-    long bytes_read;
+  unsigned index = 0;
+  char buf[BUF_SIZE];
+  long bytes_read;
 
-    while ((bytes_read = readdir_path(path, &index, buf, sizeof(buf))) > 0) {
-        for (long i = 0; i < bytes_read; i++) {
-            if (buf[i] == '\0') continue;
-            printf("%s\n", &buf[i]);
-            i += strlen(&buf[i]);
-        }
+  while ((bytes_read = readdir_path(path, &index, buf, sizeof(buf))) > 0) {
+    for (long i = 0; i < bytes_read; i++) {
+      if (buf[i] == '\0')
+        continue;
+      printf("%s\n", &buf[i]);
+      i += strlen(&buf[i]);
     }
-    if (bytes_read < 0)
-        printf("ls: cannot open directory: %s\n", path);
+  }
+  if (bytes_read < 0)
+    printf("ls: cannot open directory: %s\n", path);
 }
 
 int main(int argc, char *argv[]) {
-		const char *path = (argc > 1) ? argv[1] : ".";
-    list_directory(path);
-    return 0;
+  const char *path = (argc > 1) ? argv[1] : ".";
+  list_directory(path);
+  return 0;
 }

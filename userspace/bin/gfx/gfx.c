@@ -10,8 +10,8 @@
  * into memory nobody ever pushes to the host , the program runs, responds
  * to keys, exits cleanly, and is invisible the whole time.
  */
-#include <lib/syscall.h>
 #include <include/key_codes.h>
+#include <lib/syscall.h>
 
 extern int printf(const char *, ...);
 #include <lib/app_info.h>
@@ -21,8 +21,11 @@ APP_INFO(APP_TYPE_GUI, "gfx_test");
 int main(void) {
   struct fb_info info;
   fb_info(&info);
-  printf("fb: %dx%d pitch=%d bpp=%d\n", (int)info.width, (int)info.height,
-         (int)info.pitch, (int)info.bpp);
+  printf("fb: %dx%d pitch=%d bpp=%d\n",
+         (int)info.width,
+         (int)info.height,
+         (int)info.pitch,
+         (int)info.bpp);
 
   unsigned int *fb = (unsigned int *)fb_map();
   if (!fb || info.width <= 0 || info.height <= 0) {
@@ -50,7 +53,7 @@ int main(void) {
         unsigned int r = (x + t) & 0xFF;
         unsigned int g = (y + t) & 0xFF;
         unsigned int b = (x ^ y) & 0xFF;
-        row[x] = (r << 16) | (g << 8) | b;
+        row[x]         = (r << 16) | (g << 8) | b;
       }
     }
 

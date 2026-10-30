@@ -136,8 +136,8 @@ static double cbrt_newton(double x) {
   if (x > F64_MAX || x < -F64_MAX)
     return x;
 
-  double sign = x < 0.0 ? -1.0 : 1.0;
-  double ax = fabs(x);
+  double sign  = x < 0.0 ? -1.0 : 1.0;
+  double ax    = fabs(x);
   double scale = 1.0;
 
   while (ax >= 8.0) {
@@ -204,10 +204,10 @@ double log(double x) {
     k--;
   }
 
-  double z = (x - 1.0) / (x + 1.0);
-  double z2 = z * z;
+  double z    = (x - 1.0) / (x + 1.0);
+  double z2   = z * z;
   double term = z;
-  double sum = 0.0;
+  double sum  = 0.0;
 
   for (int n = 1; n <= 39; n += 2) {
     sum += term / (double)n;
@@ -237,7 +237,7 @@ double exp(double x) {
   }
 
   double term = 1.0;
-  double sum = 1.0;
+  double sum  = 1.0;
 
   for (int i = 1; i <= 24; i++) {
     term *= x / (double)i;
@@ -327,10 +327,10 @@ double cos(double x) {
    * Reflect into [-pi/2, pi/2] and account for the quadrant with sign.
    */
   if (x > M_PI_2) {
-    x = M_PI - x;
+    x    = M_PI - x;
     sign = -1.0;
   } else if (x < -M_PI_2) {
-    x = -M_PI - x;
+    x    = -M_PI - x;
     sign = -1.0;
   }
 
@@ -351,7 +351,7 @@ double tan(double x) {
 
 static double atan_unit(double x) {
   double sign = x < 0.0 ? -1.0 : 1.0;
-  x = fabs(x);
+  x           = fabs(x);
 
   if (x > 1.0)
     return sign * (M_PI_2 - atan_unit(1.0 / x));
@@ -367,10 +367,10 @@ static double atan_unit(double x) {
     return sign * (PI_4 + atan_unit(z));
   }
 
-  double x2 = x * x;
+  double x2   = x * x;
   double term = x;
-  double sum = x;
-  int add = 0;
+  double sum  = x;
+  int add     = 0;
 
   for (int n = 3; n <= 31; n += 2) {
     term *= x2;
@@ -418,20 +418,20 @@ double asin(double x) {
 double acos(double x) { return M_PI_2 - asin(x); }
 
 double max(double x, double y) {
-	if (x > y)
-		return x;
-	else
-		return y;
+  if (x > y)
+    return x;
+  else
+    return y;
 }
 double min(double x, double y) {
-	if (x < y)
-		return x;
-	else
-		return y;
+  if (x < y)
+    return x;
+  else
+    return y;
 }
 double round(double x) {
-	if (x >= 0.0)
-		return floor(x + 0.5);
-	else
-		return ceil(x - 0.5);
+  if (x >= 0.0)
+    return floor(x + 0.5);
+  else
+    return ceil(x - 0.5);
 }

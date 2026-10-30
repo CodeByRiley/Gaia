@@ -9,35 +9,40 @@
 
 /* Walk the tag chain looking for one of the given `type`. NULL on miss. */
 struct MB2_TAG *mb2_find_tag(u64 mb2_addr, u32 type) {
-    u8 *p = (u8*)phys_to_virt(mb2_addr) + 8; /* skip header */
-    while (1) {
-        struct MB2_TAG *t = (struct MB2_TAG*)p;
-        if (t->type == MULTIBOOT_TAG_END) return 0;
-        if (t->type == type) return t;
-        p += (t->size + 7) & ~7;             /* 8-byte align */
-    }
+  u8 *p = (u8 *)phys_to_virt(mb2_addr) + 8; /* skip header */
+  while (1) {
+    struct MB2_TAG *t = (struct MB2_TAG *)p;
+    if (t->type == MULTIBOOT_TAG_END)
+      return 0;
+    if (t->type == type)
+      return t;
+    p += (t->size + 7) & ~7; /* 8-byte align */
+  }
 }
 
 /* The boot info block stays mapped for the life of the machine, so the string
  * is returned by pointer rather than copied. */
 const char *mb2_boot_cmdline(u64 mb2_addr) {
-    struct MB2_TAG *tag = mb2_find_tag(mb2_addr, MULTIBOOT_TAG_CMDLINE);
-    if (!tag) return 0;
-    const char *string = ((struct MB2_TAG_STRING*)tag)->string;
-    return *string ? string : 0;
+  struct MB2_TAG *tag = mb2_find_tag(mb2_addr, MULTIBOOT_TAG_CMDLINE);
+  if (!tag)
+    return 0;
+  const char *string = ((struct MB2_TAG_STRING *)tag)->string;
+  return *string ? string : 0;
 }
 
 /* Walk module tags. If `cmdline` is NULL, returns the first module;
  * otherwise returns the first module whose cmdline matches exactly. */
 struct MB2_TAG_MODULE *mb2_find_module(u64 mb2_addr, const char *cmdline) {
-    u8 *p = (u8*)phys_to_virt(mb2_addr) + 8;
-    while (1) {
-        struct MB2_TAG *t = (struct MB2_TAG*)p;
-        if (t->type == MULTIBOOT_TAG_END) return 0;
-        if (t->type == MULTIBOOT_TAG_MODULE) {
-            struct MB2_TAG_MODULE *m = (struct MB2_TAG_MODULE*)t;
-            if (!cmdline || strcmp(m->cmdline, cmdline) == 0) return m;
-        }
-        p += (t->size + 7) & ~7;
+  u8 *p = (u8 *)phys_to_virt(mb2_addr) + 8;
+  while (1) {
+    struct MB2_TAG *t = (struct MB2_TAG *)p;
+    if (t->type == MULTIBOOT_TAG_END)
+      return 0;
+    if (t->type == MULTIBOOT_TAG_MODULE) {
+      struct MB2_TAG_MODULE *m = (struct MB2_TAG_MODULE *)t;
+      if (!cmdline || strcmp(m->cmdline, cmdline) == 0)
+        return m;
     }
+    p += (t->size + 7) & ~7;
+  }
 }

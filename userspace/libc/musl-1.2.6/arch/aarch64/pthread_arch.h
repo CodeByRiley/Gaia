@@ -1,8 +1,7 @@
-static inline uintptr_t __get_tp()
-{
-	uintptr_t tp;
-	__asm__ ("mrs %0,tpidr_el0" : "=r"(tp));
-	return tp;
+static inline uintptr_t __get_tp() {
+  uintptr_t tp;
+  __asm__("mrs %0,tpidr_el0" : "=r"(tp));
+  return tp;
 }
 
 #define TLS_ABOVE_TP

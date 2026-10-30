@@ -23,8 +23,7 @@ void netif_unregister(const void *driver_data) {
 
 struct netif *netif_get(void) { return registered ? &interface : (void *)0; }
 
-void netif_set_ipv4(const u8 ipv4[IPV4_ALEN],
-                    const u8 netmask[IPV4_ALEN],
+void netif_set_ipv4(const u8 ipv4[IPV4_ALEN], const u8 netmask[IPV4_ALEN],
                     const u8 gateway[IPV4_ALEN]) {
   if (!registered)
     return;

@@ -25,15 +25,17 @@
  * the mmap arena so a segment can never land on mmap or shmem, and it
  * doubles as the bound that keeps p_vaddr + p_memsz from wrapping. */
 
-u64 elf_load(const char *path,u64 *pml4){struct elf_metadata metadata;return elf_load_with_metadata(path,pml4,&metadata);}
-u64 elf_load_with_metadata(const char *path, u64 *pml4,struct elf_metadata *metadata) {
-  memset(metadata,0,sizeof(*metadata));
+u64 elf_load(const char *path, u64 *pml4) {
+  struct elf_metadata metadata;
+  return elf_load_with_metadata(path, pml4, &metadata);
+}
+u64 elf_load_with_metadata(const char *path, u64 *pml4, struct elf_metadata *metadata) {
+  memset(metadata, 0, sizeof(*metadata));
   int open_error = 0;
-  FILE *fp = fopen_ex(path, "rb", &open_error);
+  FILE *fp       = fopen_ex(path, "rb", &open_error);
   if (!fp) {
     log_write_string("elf: cannot open executable", path, KERNEL, LOG_ERROR);
-    log_write_string("elf: fopen reason", fopen_error_string(open_error),
-                     KERNEL, LOG_ERROR);
+    log_write_string("elf: fopen reason", fopen_error_string(open_error), KERNEL, LOG_ERROR);
     return 0;
   }
 
@@ -49,13 +51,16 @@ u64 elf_load_with_metadata(const char *path, u64 *pml4,struct elf_metadata *meta
     fclose(fp);
     return 0;
   }
-  if (eh.e_machine != 62 || eh.e_ident[4] != 2 || eh.e_ident[5] != 1 || eh.e_type != 2 || eh.e_phentsize != sizeof(struct Elf64_Phdr) || eh.e_phnum > 128) {
+  if (eh.e_machine != 62 || eh.e_ident[4] != 2 || eh.e_ident[5] != 1 || eh.e_type != 2 ||
+      eh.e_phentsize != sizeof(struct Elf64_Phdr) || eh.e_phnum > 128) {
     log_write("elf: not x86_64", KERNEL, LOG_ERROR);
     fclose(fp);
     return 0;
   }
 
-  metadata->phnum=eh.e_phnum;metadata->phent=eh.e_phentsize;metadata->entry=eh.e_entry;
+  metadata->phnum = eh.e_phnum;
+  metadata->phent = eh.e_phentsize;
+  metadata->entry = eh.e_entry;
   log_write_hex("elf_load: e_entry =", eh.e_entry, KERNEL, LOG_ERROR);
   for (int i = 0; i < eh.e_phnum; i++) {
     struct Elf64_Phdr ph;
@@ -66,12 +71,14 @@ u64 elf_load_with_metadata(const char *path, u64 *pml4,struct elf_metadata *meta
       return 0;
     }
     if (ph.p_type == 3) {
-      log_write("elf: dynamic interpreter is not supported",KERNEL,LOG_ERROR);
-      fclose(fp);return 0;
+      log_write("elf: dynamic interpreter is not supported", KERNEL, LOG_ERROR);
+      fclose(fp);
+      return 0;
     }
-    if(ph.p_type==6)metadata->phdr=ph.p_vaddr;
-    if(ph.p_type==PT_LOAD && eh.e_phoff>=ph.p_offset && eh.e_phoff-ph.p_offset<ph.p_filesz)
-      metadata->phdr=ph.p_vaddr+eh.e_phoff-ph.p_offset;
+    if (ph.p_type == 6)
+      metadata->phdr = ph.p_vaddr;
+    if (ph.p_type == PT_LOAD && eh.e_phoff >= ph.p_offset && eh.e_phoff - ph.p_offset < ph.p_filesz)
+      metadata->phdr = ph.p_vaddr + eh.e_phoff - ph.p_offset;
     if (ph.p_type != PT_LOAD)
       continue;
 
@@ -94,19 +101,22 @@ u64 elf_load_with_metadata(const char *path, u64 *pml4,struct elf_metadata *meta
      * and walk_or_create ORs VMM_USER into those shared entries on the
      * way down. That hands ring 3 a mapping in the kernel half of every
      * address space. Bound memsz first so the second test cannot wrap. */
-    if (ph.p_memsz > USER_IMAGE_MAX ||
-        ph.p_vaddr > USER_IMAGE_MAX - ph.p_memsz) {
+    if (ph.p_memsz > USER_IMAGE_MAX || ph.p_vaddr > USER_IMAGE_MAX - ph.p_memsz) {
       log_write("elf: segment vaddr out of range", KERNEL, LOG_ERROR);
       fclose(fp);
       return 0;
     }
 
-    if(ph.p_memsz && ph.p_vaddr < 0x40000000ULL) {
-      if(ph.p_vaddr < 4096 || process_pml4_enable_low_elf(pml4)) {fclose(fp);return 0;}
+    if (ph.p_memsz && ph.p_vaddr < 0x40000000ULL) {
+      if (ph.p_vaddr < 4096 || process_pml4_enable_low_elf(pml4)) {
+        fclose(fp);
+        return 0;
+      }
     }
-    if(ph.p_vaddr+ph.p_memsz>metadata->end)metadata->end=ph.p_vaddr+ph.p_memsz;
+    if (ph.p_vaddr + ph.p_memsz > metadata->end)
+      metadata->end = ph.p_vaddr + ph.p_memsz;
     u64 va_start = ph.p_vaddr & ~0xFFFULL;
-    u64 va_end = (ph.p_vaddr + ph.p_memsz + 0xFFF) & ~0xFFFULL;
+    u64 va_end   = (ph.p_vaddr + ph.p_memsz + 0xFFF) & ~0xFFFULL;
 
     /* NX on anything the ELF does not mark executable. Depends on
      * EFER.NXE, which enable_paging sets on the BSP and the AP
@@ -139,8 +149,7 @@ u64 elf_load_with_metadata(const char *path, u64 *pml4,struct elf_metadata *meta
       if (!vmm_translate_in(pml4, va)) {
         u64 phys = pmm_alloc_frame();
         if (!phys) {
-          log_write("elf: failed to allocate physical frame", KERNEL,
-                    LOG_ERROR);
+          log_write("elf: failed to allocate physical frame", KERNEL, LOG_ERROR);
           fclose(fp);
           return 0;
         }
@@ -179,8 +188,7 @@ u64 elf_load_with_metadata(const char *path, u64 *pml4,struct elf_metadata *meta
       usize chunk = 4096 - (va & 0xFFF);
       if (chunk > ph.p_filesz - done)
         chunk = ph.p_filesz - done;
-      if (fread((u8 *)phys_to_virt(phys) + (va & 0xFFF), 1, chunk, fp) !=
-          chunk) {
+      if (fread((u8 *)phys_to_virt(phys) + (va & 0xFFF), 1, chunk, fp) != chunk) {
         log_write("elf: could not read full segment data", KERNEL, LOG_ERROR);
         fclose(fp);
         return 0;

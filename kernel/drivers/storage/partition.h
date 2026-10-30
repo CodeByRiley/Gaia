@@ -33,7 +33,6 @@
  * partition table the caller should defer to -- an unreadable sector, an
  * absent signature, a GPT, or a table whose every entry is empty or bogus --
  * and the caller should go on treating the whole device as one volume. */
-int partition_scan(const struct block_device *parent, const char *parent_name,
-                   uint32_t inherit);
+int partition_scan(const struct block_device *parent, const char *parent_name, uint32_t inherit);
 
 #endif

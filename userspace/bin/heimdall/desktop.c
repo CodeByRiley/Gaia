@@ -1,7 +1,7 @@
 #define HEIMDALL_DECLARE_STATE
+#include "heimdall.h"
 #include "key_codes.h"
 #include "syscall.h"
-#include "heimdall.h"
 #include <display/print.h>
 #include <stdbool.h>
 #include <string.h>
@@ -16,14 +16,12 @@ int cursor_h(void) { return cursor_img.pixels ? cursor_img.height : CURSOR_H; }
 void cursor_load(void) {
   if (bmp_load(CURSOR_BMP_PATH, &cursor_img) == 0) {
     if (cursor_img.width > 0 && cursor_img.height > 0 &&
-        cursor_img.width <= CURSOR_MAX_SOURCE_DIM &&
-        cursor_img.height <= CURSOR_MAX_SOURCE_DIM) {
-      printf("heimdall: cursor %dx%d from %s\n", cursor_img.width,
-             cursor_img.height, CURSOR_BMP_PATH);
-    } else {
+        cursor_img.width <= CURSOR_MAX_SOURCE_DIM && cursor_img.height <= CURSOR_MAX_SOURCE_DIM) {
       printf(
-          "heimdall: %s has invalid cursor dimensions, using built-in cursor\n",
-          CURSOR_BMP_PATH);
+          "heimdall: cursor %dx%d from %s\n", cursor_img.width, cursor_img.height, CURSOR_BMP_PATH);
+    } else {
+      printf("heimdall: %s has invalid cursor dimensions, using built-in cursor\n",
+             CURSOR_BMP_PATH);
       bmp_free(&cursor_img);
     }
   } else {
@@ -34,8 +32,7 @@ void cursor_load(void) {
 void desktop_load(void) {
   if (bmp_load("/system/wallpaper.bmp", &wallpaper_img) == 0) {
     wallpaper_loaded = 1;
-    printf("heimdall: wallpaper %dx%d loaded\n", wallpaper_img.width,
-           wallpaper_img.height);
+    printf("heimdall: wallpaper %dx%d loaded\n", wallpaper_img.width, wallpaper_img.height);
   }
 
   /* Curated, unlike the start menu: each entry needs artwork at
@@ -43,11 +40,10 @@ void desktop_load(void) {
    * `name` is both the label and the artwork's basename; `path` must match
    * the destination in tools/create_disk.sh. */
   static const struct program desktop_candidates[] = {
-      {"DOOM", "usr/bin/doom.elf"},
+      {"DOOM",  "usr/bin/doom.elf" },
       {"skald", "system/bin/sh.elf"},
   };
-  const int candidate_count =
-      (int)(sizeof(desktop_candidates) / sizeof(desktop_candidates[0]));
+  const int candidate_count = (int)(sizeof(desktop_candidates) / sizeof(desktop_candidates[0]));
 
   desktop_icon_count = 0;
   for (int c = 0; c < candidate_count && desktop_icon_count < MAX_ICONS; c++) {
@@ -57,28 +53,27 @@ void desktop_load(void) {
     struct stat_user st;
     if (stat_raw(desktop_candidates[c].path, &st) != 0) {
       printf("heimdall: desktop icon %s skipped, %s not present\n",
-             desktop_candidates[c].name, desktop_candidates[c].path);
+             desktop_candidates[c].name,
+             desktop_candidates[c].path);
       continue;
     }
 
     struct desktop_icon *icon = &desktop_icons[desktop_icon_count++];
-    icon->program = desktop_candidates[c];
-    icon->x = 20;
-    icon->y = 20 + (desktop_icon_count - 1) * 80;
-    icon->w = 32;
-    icon->h = 32;
+    icon->program             = desktop_candidates[c];
+    icon->x                   = 20;
+    icon->y                   = 20 + (desktop_icon_count - 1) * 80;
+    icon->w                   = 32;
+    icon->h                   = 32;
   }
 
   for (int i = 0; i < desktop_icon_count; i++) {
     char path[64];
-    snprintf(path, sizeof(path), "/system/icons/%s.bmp",
-             desktop_icons[i].program.name);
+    snprintf(path, sizeof(path), "/system/icons/%s.bmp", desktop_icons[i].program.name);
 
     if (bmp_load(path, &desktop_icons[i].icon) == 0) {
       desktop_icons[i].loaded = 1;
     } else {
-      printf("heimdall: icon %s not found, using fallback\n",
-             desktop_icons[i].program.name);
+      printf("heimdall: icon %s not found, using fallback\n", desktop_icons[i].program.name);
       desktop_icons[i].loaded = 0;
     }
   }
@@ -118,14 +113,27 @@ int start_menu_has_path(const char *path) {
   return 0;
 }
 
-static const char *const skipped_programs[] = {
-    "pkill", "plist",  "mtest",       "pe_test", "audiotest", "btop",
-    "cat",   "ls",     "holyd",       "fdchild", "faulter",   "thread",
-    "tree",  "stress", "stress_peer", "uidemo",  "vmtest",    "heimdall"};
+static const char *const skipped_programs[] = {"pkill",
+                                               "plist",
+                                               "mtest",
+                                               "pe_test",
+                                               "audiotest",
+                                               "btop",
+                                               "cat",
+                                               "ls",
+                                               "holyd",
+                                               "fdchild",
+                                               "faulter",
+                                               "thread",
+                                               "tree",
+                                               "stress",
+                                               "stress_peer",
+                                               "uidemo",
+                                               "vmtest",
+                                               "heimdall"};
 
 static int is_skipped_program(const char *label) {
-  for (size_t k = 0; k < sizeof(skipped_programs) / sizeof(skipped_programs[0]);
-       k++) {
+  for (size_t k = 0; k < sizeof(skipped_programs) / sizeof(skipped_programs[0]); k++) {
     if (same_name_ci(label, skipped_programs[k]))
       return 1;
   }
@@ -135,9 +143,9 @@ static int is_skipped_program(const char *label) {
 int start_menu_remove(const char *path) {
   for (int i = 0; i < start_menu_count; i++) {
     if (same_name_ci(start_menu_programs[i].path, path)) {
-      memmove(&start_menu_programs[i], &start_menu_programs[i + 1],
-              sizeof(start_menu_programs[0]) *
-                  (size_t)(start_menu_count - i - 1));
+      memmove(&start_menu_programs[i],
+              &start_menu_programs[i + 1],
+              sizeof(start_menu_programs[0]) * (size_t)(start_menu_count - i - 1));
       start_menu_count--;
       return 1;
     }
@@ -169,7 +177,7 @@ void start_menu_add(const char *name, const char *path) {
  * with no way to reach them. */
 int start_menu_capacity(void) {
   int usable = fb_h - TASKBAR_PX - START_MENU_PAD * 2;
-  int fits = usable > 0 ? usable / START_MENU_ITEM_H : 0;
+  int fits   = usable > 0 ? usable / START_MENU_ITEM_H : 0;
   if (fits > START_MENU_MAX)
     fits = START_MENU_MAX;
   if (fits < START_MENU_DEFAULT_COUNT)
@@ -183,15 +191,14 @@ void start_menu_scan_dir(const char *dir, int capacity) {
   unsigned index = 0;
   long n;
 
-  while (start_menu_count < capacity &&
-         (n = readdir_path(dir, &index, buf, sizeof(buf))) > 0) {
+  while (start_menu_count < capacity && (n = readdir_path(dir, &index, buf, sizeof(buf))) > 0) {
     /* Packed NUL-terminated names; directories come back with a trailing
      * '/' and are skipped. */
     for (long i = 0; i < n && start_menu_count < capacity; i++) {
       if (buf[i] == 0)
         continue;
       const char *entry = &buf[i];
-      size_t len = strlen(entry);
+      size_t len        = strlen(entry);
       i += (long)len;
 
       if (len == 0 || entry[len - 1] == '/')
@@ -233,8 +240,8 @@ void build_start_menu_entries(void) {
   for (int d = 0; d < START_MENU_SCAN_DIR_COUNT; d++)
     start_menu_scan_dir(start_menu_scan_dirs[d], capacity);
 
-  printf("heimdall: start menu %d entries (%d pinned)\n", start_menu_count,
-         START_MENU_DEFAULT_COUNT);
+  printf(
+      "heimdall: start menu %d entries (%d pinned)\n", start_menu_count, START_MENU_DEFAULT_COUNT);
 }
 
 void z_remove(int handle) {

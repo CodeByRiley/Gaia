@@ -1,11 +1,10 @@
-#include <stdio.h>
 #include "syscall.h"
+#include <stdio.h>
 
-int renameat(int oldfd, const char *old, int newfd, const char *new)
-{
+int renameat(int oldfd, const char *old, int newfd, const char *new) {
 #ifdef SYS_renameat
-	return syscall(SYS_renameat, oldfd, old, newfd, new);
+  return syscall(SYS_renameat, oldfd, old, newfd, new);
 #else
-	return syscall(SYS_renameat2, oldfd, old, newfd, new, 0);
+  return syscall(SYS_renameat2, oldfd, old, newfd, new, 0);
 #endif
 }

@@ -1,7 +1,4 @@
-#include <sys/mman.h>
 #include "syscall.h"
+#include <sys/mman.h>
 
-int munlock(const void *addr, size_t len)
-{
-	return syscall(SYS_munlock, addr, len);
-}
+int munlock(const void *addr, size_t len) { return syscall(SYS_munlock, addr, len); }

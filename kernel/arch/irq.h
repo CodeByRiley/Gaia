@@ -24,7 +24,7 @@ SINLINE u64 irq_flags_read(void) {
 SINLINE u64 irq_save(void) {
   u64 rflags;
 
-  __asm__ volatile("pushfq; popq %0; cli" : "=r"(rflags) :: "memory");
+  __asm__ volatile("pushfq; popq %0; cli" : "=r"(rflags)::"memory");
   return rflags;
 }
 
@@ -33,8 +33,6 @@ SINLINE void irq_restore(u64 rflags) {
     __asm__ volatile("sti" ::: "memory");
 }
 
-SINLINE int interrupts_enabled(void) {
-  return (irq_flags_read() & RFLAGS_INTERRUPT_ENABLE) != 0;
-}
+SINLINE int interrupts_enabled(void) { return (irq_flags_read() & RFLAGS_INTERRUPT_ENABLE) != 0; }
 
 #endif /* ARCH_IRQ_H */

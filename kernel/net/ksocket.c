@@ -1,15 +1,15 @@
 #include "sched/sched.h"
 #include "sync/spinlock.h"
 #include "sync/waitqueue.h"
-#include <arch/irq.h>
-#include <utilities/errno.h>
 #include "utilities/log.h"
-#include <utilities/types.h>
-#include <net/ksocket.h>
+#include <arch/irq.h>
 #include <net/ipv4.h>
+#include <net/ksocket.h>
 #include <net/udp.h>
 #include <stdbool.h>
+#include <utilities/errno.h>
 #include <utilities/string.h>
+#include <utilities/types.h>
 
 extern void *kmalloc(usize size);
 extern void kfree(void *ptr);
@@ -17,46 +17,46 @@ extern void *memset(void *ptr, int value, usize num);
 extern void *memcpy(void *dest, const void *src, usize num);
 
 /* Active sockets use a linear lookup. */
-static struct socket *socket_list = NULL;
+static struct socket *socket_list       = NULL;
 static struct spinlock socket_list_lock = SPINLOCK_INIT;
-static u32 next_socket_id = 1;
-
+static u32 next_socket_id               = 1;
 
 void udp_echo_thread(void) {
-    // Create and bind a socket to port 5000
-    struct socket *sock = socket_create(SOCK_DGRAM, IPPROTO_UDP);
-    if (!sock) return;
+  // Create and bind a socket to port 5000
+  struct socket *sock = socket_create(SOCK_DGRAM, IPPROTO_UDP);
+  if (!sock)
+    return;
 
-    struct sockaddr_in bind_addr = {0};
-    bind_addr.family = AF_INET; // Make sure AF_INET is defined (usually 2)
-    bind_addr.port = to_be16(5000);
-    bind_addr.ip.bytes[0] = 0; // Bind to 0.0.0.0 (any)
-    bind_addr.ip.bytes[1] = 0;
-    bind_addr.ip.bytes[2] = 0;
-    bind_addr.ip.bytes[3] = 0;
+  struct sockaddr_in bind_addr = {0};
+  bind_addr.family             = AF_INET; // Make sure AF_INET is defined (usually 2)
+  bind_addr.port               = to_be16(5000);
+  bind_addr.ip.bytes[0]        = 0; // Bind to 0.0.0.0 (any)
+  bind_addr.ip.bytes[1]        = 0;
+  bind_addr.ip.bytes[2]        = 0;
+  bind_addr.ip.bytes[3]        = 0;
 
-    if (socket_bind(sock, &bind_addr) != 0) {
-        log_write("Echo thread: failed to bind", KERNEL, LOG_ERROR);
-        return;
+  if (socket_bind(sock, &bind_addr) != 0) {
+    log_write("Echo thread: failed to bind", KERNEL, LOG_ERROR);
+    return;
+  }
+
+  log_write("Echo thread: listening on port 5000", KERNEL, LOG_INFO);
+
+  char buf[512];
+  struct sockaddr_in src_addr;
+
+  while (1) {
+    // Leave room for the terminator the log line below appends.
+    int bytes = socket_recvfrom(sock, buf, sizeof(buf) - 1, &src_addr, 0);
+
+    if (bytes > 0) {
+      buf[bytes] = '\0'; // Null terminate for printing
+      log_write_fmt(KERNEL, LOG_INFO, "Echo thread: received '%s', bouncing back!", buf);
+
+      // Return to sender ;p
+      socket_sendto(sock, buf, bytes, &src_addr);
     }
-
-    log_write("Echo thread: listening on port 5000", KERNEL, LOG_INFO);
-
-    char buf[512];
-    struct sockaddr_in src_addr;
-
-    while (1) {
-        // Leave room for the terminator the log line below appends.
-        int bytes = socket_recvfrom(sock, buf, sizeof(buf) - 1, &src_addr, 0);
-
-        if (bytes > 0) {
-            buf[bytes] = '\0'; // Null terminate for printing
-            log_write_fmt(KERNEL, LOG_INFO, "Echo thread: received '%s', bouncing back!", buf);
-
-            // Return to sender ;p
-            socket_sendto(sock, buf, bytes, &src_addr);
-        }
-    }
+  }
 }
 
 struct socket *socket_create(int type, int protocol) {
@@ -67,14 +67,14 @@ struct socket *socket_create(int type, int protocol) {
   memset(sock, 0, sizeof(struct socket));
 
   // Safely assign ID and add to list
-  u64 rflags = spin_lock_irqsave(&socket_list_lock);
-  sock->id = next_socket_id++;
-  sock->next = socket_list;
+  u64 rflags  = spin_lock_irqsave(&socket_list_lock);
+  sock->id    = next_socket_id++;
+  sock->next  = socket_list;
   socket_list = sock;
   spin_unlock_irqrestore(&socket_list_lock, rflags);
 
-  sock->state = SOCKET_UNBOUND;
-  sock->type = type;
+  sock->state    = SOCKET_UNBOUND;
+  sock->type     = type;
   sock->protocol = protocol;
 
   spinlock_init(&sock->lock);
@@ -95,84 +95,87 @@ int socket_bind(struct socket *sock, const struct sockaddr_in *addr) {
 
 int socket_sendto(struct socket *sock, const void *buf, usize len,
                   const struct sockaddr_in *dest_addr) {
-    if (!sock || !buf || !dest_addr) return -1;
-    if (len > (IPV4_PAYLOAD_MAX - UDP_HEADER_SIZE)) return -1;
+  if (!sock || !buf || !dest_addr)
+    return -1;
+  if (len > (IPV4_PAYLOAD_MAX - UDP_HEADER_SIZE))
+    return -1;
 
-    sock->remote = *dest_addr;
+  sock->remote = *dest_addr;
 
-    usize total_frame_size = IPV4_HEADROOM + UDP_HEADER_SIZE + len;
-    u8 *frame = kmalloc(total_frame_size);
-    if (!frame) return -1;
+  usize total_frame_size = IPV4_HEADROOM + UDP_HEADER_SIZE + len;
+  u8 *frame              = kmalloc(total_frame_size);
+  if (!frame)
+    return -1;
 
-    u8 *payload_dest = frame + IPV4_HEADROOM + UDP_HEADER_SIZE;
-    memcpy(payload_dest, buf, len);
+  u8 *payload_dest = frame + IPV4_HEADROOM + UDP_HEADER_SIZE;
+  memcpy(payload_dest, buf, len);
 
-    struct udp_header *udp = (struct udp_header *)(frame + IPV4_HEADROOM);
-    udp->src_port = sock->local.port;
-    udp->dst_port = dest_addr->port;
-    udp->length = to_be16(UDP_HEADER_SIZE + len);
-    udp->checksum = 0;
+  struct udp_header *udp = (struct udp_header *)(frame + IPV4_HEADROOM);
+  udp->src_port          = sock->local.port;
+  udp->dst_port          = dest_addr->port;
+  udp->length            = to_be16(UDP_HEADER_SIZE + len);
+  udp->checksum          = 0;
 
-    int ret = ipv4_output(dest_addr->ip.bytes, IPPROTO_UDP,
-                          frame + IPV4_HEADROOM, UDP_HEADER_SIZE + len);
+  int ret =
+      ipv4_output(dest_addr->ip.bytes, IPPROTO_UDP, frame + IPV4_HEADROOM, UDP_HEADER_SIZE + len);
 
-    kfree(frame);
+  kfree(frame);
 
-    if (ret < 0) return -1;
-    return len;
+  if (ret < 0)
+    return -1;
+  return len;
 }
 
-int socket_readable(struct socket *sock) {
-    return sock && sock->rx_queue.head != NULL;
-}
+int socket_readable(struct socket *sock) { return sock && sock->rx_queue.head != NULL; }
 
-int socket_recvfrom(struct socket *sock, void *buf, usize len,
-                    struct sockaddr_in *src_addr, int flags) {
-    if (!sock || !buf) return -EINVAL;
+int socket_recvfrom(struct socket *sock, void *buf, usize len, struct sockaddr_in *src_addr,
+                    int flags) {
+  if (!sock || !buf)
+    return -EINVAL;
 
-    /* IRQs stay off from the empty check until wq_wait has parked us, so a
-     * datagram delivered in between cannot slip past without a wake. See
-     * sync/waitqueue.h. */
-    u64 irq_flags = irq_save();
-    struct packet_node *node;
-    for (;;) {
-        spin_lock(&sock->lock);
-        node = sock->rx_queue.head;
-        if (node) {
-            sock->rx_queue.head = node->next;
-            if (!sock->rx_queue.head) {
-                sock->rx_queue.tail = NULL;
-            }
-            sock->rx_queue.count--;
-            spin_unlock(&sock->lock);
-            break;
-        }
-        spin_unlock(&sock->lock);
-
-        if (flags & SOCKET_RECV_NONBLOCK) {
-            irq_restore(irq_flags);
-            return -EAGAIN;
-        }
-        if (wq_wait(&sock->readers, 0) == -EINTR) {
-            irq_restore(irq_flags);
-            return -EINTR;
-        }
+  /* IRQs stay off from the empty check until wq_wait has parked us, so a
+   * datagram delivered in between cannot slip past without a wake. See
+   * sync/waitqueue.h. */
+  u64 irq_flags = irq_save();
+  struct packet_node *node;
+  for (;;) {
+    spin_lock(&sock->lock);
+    node = sock->rx_queue.head;
+    if (node) {
+      sock->rx_queue.head = node->next;
+      if (!sock->rx_queue.head) {
+        sock->rx_queue.tail = NULL;
+      }
+      sock->rx_queue.count--;
+      spin_unlock(&sock->lock);
+      break;
     }
-    irq_restore(irq_flags);
+    spin_unlock(&sock->lock);
 
-    usize to_copy = (len < node->length) ? len : node->length;
-    memcpy(buf, node->payload, to_copy);
-
-    if (src_addr) {
-        src_addr->family = AF_INET;
-        src_addr->port = node->src_port;
-        src_addr->ip = node->src_ip;
+    if (flags & SOCKET_RECV_NONBLOCK) {
+      irq_restore(irq_flags);
+      return -EAGAIN;
     }
+    if (wq_wait(&sock->readers, 0) == -EINTR) {
+      irq_restore(irq_flags);
+      return -EINTR;
+    }
+  }
+  irq_restore(irq_flags);
 
-    kfree(node->payload);
-    kfree(node);
+  usize to_copy = (len < node->length) ? len : node->length;
+  memcpy(buf, node->payload, to_copy);
 
-    return to_copy;
+  if (src_addr) {
+    src_addr->family = AF_INET;
+    src_addr->port   = node->src_port;
+    src_addr->ip     = node->src_ip;
+  }
+
+  kfree(node->payload);
+  kfree(node);
+
+  return to_copy;
 }
 
 /* Unlink, drain, free. The queued packets each own a kmalloc'd payload, so
@@ -181,7 +184,7 @@ void socket_close(struct socket *sock) {
   if (!sock)
     return;
 
-  u64 rflags = spin_lock_irqsave(&socket_list_lock);
+  u64 rflags           = spin_lock_irqsave(&socket_list_lock);
   struct socket **link = &socket_list;
   while (*link && *link != sock)
     link = &(*link)->next;
@@ -210,9 +213,9 @@ port_t socket_alloc_ephemeral_port(void) {
 
   for (int attempt = 0; attempt < 28232; attempt++) {
     u16 candidate = next_port;
-    next_port = (next_port >= 60999u) ? 32768u : (u16)(next_port + 1u);
+    next_port     = (next_port >= 60999u) ? 32768u : (u16)(next_port + 1u);
 
-    int taken = 0;
+    int taken  = 0;
     u64 rflags = spin_lock_irqsave(&socket_list_lock);
     for (struct socket *s = socket_list; s; s = s->next) {
       if (from_be16(s->local.port) == candidate) {
@@ -229,11 +232,10 @@ port_t socket_alloc_ephemeral_port(void) {
 }
 
 /* Deliver an IP payload to its bound socket. */
-void socket_handle_incoming(struct ipv4_addr src_ip, port_t src_port,
-                            struct ipv4_addr dest_ip, port_t dest_port,
-                            u8 protocol, void *payload, usize length) {
+void socket_handle_incoming(struct ipv4_addr src_ip, port_t src_port, struct ipv4_addr dest_ip,
+                            port_t dest_port, u8 protocol, void *payload, usize length) {
 
-  struct socket *curr = socket_list;
+  struct socket *curr   = socket_list;
   struct socket *target = NULL;
 
   // Lock the global list just to find the target socket
@@ -241,7 +243,9 @@ void socket_handle_incoming(struct ipv4_addr src_ip, port_t src_port,
 
   while (curr) {
     if (curr->protocol == protocol && curr->local.port == dest_port) {
-      struct ipv4_addr wildcard = {{0, 0, 0, 0}};
+      struct ipv4_addr wildcard = {
+          {0, 0, 0, 0}
+      };
       if (memcmp(&curr->local.ip, &dest_ip, sizeof(struct ipv4_addr)) == 0 ||
           memcmp(&curr->local.ip, &wildcard, sizeof(struct ipv4_addr)) == 0) {
         target = curr;
@@ -259,7 +263,8 @@ void socket_handle_incoming(struct ipv4_addr src_ip, port_t src_port,
 
   // Allocate memory BEFORE taking the target lock
   struct packet_node *node = kmalloc(sizeof(struct packet_node));
-  if (!node) return; // Out of memory
+  if (!node)
+    return; // Out of memory
 
   node->payload = kmalloc(length);
   if (!node->payload) {
@@ -268,10 +273,10 @@ void socket_handle_incoming(struct ipv4_addr src_ip, port_t src_port,
   }
 
   memcpy(node->payload, payload, length);
-  node->src_ip = src_ip;
+  node->src_ip   = src_ip;
   node->src_port = src_port;
-  node->length = length;
-  node->next = NULL;
+  node->length   = length;
+  node->next     = NULL;
 
   // Lock the specific socket to safely push to its queue
   u64 sock_rflags = spin_lock_irqsave(&target->lock);
@@ -287,9 +292,9 @@ void socket_handle_incoming(struct ipv4_addr src_ip, port_t src_port,
   spin_unlock_irqrestore(&target->lock, sock_rflags);
 
   // Update socket metadata
-  target->remote.ip = src_ip;
+  target->remote.ip   = src_ip;
   target->remote.port = src_port;
-  target->state = SOCKET_ESTABLISHED;
+  target->state       = SOCKET_ESTABLISHED;
 
   wq_wake_all(&target->readers);
 }

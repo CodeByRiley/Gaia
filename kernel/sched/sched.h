@@ -18,11 +18,11 @@
 #ifndef SCHED_H
 #define SCHED_H
 
-#include <utilities/types.h>
 #include <memory/uvm.h>
 #include <msg/msg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 /* Priority levels, numbered low to high. The ordering is load-bearing twice
  * over: ready_head[] is indexed by it, and ready_push compares levels
@@ -71,7 +71,6 @@ struct vfs_file;
 struct wq_entry;
 struct pipe;
 
-
 /* Scheduler and VM types */
 enum task_state {
   TASK_RUNNING,
@@ -119,7 +118,6 @@ struct task_files {
   char cwd[TASK_CWD_MAX];
 };
 
-
 /* IPC and input state */
 struct task_ipc {
   struct ipc_msg *ring;
@@ -161,7 +159,7 @@ struct task_context {
    * IA32_FS_BASE for userspace TLS.
    */
   u64 fs_base;
-  u64 gs_base; /* User GS; kernel GS remains cpu_local through swapgs. */
+  u64 gs_base;         /* User GS; kernel GS remains cpu_local through swapgs. */
   int abi_personality; /* 0 Gaia, 1 Linux ELF, 2 Win32 DLL runtime. */
 
   /* Indexed by signal-1. Fresh processes start with SIG_DFL (all zero).
@@ -200,7 +198,6 @@ struct task {
 
   struct task *next;
 
-
   // Process/task relationship.
   int parent_pid;
   int waiting_for_pid;
@@ -216,11 +213,9 @@ struct task {
    * does not count it, and its exit leaves no exit record. */
   int is_thread;
 
-
   // Kernel execution.
   void *kstack;
   void (*kthread_entry)(void);
-
 
   /* TTY channel this task reads stdin from and writes console output to.
    * Inherited from the parent alongside cwd, so everything a shell launches
@@ -240,7 +235,6 @@ struct task {
   struct task_ipc *ipc;
   struct task_input *input;
   struct task_context *context;
-
 
   // Futex state.
   u64 futex_addr;
@@ -265,7 +259,6 @@ struct task {
   /* Active or queued VFS operation: its kernel stack/FDs must stay alive. */
   unsigned vfs_active;
 };
-
 
 /* Descriptor-table accessors                                                 */
 /*
@@ -310,8 +303,7 @@ static inline int task_fd_is_dir(struct task *t, int fd) {
  * which end it is. */
 static inline struct pipe *task_fd_pipe(struct task *t, int fd, int *write_end) {
   struct task_fd *s = task_fd_slot(t, fd);
-  if (s == NULL ||
-      (s->type != TASK_FD_PIPE_READ && s->type != TASK_FD_PIPE_WRITE))
+  if (s == NULL || (s->type != TASK_FD_PIPE_READ && s->type != TASK_FD_PIPE_WRITE))
     return NULL;
   if (write_end)
     *write_end = s->type == TASK_FD_PIPE_WRITE;
@@ -328,7 +320,6 @@ static inline int task_fd_is_console(struct task *t, int fd) {
   enum task_fd_type type = t->files->fd[fd].type;
   return type == TASK_FD_TTY || (fd < 3 && type == TASK_FD_UNUSED);
 }
-
 
 /* Address-space accessor                                                     */
 /*
@@ -355,13 +346,11 @@ void task_fd_release(struct task_fd *slot);
 /* Make `dst` a second reference to what `src` holds, as dup() does. `dst`
  * must be unused. An unused standard slot copies as TASK_FD_TTY when
  * `src_is_console` is set. Returns -1 if a directory path copy fails. */
-int task_fd_dup(struct task_fd *dst, const struct task_fd *src,
-                int src_is_console);
+int task_fd_dup(struct task_fd *dst, const struct task_fd *src, int src_is_console);
 
 /* Point a directory slot at `path`, allocating its copy. Returns -1 if the
  * copy cannot be allocated, leaving the slot's path unset. */
 int task_fd_set_dir_path(struct task_fd *slot, const char *path);
-
 
 /* Userspace snapshot ABI                                                    */
 struct task_snap {
@@ -372,18 +361,14 @@ struct task_snap {
   char name[16];
 };
 
-_Static_assert(sizeof(struct task_snap) == 40,
-               "task_snap must match userspace proc_info size");
+_Static_assert(sizeof(struct task_snap) == 40, "task_snap must match userspace proc_info size");
 
 _Static_assert(offsetof(struct task_snap, ticks_run) == 0,
                "task_snap.ticks_run offset is userspace ABI");
 
-_Static_assert(offsetof(struct task_snap, pid) == 8,
-               "task_snap.pid offset is userspace ABI");
+_Static_assert(offsetof(struct task_snap, pid) == 8, "task_snap.pid offset is userspace ABI");
 
-_Static_assert(offsetof(struct task_snap, name) == 20,
-               "task_snap.name offset is userspace ABI");
-
+_Static_assert(offsetof(struct task_snap, name) == 20, "task_snap.name offset is userspace ABI");
 
 /* Scheduler API                                                             */
 int sched_snapshot(struct task_snap *out, int max);
@@ -396,13 +381,11 @@ void sleep_ms_busy(u32 ms);
 
 struct task *task_spawn(void (*entry)(void));
 
-struct task *task_spawn_user(u64 *user_pml4, u64 entry,
-                             u64 user_rsp, int parent_pid);
+struct task *task_spawn_user(u64 *user_pml4, u64 entry, u64 user_rsp, int parent_pid);
 
 struct task *task_reserve_user(int parent_pid);
 
-int task_activate_reserved_user(struct task *t, u64 *user_pml4,
-                                u64 entry, u64 user_rsp);
+int task_activate_reserved_user(struct task *t, u64 *user_pml4, u64 entry, u64 user_rsp);
 
 void task_fail_reserved_user(struct task *t, long code);
 

@@ -21,7 +21,8 @@ int vbox_video_init(u32 width, u32 height);
 /* Return the current VMSVGA framebuffer layout. */
 int vbox_video_get_mode(struct vbox_video_mode *mode);
 
-/* Poll the newest host size hint and program it. 1=changed, 0=none, -1=error. */
+/* Poll the newest host size hint and program it. 1=changed, 0=none, -1=error.
+ */
 int vbox_video_poll_resize(struct vbox_video_mode *mode);
 
 /* Publish a dirty framebuffer rectangle through the SVGA command FIFO. */

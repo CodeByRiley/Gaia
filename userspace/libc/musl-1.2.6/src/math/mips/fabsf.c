@@ -2,11 +2,10 @@
 
 #include <math.h>
 
-float fabsf(float x)
-{
-	float r;
-	__asm__("abs.s %0,%1" : "=f"(r) : "f"(x));
-	return r;
+float fabsf(float x) {
+  float r;
+  __asm__("abs.s %0,%1" : "=f"(r) : "f"(x));
+  return r;
 }
 
 #else

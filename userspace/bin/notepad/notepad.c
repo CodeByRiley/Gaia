@@ -22,18 +22,18 @@ APP_INFO(APP_TYPE_GUI, "Text Editor");
 
 // Globals
 static uint32_t *surface = 0;
-static int surf_w = 0;
-static int surf_h = 0;
-static int win_handle = -1;
+static int surf_w        = 0;
+static int surf_h        = 0;
+static int win_handle    = -1;
 static int shift_pressed = 0;
-static int alt_pressed = 0;
-static int ctrl_pressed = 0;
+static int alt_pressed   = 0;
+static int ctrl_pressed  = 0;
 
 static int font_ready = 0;
-static int cell_w = 9;
-static int cell_h = 18;
-static int ascent = 12;
-static int descent = -3;
+static int cell_w     = 9;
+static int cell_h     = 18;
+static int ascent     = 12;
+static int descent    = -3;
 
 static char text_buf[MAX_CHARS];
 static int text_len = 0;
@@ -43,7 +43,7 @@ static int text_len = 0;
  * previous version behind, and could only ever be closed once. */
 static char file_path[PATH_MAX];
 static int have_file = 0;
-static int dirty = 0;
+static int dirty     = 0;
 
 static void clear_surface(void) {
   if (!surface)
@@ -69,8 +69,7 @@ static void update_title(void) {
     return;
 
   char title[64];
-  snprintf(title, sizeof(title), "%sNotepad - %s", dirty ? "*" : "",
-           file_name());
+  snprintf(title, sizeof(title), "%sNotepad - %s", dirty ? "*" : "", file_name());
   wm_window_set_title(win_handle, title);
 }
 
@@ -82,8 +81,12 @@ static void update_status(void) {
     return;
 
   char line[48];
-  snprintf(line, sizeof(line), "%s  %d bytes%s  Ctrl+S save", file_name(),
-           text_len, dirty ? "  (modified)" : "");
+  snprintf(line,
+           sizeof(line),
+           "%s  %d bytes%s  Ctrl+S save",
+           file_name(),
+           text_len,
+           dirty ? "  (modified)" : "");
   wm_window_set_status(win_handle, line);
 }
 
@@ -119,7 +122,7 @@ static void load_text_file(const char *path) {
   fclose(f);
 
   int count = (int)got;
-  text_len = count;
+  text_len  = count;
   if (count == MAX_CHARS)
     printf("notepad: %s truncated to %d bytes\n", path, MAX_CHARS);
   else
@@ -129,17 +132,15 @@ static void load_text_file(const char *path) {
 /* Ask heimdall for a path. Returns 1 if file_path now holds one. */
 static int prompt_for_path(void) {
   char entered[PATH_MAX];
-  int rc = wm_prompt(win_handle, WM_PROMPT_TEXT,
-                     "Save as (full path):", entered, sizeof(entered));
+  int rc = wm_prompt(win_handle, WM_PROMPT_TEXT, "Save as (full path):", entered, sizeof(entered));
   if (rc != WM_PROMPT_OK || !entered[0])
     return 0;
 
   strncpy(file_path, entered, sizeof(file_path) - 1);
   file_path[sizeof(file_path) - 1] = 0;
-  have_file = 1;
+  have_file                        = 1;
   return 1;
 }
-
 
 /* save_as: always ask for a path (Ctrl+Shift+S). Otherwise write straight
  * back to the open file, asking only when the buffer has never had a name.
@@ -169,8 +170,7 @@ static void save_text(int save_as) {
   if (written != (size_t)text_len) {
     wm_prompt(win_handle, WM_PROMPT_MESSAGE, "Short write , disk full?", 0, 0);
     set_status("Save failed");
-    printf("notepad: short write to %s (%d of %d bytes)\n", file_path,
-           (int)written, text_len);
+    printf("notepad: short write to %s (%d of %d bytes)\n", file_path, (int)written, text_len);
     return;
   }
 
@@ -210,11 +210,11 @@ static void new_file(void) {
   if (!confirm_discard("Save changes before the new file?"))
     return;
 
-  text_len = 0;
-  text_buf[0] = 0;
+  text_len     = 0;
+  text_buf[0]  = 0;
   file_path[0] = 0;
-  have_file = 0;
-  dirty = 0;
+  have_file    = 0;
+  dirty        = 0;
   update_title();
   update_status();
   printf("notepad: new file\n");
@@ -231,8 +231,8 @@ static void render_text(void) {
   struct gfx_surface s;
   gfx_surface_init(&s, surface, surf_w, surf_h, surf_w);
 
-  int x = 0;
-  int y = 0;
+  int x        = 0;
+  int y        = 0;
   int baseline = y + ascent;
 
   for (int i = 0; i < text_len; i++) {
@@ -257,10 +257,8 @@ static void render_text(void) {
 
     if (c >= 32 && c <= 126) {
       /* Keep glyphs inside their cells. */
-      struct gfx_rect prev =
-          gfx_clip_push(&s, gfx_rect_make(x, y, cell_w, cell_h));
-      ttf_draw_glyph_cell(&s, g_sys_font, x, baseline, cell_w, (unsigned char)c,
-                          FONT_PX, COLOR_FG);
+      struct gfx_rect prev = gfx_clip_push(&s, gfx_rect_make(x, y, cell_w, cell_h));
+      ttf_draw_glyph_cell(&s, g_sys_font, x, baseline, cell_w, (unsigned char)c, FONT_PX, COLOR_FG);
       gfx_clip_set(&s, prev);
     }
 
@@ -274,7 +272,7 @@ int main(int argc, char **argv) {
   if (argc > 1 && argv[1] && argv[1][0]) {
     strncpy(file_path, argv[1], sizeof(file_path) - 1);
     file_path[sizeof(file_path) - 1] = 0;
-    have_file = 1;
+    have_file                        = 1;
   }
 
   /* Font state is process-local. */
@@ -297,16 +295,15 @@ int main(int argc, char **argv) {
   }
 
   struct wm_window win;
-  if (wm_window_create_ex(WIN_W, WIN_H, "Notepad", WM_CREATE_STATUSBAR, &win) !=
-      0) {
+  if (wm_window_create_ex(WIN_W, WIN_H, "Notepad", WM_CREATE_STATUSBAR, &win) != 0) {
     printf("notepad: Failed to get window\n");
     return 1;
   }
 
   win_handle = win.handle;
-  surf_w = win.w;
-  surf_h = win.h;
-  surface = (uint32_t *)win.surface_va;
+  surf_w     = win.w;
+  surf_h     = win.h;
+  surface    = (uint32_t *)win.surface_va;
   if (win_handle < 0 || !surface) {
     printf("notepad: Failed to get window\n");
     return 1;
@@ -337,7 +334,7 @@ int main(int argc, char **argv) {
       }
       {
         int msg_type = event.type;
-        int keycode = event.param;
+        int keycode  = event.param;
 
         if (msg_type == WM_EV_KEY_DOWN) {
           int needs_redraw = 0;
@@ -381,29 +378,25 @@ int main(int argc, char **argv) {
                 needs_redraw = 1;
               }
             }
-          }
-          else if (keycode == KEY_ENTER || keycode == KEY_KPENTER) {
+          } else if (keycode == KEY_ENTER || keycode == KEY_KPENTER) {
             if (text_len < MAX_CHARS - 1) {
               text_buf[text_len++] = '\n';
               mark_modified();
               needs_redraw = 1;
             }
-          }
-          else if (keycode == KEY_BACKSPACE) {
+          } else if (keycode == KEY_BACKSPACE) {
             if (text_len > 0) {
               text_len--;
               mark_modified();
               needs_redraw = 1;
             }
-          }
-          else if (keycode == KEY_TAB) {
+          } else if (keycode == KEY_TAB) {
             if (text_len < MAX_CHARS - 1) {
               text_buf[text_len++] = '\t';
               mark_modified();
               needs_redraw = 1;
             }
-          }
-          else {
+          } else {
             char c = keymap_to_ascii(keycode, shift_pressed);
 
             if (c >= 32 && c <= 126 && text_len < MAX_CHARS - 1) {
@@ -430,8 +423,8 @@ int main(int argc, char **argv) {
         }
       }
       if (event.type == WM_EV_RESIZE) {
-        surf_w = event.w;
-        surf_h = event.h;
+        surf_w  = event.w;
+        surf_h  = event.h;
         surface = (uint32_t *)event.surface_va;
         render_text();
         invalidate();

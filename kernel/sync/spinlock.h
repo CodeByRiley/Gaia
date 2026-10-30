@@ -36,9 +36,7 @@ SINLINE void spin_lock(struct spinlock *l) {
   }
 }
 
-SINLINE void spin_unlock(struct spinlock *l) {
-  __atomic_store_n(&l->locked, 0, __ATOMIC_RELEASE);
-}
+SINLINE void spin_unlock(struct spinlock *l) { __atomic_store_n(&l->locked, 0, __ATOMIC_RELEASE); }
 
 /* IRQ-safe variants. Save RFLAGS, disable interrupts, acquire. Restore
  * in reverse. The returned u64 is opaque , pass it straight to

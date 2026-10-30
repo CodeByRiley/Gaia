@@ -10,6 +10,11 @@
 #define WT_NO_GIT 1
 #define WT_REVID "3.11"
 #define WT_MODIFIED 0
-#define WT_MODIFICATIONS {{NULL, NULL}}
+#define WT_MODIFICATIONS                                                                           \
+  {                                                                                                \
+    {                                                                                              \
+      NULL, NULL                                                                                   \
+    }                                                                                              \
+  }
 
 #endif

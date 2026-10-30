@@ -1,88 +1,88 @@
 #ifndef _PTHREAD_IMPL_H
 #define _PTHREAD_IMPL_H
 
-#include <pthread.h>
-#include <signal.h>
-#include <errno.h>
-#include <limits.h>
-#include <sys/mman.h>
-#include "libc.h"
-#include "syscall.h"
 #include "atomic.h"
 #include "futex.h"
+#include "libc.h"
+#include "syscall.h"
+#include <errno.h>
+#include <limits.h>
+#include <pthread.h>
+#include <signal.h>
+#include <sys/mman.h>
 
 #include "pthread_arch.h"
 
 #define pthread __pthread
 
 struct pthread {
-	/* Part 1 -- these fields may be external or
-	 * internal (accessed via asm) ABI. Do not change. */
-	struct pthread *self;
+  /* Part 1 -- these fields may be external or
+   * internal (accessed via asm) ABI. Do not change. */
+  struct pthread *self;
 #ifndef TLS_ABOVE_TP
-	uintptr_t *dtv;
+  uintptr_t *dtv;
 #endif
-	struct pthread *prev, *next; /* non-ABI */
-	uintptr_t sysinfo;
+  struct pthread *prev, *next; /* non-ABI */
+  uintptr_t sysinfo;
 #ifndef TLS_ABOVE_TP
 #ifdef CANARY_PAD
-	uintptr_t canary_pad;
+  uintptr_t canary_pad;
 #endif
-	uintptr_t canary;
+  uintptr_t canary;
 #endif
 
-	/* Part 2 -- implementation details, non-ABI. */
-	int tid;
-	int errno_val;
-	volatile int detach_state;
-	volatile int cancel;
-	volatile unsigned char canceldisable, cancelasync;
-	unsigned char tsd_used:1;
-	unsigned char dlerror_flag:1;
-	unsigned char *map_base;
-	size_t map_size;
-	void *stack;
-	size_t stack_size;
-	size_t guard_size;
-	void *result;
-	struct __ptcb *cancelbuf;
-	void **tsd;
-	struct {
-		volatile void *volatile head;
-		long off;
-		volatile void *volatile pending;
-	} robust_list;
-	int h_errno_val;
-	volatile int timer_id;
-	locale_t locale;
-	volatile int killlock[1];
-	char *dlerror_buf;
-	void *stdio_locks;
+  /* Part 2 -- implementation details, non-ABI. */
+  int tid;
+  int errno_val;
+  volatile int detach_state;
+  volatile int cancel;
+  volatile unsigned char canceldisable, cancelasync;
+  unsigned char tsd_used     : 1;
+  unsigned char dlerror_flag : 1;
+  unsigned char *map_base;
+  size_t map_size;
+  void *stack;
+  size_t stack_size;
+  size_t guard_size;
+  void *result;
+  struct __ptcb *cancelbuf;
+  void **tsd;
+  struct {
+    volatile void *volatile head;
+    long off;
+    volatile void *volatile pending;
+  } robust_list;
+  int h_errno_val;
+  volatile int timer_id;
+  locale_t locale;
+  volatile int killlock[1];
+  char *dlerror_buf;
+  void *stdio_locks;
 
-	/* Part 3 -- the positions of these fields relative to
-	 * the end of the structure is external and internal ABI. */
+  /* Part 3 -- the positions of these fields relative to
+   * the end of the structure is external and internal ABI. */
 #ifdef TLS_ABOVE_TP
-	uintptr_t canary;
-	uintptr_t *dtv;
+  uintptr_t canary;
+  uintptr_t *dtv;
 #endif
 };
 
 enum {
-	DT_EXITED = 0,
-	DT_EXITING,
-	DT_JOINABLE,
-	DT_DETACHED,
+  DT_EXITED = 0,
+  DT_EXITING,
+  DT_JOINABLE,
+  DT_DETACHED,
 };
 
-#define __SU (sizeof(size_t)/sizeof(int))
+#define __SU (sizeof(size_t) / sizeof(int))
 
 #define _a_stacksize __u.__s[0]
 #define _a_guardsize __u.__s[1]
 #define _a_stackaddr __u.__s[2]
-#define _a_detach __u.__i[3*__SU+0]
-#define _a_sched __u.__i[3*__SU+1]
-#define _a_policy __u.__i[3*__SU+2]
-#define _a_prio __u.__i[3*__SU+3]
+#define _a_detach __u.__i[3 * __SU + 0]
+#define _a_sched __u.__i[3 * __SU + 1]
+#define _a_policy __u.__i[3 * __SU + 2]
+#define _a_prio __u.__i[3 * __SU + 3]
 #define _m_type __u.__i[0]
 #define _m_lock __u.__vi[1]
 #define _m_waiters __u.__vi[2]
@@ -130,13 +130,11 @@ enum {
 #define SIGCANCEL 33
 #define SIGSYNCCALL 34
 
-#define SIGALL_SET ((sigset_t *)(const unsigned long long [2]){ -1,-1 })
-#define SIGPT_SET \
-	((sigset_t *)(const unsigned long [_NSIG/8/sizeof(long)]){ \
-	[sizeof(long)==4] = 3UL<<(32*(sizeof(long)>4)) })
-#define SIGTIMER_SET \
-	((sigset_t *)(const unsigned long [_NSIG/8/sizeof(long)]){ \
-	 0x80000000 })
+#define SIGALL_SET ((sigset_t *)(const unsigned long long[2]){-1, -1})
+#define SIGPT_SET                                                                                  \
+  ((sigset_t *)(const unsigned long[_NSIG / 8 / sizeof(long)]){                                    \
+      [sizeof(long) == 4] = 3UL << (32 * (sizeof(long) > 4))})
+#define SIGTIMER_SET ((sigset_t *)(const unsigned long[_NSIG / 8 / sizeof(long)]){0x80000000})
 
 void *__tls_get_addr(tls_mod_off_t *);
 hidden int __init_tp(void *);
@@ -165,18 +163,19 @@ hidden void __unmapself(void *, size_t);
 hidden int __timedwait(volatile int *, int, clockid_t, const struct timespec *, int);
 hidden int __timedwait_cp(volatile int *, int, clockid_t, const struct timespec *, int);
 hidden void __wait(volatile int *, volatile int *, int, int);
-static inline void __wake(volatile void *addr, int cnt, int priv)
-{
-	if (priv) priv = FUTEX_PRIVATE;
-	if (cnt<0) cnt = INT_MAX;
-	__syscall(SYS_futex, addr, FUTEX_WAKE|priv, cnt) != -ENOSYS ||
-	__syscall(SYS_futex, addr, FUTEX_WAKE, cnt);
+static inline void __wake(volatile void *addr, int cnt, int priv) {
+  if (priv)
+    priv = FUTEX_PRIVATE;
+  if (cnt < 0)
+    cnt = INT_MAX;
+  __syscall(SYS_futex, addr, FUTEX_WAKE | priv, cnt) != -ENOSYS ||
+      __syscall(SYS_futex, addr, FUTEX_WAKE, cnt);
 }
-static inline void __futexwait(volatile void *addr, int val, int priv)
-{
-	if (priv) priv = FUTEX_PRIVATE;
-	__syscall(SYS_futex, addr, FUTEX_WAIT|priv, val, 0) != -ENOSYS ||
-	__syscall(SYS_futex, addr, FUTEX_WAIT, val, 0);
+static inline void __futexwait(volatile void *addr, int val, int priv) {
+  if (priv)
+    priv = FUTEX_PRIVATE;
+  __syscall(SYS_futex, addr, FUTEX_WAIT | priv, val, 0) != -ENOSYS ||
+      __syscall(SYS_futex, addr, FUTEX_WAIT, val, 0);
 }
 
 hidden void __acquire_ptc(void);
@@ -197,9 +196,9 @@ extern hidden unsigned __default_guardsize;
 #define DEFAULT_STACK_SIZE 131072
 #define DEFAULT_GUARD_SIZE 8192
 
-#define DEFAULT_STACK_MAX (8<<20)
-#define DEFAULT_GUARD_MAX (1<<20)
+#define DEFAULT_STACK_MAX (8 << 20)
+#define DEFAULT_GUARD_MAX (1 << 20)
 
-#define __ATTRP_C11_THREAD ((void*)(uintptr_t)-1)
+#define __ATTRP_C11_THREAD ((void *)(uintptr_t)-1)
 
 #endif

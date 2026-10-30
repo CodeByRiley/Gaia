@@ -9,200 +9,202 @@
  * log_*_from_u8 helpers so an out-of-range value falls back to a sane
  * default rather than indexing past the enum tables.
  */
-#include <utilities/log.h>
 #include <display/print.h>
+#include <utilities/log.h>
 
 /* Validate raw type byte to enum log_type. Returns 1 on hit. */
 static int log_type_from_u8(u8 value, enum log_type *out) {
-    switch (value) {
-        case KERNEL:
-        case SYSTEM:
-        case FILESYS:
-        case USER:
-            *out = (enum log_type)value;
-            return 1;
+  switch (value) {
+  case KERNEL:
+  case SYSTEM:
+  case FILESYS:
+  case USER:
+    *out = (enum log_type)value;
+    return 1;
 
-        default:
-            return 0;
-    }
+  default:
+    return 0;
+  }
 }
 
 /* Validate raw level byte to enum log_level. Returns 1 on hit. */
 static int log_level_from_u8(u8 value, enum log_level *out) {
-    switch (value) {
-        case LOG_DEBUG:
-        case LOG_INFO:
-        case LOG_WARN:
-        case LOG_ERROR:
-        case LOG_FATAL:
-            *out = (enum log_level)value;
-            return 1;
+  switch (value) {
+  case LOG_DEBUG:
+  case LOG_INFO:
+  case LOG_WARN:
+  case LOG_ERROR:
+  case LOG_FATAL:
+    *out = (enum log_level)value;
+    return 1;
 
-        default:
-            return 0;
-    }
+  default:
+    return 0;
+  }
 }
 
 /* Display label for a subsystem tag. */
 static const char *log_type_name(enum log_type type) {
-    switch (type) {
-        case KERNEL:  return "KERNEL";
-        case SYSTEM:  return "SYSTEM";
-        case FILESYS: return "FILESYS";
-        case USER:    return "USER";
-        default:      return "UNKNOWN";
-    }
+  switch (type) {
+  case KERNEL:
+    return "KERNEL";
+  case SYSTEM:
+    return "SYSTEM";
+  case FILESYS:
+    return "FILESYS";
+  case USER:
+    return "USER";
+  default:
+    return "UNKNOWN";
+  }
 }
 
 /* Bounded string copy. NULs-terminates even when truncating. */
 static void log_copy_message(char *dst, u64 dst_cap, const char *src) {
-    u64 i = 0;
+  u64 i = 0;
 
-    if (dst_cap == 0) return;
+  if (dst_cap == 0)
+    return;
 
-    while (src && src[i] != '\0' && i + 1 < dst_cap) {
-        dst[i] = src[i];
-        i++;
-    }
+  while (src && src[i] != '\0' && i + 1 < dst_cap) {
+    dst[i] = src[i];
+    i++;
+  }
 
-    dst[i] = '\0';
+  dst[i] = '\0';
 }
 
 /* Initialise an entry with safe defaults and copy `message` into it.
  * Bad raw_type/raw_level fall back to SYSTEM | LOG_INFO. */
-static void log_init_entry(struct log_entry *entry, const char *message,
-                           u8 raw_type, u8 raw_level) {
-    entry->message[0] = '\0';
-    entry->timestamp = 0;
-    entry->level = LOG_INFO;
+static void log_init_entry(struct log_entry *entry, const char *message, u8 raw_type,
+                           u8 raw_level) {
+  entry->message[0]   = '\0';
+  entry->timestamp    = 0;
+  entry->level        = LOG_INFO;
+  entry->type         = SYSTEM;
+  entry->has_hex      = 0;
+  entry->has_int      = 0;
+  entry->int_value    = 0;
+  entry->hex_value    = 0;
+  entry->has_string   = 0;
+  entry->string_value = 0;
+
+  if (!log_type_from_u8(raw_type, &entry->type)) {
     entry->type = SYSTEM;
-    entry->has_hex = 0;
-    entry->has_int = 0;
-    entry->int_value = 0;
-    entry->hex_value = 0;
-    entry->has_string = 0;
-    entry->string_value = 0;
+  }
 
-    if (!log_type_from_u8(raw_type, &entry->type)) {
-        entry->type = SYSTEM;
-    }
+  if (!log_level_from_u8(raw_level, &entry->level)) {
+    entry->level = LOG_INFO;
+  }
 
-    if (!log_level_from_u8(raw_level, &entry->level)) {
-        entry->level = LOG_INFO;
-    }
-
-    log_copy_message(entry->message, sizeof(entry->message), message);
+  log_copy_message(entry->message, sizeof(entry->message), message);
 }
 
 /* Render a populated entry to both serial & VGA text-mode print. */
 void log_write_entry(struct log_entry *entry) {
-    serial_write_str("[");
-    serial_write_str(log_type_name(entry->type));
-    serial_write_str("]: ");
-    serial_write_str(entry->message);
-    if (entry->has_hex) {
-        serial_write_str(" ");
-        serial_write_hex(entry->hex_value);
-    }
-    if (entry->has_string) {
-        serial_write_str(" ");
-        serial_write_str(entry->string_value);
-    }
-    if (entry->has_int) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%ld", (long)entry->int_value);
-        serial_write_str(" ");
-        serial_write_str(buf);
-    }
-    serial_write_str("\n");
+  serial_write_str("[");
+  serial_write_str(log_type_name(entry->type));
+  serial_write_str("]: ");
+  serial_write_str(entry->message);
+  if (entry->has_hex) {
+    serial_write_str(" ");
+    serial_write_hex(entry->hex_value);
+  }
+  if (entry->has_string) {
+    serial_write_str(" ");
+    serial_write_str(entry->string_value);
+  }
+  if (entry->has_int) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%ld", (long)entry->int_value);
+    serial_write_str(" ");
+    serial_write_str(buf);
+  }
+  serial_write_str("\n");
 
-    print_write_str("[");
-    print_write_str(log_type_name(entry->type));
-    print_write_str("]: ");
-    print_write_str(entry->message);
-    if (entry->has_hex) {
-        print_write_str(" ");
-        print_write_hex(entry->hex_value);
-    }
-    if (entry->has_string) {
-        print_write_str(" ");
-        print_write_str(entry->string_value);
-    }
-    if (entry->has_int) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%ld", (long)entry->int_value);
-        print_write_str(" ");
-        print_write_str(buf);
-    }
-    print_write_str("\n");
+  print_write_str("[");
+  print_write_str(log_type_name(entry->type));
+  print_write_str("]: ");
+  print_write_str(entry->message);
+  if (entry->has_hex) {
+    print_write_str(" ");
+    print_write_hex(entry->hex_value);
+  }
+  if (entry->has_string) {
+    print_write_str(" ");
+    print_write_str(entry->string_value);
+  }
+  if (entry->has_int) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%ld", (long)entry->int_value);
+    print_write_str(" ");
+    print_write_str(buf);
+  }
+  print_write_str("\n");
 }
 
 /* Plain message, no payload. */
 void log_write(const char *message, u8 raw_type, u8 raw_level) {
-    struct log_entry entry;
-    log_init_entry(&entry, message, raw_type, raw_level);
-    log_write_entry(&entry);
+  struct log_entry entry;
+  log_init_entry(&entry, message, raw_type, raw_level);
+  log_write_entry(&entry);
 }
 
 /* Message & hex payload. */
-void log_write_hex(const char *message, u64 value,
-                   u8 raw_type, u8 raw_level) {
-    struct log_entry entry;
-    log_init_entry(&entry, message, raw_type, raw_level);
-    entry.has_hex = 1;
-    entry.hex_value = value;
-    log_write_entry(&entry);
+void log_write_hex(const char *message, u64 value, u8 raw_type, u8 raw_level) {
+  struct log_entry entry;
+  log_init_entry(&entry, message, raw_type, raw_level);
+  entry.has_hex   = 1;
+  entry.hex_value = value;
+  log_write_entry(&entry);
 }
 
 /* Message + signed-int payload. */
-void log_write_int(const char *message, int64_t value,
-                   u8 raw_type, u8 raw_level) {
-    struct log_entry entry;
-    log_init_entry(&entry, message, raw_type, raw_level);
-    entry.has_int = 1;
-    entry.int_value = value;
-    log_write_entry(&entry);
+void log_write_int(const char *message, int64_t value, u8 raw_type, u8 raw_level) {
+  struct log_entry entry;
+  log_init_entry(&entry, message, raw_type, raw_level);
+  entry.has_int   = 1;
+  entry.int_value = value;
+  log_write_entry(&entry);
 }
 
 /* Message & string payload. */
-void log_write_string(const char *message, const char *val,
-                      u8 raw_type, u8 raw_level) {
-    struct log_entry entry;
-    log_init_entry(&entry, message, raw_type, raw_level);
-    entry.has_string = 1;
-    entry.string_value = val;
-    log_write_entry(&entry);
+void log_write_string(const char *message, const char *val, u8 raw_type, u8 raw_level) {
+  struct log_entry entry;
+  log_init_entry(&entry, message, raw_type, raw_level);
+  entry.has_string   = 1;
+  entry.string_value = val;
+  log_write_entry(&entry);
 }
 
 /* Pretty-print a CPU exception. Routed to both serial & VGA so the cause
  * is captured even if the framebuffer pipeline is the thing that broke. */
-void log_write_exception(u64 int_num, const char *name,
-                         u64 err_code, u64 rip) {
-    serial_write_str("[KERNEL]: !! exception ");
-    serial_write_hex(int_num);
-    serial_write_str(" (");
-    serial_write_str(name ? name : "unknown");
-    serial_write_str(")\n[KERNEL]:   err=");
-    serial_write_hex(err_code);
-    serial_write_str("\n[KERNEL]:   rip=");
-    serial_write_hex(rip);
-    serial_write_str("\n");
+void log_write_exception(u64 int_num, const char *name, u64 err_code, u64 rip) {
+  serial_write_str("[KERNEL]: !! exception ");
+  serial_write_hex(int_num);
+  serial_write_str(" (");
+  serial_write_str(name ? name : "unknown");
+  serial_write_str(")\n[KERNEL]:   err=");
+  serial_write_hex(err_code);
+  serial_write_str("\n[KERNEL]:   rip=");
+  serial_write_hex(rip);
+  serial_write_str("\n");
 
-    /* A page fault may have been caused by the framebuffer mapping itself.
-     * Keep that report on the polled serial path so diagnostics cannot recurse
-     * into a second page fault while trying to draw the first one. */
-    if (int_num == 14)
-        return;
+  /* A page fault may have been caused by the framebuffer mapping itself.
+   * Keep that report on the polled serial path so diagnostics cannot recurse
+   * into a second page fault while trying to draw the first one. */
+  if (int_num == 14)
+    return;
 
-    print_write_str("[KERNEL]: !! exception ");
-    print_write_hex(int_num);
-    print_write_str(" (");
-    print_write_str(name ? name : "unknown");
-    print_write_str(")\n[KERNEL]:   err=");
-    print_write_hex(err_code);
-    print_write_str("\n[KERNEL]:   rip=");
-    print_write_hex(rip);
-    print_write_str("\n");
+  print_write_str("[KERNEL]: !! exception ");
+  print_write_hex(int_num);
+  print_write_str(" (");
+  print_write_str(name ? name : "unknown");
+  print_write_str(")\n[KERNEL]:   err=");
+  print_write_hex(err_code);
+  print_write_str("\n[KERNEL]:   rip=");
+  print_write_hex(rip);
+  print_write_str("\n");
 }
 
 /* formatted logging */
@@ -211,32 +213,32 @@ void log_write_exception(u64 int_num, const char *name,
  * the entry.  Kept on the stack; log_init_entry's log_copy_message will
  * truncate to sizeof(entry->message) if the formatted text is longer
  * than the entry can hold, so callers never need to pre-size. */
-#define LOG_FMT_BUF  512
+#define LOG_FMT_BUF 512
 
 /* va_list variant */
 void log_write_vfmt(u8 raw_type, u8 raw_level, const char *fmt, va_list args) {
-    char buf[LOG_FMT_BUF];
+  char buf[LOG_FMT_BUF];
 
-    if (!fmt) {
-        struct log_entry entry;
-        log_init_entry(&entry, "(null fmt)", raw_type, raw_level);
-        log_write_entry(&entry);
-        return;
-    }
-
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    buf[sizeof(buf) - 1] = '\0';   /* belt-and-suspenders */
-
+  if (!fmt) {
     struct log_entry entry;
-    log_init_entry(&entry, buf, raw_type, raw_level);
+    log_init_entry(&entry, "(null fmt)", raw_type, raw_level);
     log_write_entry(&entry);
+    return;
+  }
+
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  buf[sizeof(buf) - 1] = '\0'; /* belt-and-suspenders */
+
+  struct log_entry entry;
+  log_init_entry(&entry, buf, raw_type, raw_level);
+  log_write_entry(&entry);
 }
 
 /* printf-style entry point */
 void log_write_fmt(u8 raw_type, u8 raw_level, const char *fmt, ...) {
-    va_list args;
+  va_list args;
 
-    va_start(args, fmt);
-    log_write_vfmt(raw_type, raw_level, fmt, args);
-    va_end(args);
+  va_start(args, fmt);
+  log_write_vfmt(raw_type, raw_level, fmt, args);
+  va_end(args);
 }

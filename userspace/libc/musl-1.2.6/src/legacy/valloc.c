@@ -1,8 +1,5 @@
 #define _BSD_SOURCE
-#include <stdlib.h>
 #include "libc.h"
+#include <stdlib.h>
 
-void *valloc(size_t size)
-{
-	return memalign(PAGE_SIZE, size);
-}
+void *valloc(size_t size) { return memalign(PAGE_SIZE, size); }

@@ -51,8 +51,7 @@ int prompt_button_count(int kind) {
  * cannot disagree about what "the second button" means. */
 int prompt_button_result(int kind, int idx) {
   if (kind == WM_PROMPT_CONFIRM)
-    return idx == 0 ? WM_PROMPT_OK
-                    : (idx == 1 ? WM_PROMPT_NO : WM_PROMPT_CANCEL);
+    return idx == 0 ? WM_PROMPT_OK : (idx == 1 ? WM_PROMPT_NO : WM_PROMPT_CANCEL);
   if (kind == WM_PROMPT_TEXT)
     return idx == 0 ? WM_PROMPT_OK : WM_PROMPT_CANCEL;
   return WM_PROMPT_OK;
@@ -66,8 +65,7 @@ void prompt_freeze_rect(void) {
   int wx = 0, wy = 0, wcw = 0, wch = 0;
 
   /* Prefer the owner window; otherwise use the screen center. */
-  if (prompt.owner_handle > 0 &&
-      win_get_rect(prompt.owner_handle, &wx, &wy, &wcw, &wch)) {
+  if (prompt.owner_handle > 0 && win_get_rect(prompt.owner_handle, &wx, &wy, &wcw, &wch)) {
     int o_w = outer_w_dims(wcw);
     int o_h = outer_h_dims(wch, status_h_of(prompt.owner_handle));
 
@@ -86,8 +84,7 @@ void prompt_freeze_rect(void) {
   if (prompt.x + prompt.w > fb_w)
     prompt.x = (fb_w > prompt.w) ? (fb_w - prompt.w) : 0;
   if (prompt.y + prompt.h > fb_h - TASKBAR_PX)
-    prompt.y =
-        ((fb_h - TASKBAR_PX) > prompt.h) ? (fb_h - TASKBAR_PX - prompt.h) : 0;
+    prompt.y = ((fb_h - TASKBAR_PX) > prompt.h) ? (fb_h - TASKBAR_PX - prompt.h) : 0;
 }
 
 void prompt_rect(int *px, int *py, int *pw, int *ph) {
@@ -100,7 +97,7 @@ void prompt_rect(int *px, int *py, int *pw, int *ph) {
 void prompt_btn_rect(int idx, int *bx, int *by, int *bw, int *bh) {
   int px, py, pw, ph;
   prompt_rect(&px, &py, &pw, &ph);
-  int n = prompt_button_count(prompt.kind);
+  int n     = prompt_button_count(prompt.kind);
   int row_w = n * PROMPT_BTN_W + (n - 1) * PROMPT_BTN_GAP;
 
   *bw = PROMPT_BTN_W;
@@ -116,7 +113,7 @@ void prompt_send_result(int result) {
   struct ipc_msg resp;
   memset(&resp, 0, sizeof(resp));
   resp.type = IPC_WM_PROMPT_RESP;
-  resp.a = result;
+  resp.a    = result;
   if (prompt.kind == WM_PROMPT_TEXT && result == WM_PROMPT_OK) {
     size_t i = 0;
     while (i < sizeof(resp.str) - 1 && prompt.input[i]) {
@@ -134,10 +131,8 @@ void prompt_send_result(int result) {
   mark_dirty(px, py, pw, ph);
 }
 
-void handle_prompt_req(int owner_pid, int handle, int kind,
-                              const char *message) {
-  if (kind != WM_PROMPT_MESSAGE && kind != WM_PROMPT_CONFIRM &&
-      kind != WM_PROMPT_TEXT)
+void handle_prompt_req(int owner_pid, int handle, int kind, const char *message) {
+  if (kind != WM_PROMPT_MESSAGE && kind != WM_PROMPT_CONFIRM && kind != WM_PROMPT_TEXT)
     return;
 
   if (prompt.active) {
@@ -145,17 +140,17 @@ void handle_prompt_req(int owner_pid, int handle, int kind,
     struct ipc_msg busy;
     memset(&busy, 0, sizeof(busy));
     busy.type = IPC_WM_PROMPT_RESP;
-    busy.a = WM_PROMPT_CANCEL;
+    busy.a    = WM_PROMPT_CANCEL;
     ipc_send(owner_pid, &busy);
     return;
   }
 
   memset(&prompt, 0, sizeof(prompt));
-  prompt.active = 1;
-  prompt.kind = kind;
-  prompt.owner_pid = owner_pid;
+  prompt.active       = 1;
+  prompt.kind         = kind;
+  prompt.owner_pid    = owner_pid;
   prompt.owner_handle = handle;
-  prompt.selected = 0;
+  prompt.selected     = 0;
   if (message) {
     size_t i = 0;
     while (i < sizeof(prompt.message) - 1 && message[i]) {
@@ -171,8 +166,7 @@ void handle_prompt_req(int owner_pid, int handle, int kind,
   int px, py, pw, ph;
   prompt_rect(&px, &py, &pw, &ph);
   mark_dirty(px, py, pw, ph);
-  printf("heimdall: prompt kind=%d owner=%d handle=%d at %d,%d\n", kind,
-         owner_pid, handle, px, py);
+  printf("heimdall: prompt kind=%d owner=%d handle=%d at %d,%d\n", kind, owner_pid, handle, px, py);
 }
 
 /* An owner that dies or loses its window mid-dialog leaves nothing to answer
@@ -204,8 +198,12 @@ void draw_prompt(void) {
   fb_fill_rect(px, py + ph - 1, pw, 1, TITLEBAR_BG);
   fb_fill_rect(px + pw - 1, py, 1, ph, TITLEBAR_BG);
 
-  draw_text_fb(px + PROMPT_PAD, py + PROMPT_PAD, prompt.message,
-               pw - 2 * PROMPT_PAD, PROMPT_TEXT, PROMPT_BG);
+  draw_text_fb(px + PROMPT_PAD,
+               py + PROMPT_PAD,
+               prompt.message,
+               pw - 2 * PROMPT_PAD,
+               PROMPT_TEXT,
+               PROMPT_BG);
 
   if (prompt.kind == WM_PROMPT_TEXT) {
     int fx = px + PROMPT_PAD;
@@ -216,8 +214,7 @@ void draw_prompt(void) {
     fb_fill_rect(fx, fy, 1, PROMPT_FIELD_H, TITLEBAR_BG);
 
     int ty = fy + (PROMPT_FIELD_H - FONT_GLYPH_H) / 2;
-    draw_text_fb(fx + 3, ty, prompt.input, fw - 6, PROMPT_TEXT,
-                 PROMPT_FIELD_BG);
+    draw_text_fb(fx + 3, ty, prompt.input, fw - 6, PROMPT_TEXT, PROMPT_FIELD_BG);
     /* Caret sits after the last glyph; the field scrolls nowhere, so a
      * string longer than the field just runs under the right edge. */
     int caret_x = fx + 3 + prompt.caret * FONT_GLYPH_W;
@@ -229,7 +226,7 @@ void draw_prompt(void) {
   for (int i = 0; i < n; i++) {
     int bx, by, bw, bh;
     prompt_btn_rect(i, &bx, &by, &bw, &bh);
-    int sel = (i == prompt.selected);
+    int sel     = (i == prompt.selected);
     uint32_t bg = sel ? PROMPT_BTN_SEL_BG : PROMPT_BTN_BG;
     uint32_t fg = sel ? PROMPT_BTN_SEL_FG : PROMPT_TEXT;
     fb_fill_rect(bx, by, bw, bh, bg);
@@ -237,9 +234,8 @@ void draw_prompt(void) {
     fb_fill_rect(bx, by + bh - 1, bw, 1, TITLEBAR_BG);
 
     const char *label = prompt_button_label(prompt.kind, i);
-    int label_w = (int)strlen(label) * FONT_GLYPH_W;
-    draw_text_fb(bx + (bw - label_w) / 2, by + (bh - FONT_GLYPH_H) / 2, label,
-                 bw, fg, bg);
+    int label_w       = (int)strlen(label) * FONT_GLYPH_W;
+    draw_text_fb(bx + (bw - label_w) / 2, by + (bh - FONT_GLYPH_H) / 2, label, bw, fg, bg);
   }
 }
 
@@ -277,18 +273,19 @@ int prompt_handle_key(int keycode, int shift) {
     char c = keymap_to_ascii(keycode, shift);
     if (c >= 32 && c <= 126 && prompt.caret < PROMPT_MAX_TEXT) {
       prompt.input[prompt.caret++] = c;
-      prompt.input[prompt.caret] = 0;
+      prompt.input[prompt.caret]   = 0;
       goto redraw;
     }
   }
   /* Swallow anything else: a stray key must not reach the app behind. */
   return 1;
 
-redraw: {
-  int px, py, pw, ph;
-  prompt_rect(&px, &py, &pw, &ph);
-  mark_dirty(px, py, pw, ph);
-}
+redraw:
+  {
+    int px, py, pw, ph;
+    prompt_rect(&px, &py, &pw, &ph);
+    mark_dirty(px, py, pw, ph);
+  }
   return 1;
 }
 

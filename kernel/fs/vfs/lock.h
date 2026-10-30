@@ -9,10 +9,9 @@ void vfs_assert_locked(void);
 /* Scope cleanup covers every early return without a forest of unlock labels.
  * Do not nest guards: call already-locked helpers inside a VFS operation. */
 static inline void vfs_guard_release(int *guard) {
-    (void)guard;
-    vfs_unlock();
+  (void)guard;
+  vfs_unlock();
 }
-#define VFS_GUARD() \
-    int vfs_guard CLEANUP(vfs_guard_release) UNUSED = (vfs_lock(), 0)
+#define VFS_GUARD() int vfs_guard CLEANUP(vfs_guard_release) UNUSED = (vfs_lock(), 0)
 
 #endif

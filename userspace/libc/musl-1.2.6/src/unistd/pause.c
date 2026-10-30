@@ -1,7 +1,4 @@
-#include <unistd.h>
 #include "syscall.h"
+#include <unistd.h>
 
-int pause(void)
-{
-	return sys_pause_cp();
-}
+int pause(void) { return sys_pause_cp(); }

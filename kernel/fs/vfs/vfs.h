@@ -1,9 +1,9 @@
 /* Filesystem-neutral objects and API. See ../README.md for ownership rules. */
 #ifndef KERNEL_VFS_H
 #define KERNEL_VFS_H
+#include <drivers/storage/block.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <drivers/storage/block.h>
 
 #define VFS_PATH_MAX 260
 #define VFS_NAME_MAX 255
@@ -12,14 +12,14 @@
 
 enum vfs_node_type { VFS_NODE_NONE, VFS_NODE_FILE, VFS_NODE_DIRECTORY };
 struct vfs_stat {
-    uint64_t size, inode, blocks;
-    uint32_t block_size, mode;
-    uint8_t type, attributes;
+  uint64_t size, inode, blocks;
+  uint32_t block_size, mode;
+  uint8_t type, attributes;
 };
 struct vfs_dirent {
-    uint64_t inode;
-    uint8_t type;
-    char name[VFS_NAME_MAX + 1];
+  uint64_t inode;
+  uint8_t type;
+  char name[VFS_NAME_MAX + 1];
 };
 struct vfs_inode;
 struct vfs_file;
@@ -29,72 +29,72 @@ struct vfs_mount;
 /* Name operations receive ONE name in a known directory, never a path.
  * lookup/create return one owned inode reference; failures return none. */
 struct vfs_inode_operations {
-    int (*lookup)(struct vfs_inode *dir, const char *name, struct vfs_inode **out);
-    int (*create)(struct vfs_inode *dir, const char *name, struct vfs_inode **out);
-    int (*mkdir)(struct vfs_inode *dir, const char *name);
-    int (*unlink)(struct vfs_inode *dir, const char *name);
-    int (*rmdir)(struct vfs_inode *dir, const char *name);
-    int (*getattr)(struct vfs_inode *inode, struct vfs_stat *out);
-    int (*truncate)(struct vfs_inode *inode);
+  int (*lookup)(struct vfs_inode *dir, const char *name, struct vfs_inode **out);
+  int (*create)(struct vfs_inode *dir, const char *name, struct vfs_inode **out);
+  int (*mkdir)(struct vfs_inode *dir, const char *name);
+  int (*unlink)(struct vfs_inode *dir, const char *name);
+  int (*rmdir)(struct vfs_inode *dir, const char *name);
+  int (*getattr)(struct vfs_inode *inode, struct vfs_stat *out);
+  int (*truncate)(struct vfs_inode *inode);
 };
 /* release must tolerate a partially failed open. iterate returns >0 for an
  * entry, 0 at EOF, -1 on failure; index is a backend-owned cookie. */
 struct vfs_file_operations {
-    int (*open)(struct vfs_file *file);
-    void (*release)(struct vfs_file *file);
-    size_t (*read)(struct vfs_file *file, void *buffer, size_t length);
-    size_t (*write)(struct vfs_file *file, const void *buffer, size_t length);
-    int (*seek)(struct vfs_file *file, uint64_t position);
-    long (*iterate)(struct vfs_inode *dir, uint32_t *index, struct vfs_dirent *out);
+  int (*open)(struct vfs_file *file);
+  void (*release)(struct vfs_file *file);
+  size_t (*read)(struct vfs_file *file, void *buffer, size_t length);
+  size_t (*write)(struct vfs_file *file, const void *buffer, size_t length);
+  int (*seek)(struct vfs_file *file, uint64_t position);
+  long (*iterate)(struct vfs_inode *dir, uint32_t *index, struct vfs_dirent *out);
 };
 /* Live inodes are shared by (superblock, number), not pathname.
  * private_data borrows backend/image state; it must outlive the inode. */
 struct vfs_inode {
-    struct vfs_superblock *super;
-    uint64_t number;
-    uint8_t type;
-    void *private_data;
-    const struct vfs_inode_operations *operations;
-    const struct vfs_file_operations *file_operations;
-    unsigned references;
-    struct vfs_inode *next;
+  struct vfs_superblock *super;
+  uint64_t number;
+  uint8_t type;
+  void *private_data;
+  const struct vfs_inode_operations *operations;
+  const struct vfs_file_operations *file_operations;
+  unsigned references;
+  struct vfs_inode *next;
 };
 struct vfs_filesystem {
-    const char *name;
-    int (*probe)(const void *image, size_t size);
-    int (*mount)(struct vfs_superblock *super, void *image, size_t size);
-    int (*attach)(struct vfs_superblock *super, void *context);
-    void (*unmount)(struct vfs_superblock *super);
-    int (*sync)(struct vfs_superblock *super);
+  const char *name;
+  int (*probe)(const void *image, size_t size);
+  int (*mount)(struct vfs_superblock *super, void *image, size_t size);
+  int (*attach)(struct vfs_superblock *super, void *context);
+  void (*unmount)(struct vfs_superblock *super);
+  int (*sync)(struct vfs_superblock *super);
 };
 /* Mount supplies private_data and an owned root reference. unmount frees
  * backend state, never the caller-owned image; it also handles failed mounts. */
 struct vfs_superblock {
-    const struct vfs_filesystem *filesystem;
-    void *private_data;
-    struct vfs_inode *root, *inodes;
-    unsigned open_files;
-    /* Raw maintenance I/O uses this stable transport identity to refuse
-     * writes below a mounted filesystem. */
-    void *device_context;
+  const struct vfs_filesystem *filesystem;
+  void *private_data;
+  struct vfs_inode *root, *inodes;
+  unsigned open_files;
+  /* Raw maintenance I/O uses this stable transport identity to refuse
+   * writes below a mounted filesystem. */
+  void *device_context;
 };
 struct vfs_file {
-    const struct vfs_mount *mount;
-    struct vfs_inode *node;
-    void *private_data;
-    uint64_t position;
-    /* Compatibility snapshots; vfs_file_stat refreshes from the inode. */
-    uint64_t size, inode;
-    uint8_t type, attributes;
-    /* Descriptors sharing this file after dup() or stdio inheritance. The
-     * fd layer owns it: the last release closes the file. Zero for files
-     * the kernel opens for itself. */
-    uint32_t fd_refs;
+  const struct vfs_mount *mount;
+  struct vfs_inode *node;
+  void *private_data;
+  uint64_t position;
+  /* Compatibility snapshots; vfs_file_stat refreshes from the inode. */
+  uint64_t size, inode;
+  uint8_t type, attributes;
+  /* Descriptors sharing this file after dup() or stdio inheritance. The
+   * fd layer owns it: the last release closes the file. Zero for files
+   * the kernel opens for itself. */
+  uint32_t fd_refs;
 };
 /* Backend-only reference helpers: caller must already hold the VFS gate. */
-struct vfs_inode *vfs_inode_get(struct vfs_superblock *super, uint64_t number,
-    uint8_t type, void *private_data, const struct vfs_inode_operations *operations,
-    const struct vfs_file_operations *file_operations);
+struct vfs_inode *vfs_inode_get(struct vfs_superblock *super, uint64_t number, uint8_t type,
+                                void *private_data, const struct vfs_inode_operations *operations,
+                                const struct vfs_file_operations *file_operations);
 struct vfs_inode *vfs_inode_ref(struct vfs_inode *inode);
 void vfs_inode_put(struct vfs_inode *inode);
 
@@ -113,13 +113,10 @@ void vfs_inode_put(struct vfs_inode *inode);
  * this boundary, so syscall callers never mistake a bare -1 for -EPERM. */
 void vfs_init(void);
 int vfs_register(const struct vfs_filesystem *filesystem);
-int vfs_mount_image(const char *mountpoint, const char *filesystem,
-                    void *image, size_t size);
-int vfs_mount_auto(const char *mountpoint, void *image, size_t size,
-                   const char **mounted_type);
+int vfs_mount_image(const char *mountpoint, const char *filesystem, void *image, size_t size);
+int vfs_mount_auto(const char *mountpoint, void *image, size_t size, const char **mounted_type);
 int vfs_attach(const char *mountpoint, const char *filesystem, void *context);
-int vfs_attach_auto(const char *mountpoint, void *context,
-                    const char **mounted_type);
+int vfs_attach_auto(const char *mountpoint, void *context, const char **mounted_type);
 int vfs_unmount(const char *mountpoint);
 int vfs_sync_all(void);
 int vfs_device_mounted(const void *context);

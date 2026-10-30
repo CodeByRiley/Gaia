@@ -13,7 +13,7 @@
 /* Port base and IRQ of the card we actually bound to. isa.c offers both
  * 0x220 and 0x240, so nothing here may assume the standard base. */
 static u16 sb16_base = SB16_DEFAULT_IO;
-static u8 sb16_irq = SB16_DEFAULT_IRQ;
+static u8 sb16_irq   = SB16_DEFAULT_IRQ;
 
 static int sb16_is_playing = 0;
 static int sb16_irq_hooked = 0;
@@ -30,9 +30,9 @@ enum playback_kind {
 static enum playback_kind playback_kind = PLAYBACK_NONE;
 
 /* Legacy kernel-only looping source used by sb16_play_wav(). */
-static u8 *current_audio_data = 0;  // Pointer to the raw WAV PCM data
-static u32 current_audio_size = 0;  // Total size of the WAV data
-static u32 audio_position = 0;      // How many bytes we've copied so far
+static u8 *current_audio_data  = 0; // Pointer to the raw WAV PCM data
+static u32 current_audio_size  = 0; // Total size of the WAV data
+static u32 audio_position      = 0; // How many bytes we've copied so far
 static int sb16_use_first_half = 1; // Half completed by the next IRQ
 
 /* Kernel-owned queue for userspace PCM. Keeping user pointers out of the IRQ
@@ -83,7 +83,7 @@ void sb16_set_volume(int percent) {
   if (percent > 100)
     percent = 100;
 
-  u8 step = (u8)((percent * 15) / 100);
+  u8 step  = (u8)((percent * 15) / 100);
   u8 level = (u8)((step << 4) | step);
 
   sb16_mixer_write(SB16_MIXER_MASTER_VOL, level);
@@ -101,7 +101,7 @@ void sb16_ack_irq(void) {
 }
 
 static u32 stream_take(void *destination, u32 bytes) {
-  u32 take = stream_used < bytes ? stream_used : bytes;
+  u32 take  = stream_used < bytes ? stream_used : bytes;
   u32 first = SB16_STREAM_BUFFER_SIZE - stream_read_pos;
   if (first > take)
     first = take;
@@ -117,8 +117,8 @@ static u32 stream_take(void *destination, u32 bytes) {
 
 static u32 stream_fill_dma_half(int half_index) {
   u32 half_bytes = SB16_DMA_BUFFER_SIZE / 2;
-  u8 *target = sb16_dma_buffer_virt + half_index * half_bytes;
-  u32 copied = stream_take(target, half_bytes);
+  u8 *target     = sb16_dma_buffer_virt + half_index * half_bytes;
+  u32 copied     = stream_take(target, half_bytes);
 
   if (copied < half_bytes) {
     memset(target + copied, 0, half_bytes - copied);
@@ -139,9 +139,9 @@ void sb16_irq_handler(void) {
   if (!sb16_is_playing)
     return;
 
-  u32 half = SB16_DMA_BUFFER_SIZE / 2;
+  u32 half       = SB16_DMA_BUFFER_SIZE / 2;
   int half_index = sb16_use_first_half ? 0 : 1;
-  u8 *target = sb16_dma_buffer_virt + half_index * half;
+  u8 *target     = sb16_dma_buffer_virt + half_index * half;
 
   if (playback_kind == PLAYBACK_STREAM) {
     if (stream_dma_pending >= stream_dma_valid[half_index])
@@ -154,13 +154,12 @@ void sb16_irq_handler(void) {
     return;
   }
 
-  if (playback_kind != PLAYBACK_SOURCE_LOOP || !current_audio_data ||
-      current_audio_size == 0)
+  if (playback_kind != PLAYBACK_SOURCE_LOOP || !current_audio_data || current_audio_size == 0)
     return;
 
   u32 filled = 0;
   while (filled < half) {
-    u32 chunk = half - filled;
+    u32 chunk     = half - filled;
     u32 remaining = current_audio_size - audio_position;
     if (chunk > remaining)
       chunk = remaining;
@@ -176,7 +175,7 @@ void sb16_irq_handler(void) {
 }
 
 void sb16_program_dma(void) {
-  u16 count = (SB16_DMA_BUFFER_SIZE / 2) - 1;
+  u16 count    = (SB16_DMA_BUFFER_SIZE / 2) - 1;
   u16 addr_low = (sb16_dma_buffer_phys >> 1) & 0xFFFF;
   u8 addr_page = (sb16_dma_buffer_phys >> 16) & 0xFE;
 
@@ -188,8 +187,7 @@ void sb16_program_dma(void) {
    * channel 4's mode -- that is the master/slave cascade channel, which
    * must stay in cascade mode, and it would leave channel 5's own mode
    * register unprogrammed. */
-  outb(DMA_SLAVE_MODE,
-       DMA_MODE_SINGLE | DMA_MODE_AUTOINIT | DMA_MODE_READ | DMA_CHAN5_SELECT);
+  outb(DMA_SLAVE_MODE, DMA_MODE_SINGLE | DMA_MODE_AUTOINIT | DMA_MODE_READ | DMA_CHAN5_SELECT);
   outb(DMA_SLAVE_CHAN5_ADDR, addr_low & 0xFF);
   outb(DMA_SLAVE_CHAN5_ADDR, (addr_low >> 8) & 0xFF);
   outb(DMA_CHAN5_PAGE, addr_page);
@@ -198,8 +196,8 @@ void sb16_program_dma(void) {
 }
 
 int sb16_allocate_dma_buffer(void) {
-  sb16_dma_buffer_phys = pmm_alloc_contiguous_below(
-      SB16_DMA_LIMIT, SB16_DMA_BUFFER_SIZE / FRAME_SIZE);
+  sb16_dma_buffer_phys =
+      pmm_alloc_contiguous_below(SB16_DMA_LIMIT, SB16_DMA_BUFFER_SIZE / FRAME_SIZE);
 
   if (!sb16_dma_buffer_phys) {
     log_write("SB16: Failed to allocate DMA buffer!", KERNEL, LOG_ERROR);
@@ -210,12 +208,10 @@ int sb16_allocate_dma_buffer(void) {
    * buffer straddling a 128 KiB boundary would silently wrap back to
    * the start of its own 128 KiB block. */
   u64 last = sb16_dma_buffer_phys + SB16_DMA_BUFFER_SIZE - 1;
-  if ((sb16_dma_buffer_phys / ISA_DMA16_BOUNDARY) !=
-      (last / ISA_DMA16_BOUNDARY)) {
-    log_write_hex("SB16: DMA buffer crosses 128K boundary @",
-                  sb16_dma_buffer_phys, KERNEL, LOG_ERROR);
-    pmm_free_contiguous(sb16_dma_buffer_phys,
-                        SB16_DMA_BUFFER_SIZE / FRAME_SIZE);
+  if ((sb16_dma_buffer_phys / ISA_DMA16_BOUNDARY) != (last / ISA_DMA16_BOUNDARY)) {
+    log_write_hex(
+        "SB16: DMA buffer crosses 128K boundary @", sb16_dma_buffer_phys, KERNEL, LOG_ERROR);
+    pmm_free_contiguous(sb16_dma_buffer_phys, SB16_DMA_BUFFER_SIZE / FRAME_SIZE);
     sb16_dma_buffer_phys = 0;
     return -1;
   }
@@ -284,7 +280,7 @@ void sb16_play(void) {
 
   current_audio_data = 0;
   current_audio_size = 0;
-  playback_kind = PLAYBACK_DMA_LOOP;
+  playback_kind      = PLAYBACK_DMA_LOOP;
   sb16_arm(44100);
 }
 
@@ -307,7 +303,7 @@ void sb16_play_wav(u8 *wav_data, u32 wav_size) {
 
   current_audio_data = wav_data;
   current_audio_size = wav_size;
-  audio_position = 0;
+  audio_position     = 0;
 
   /* The first IRQ indicates the “first half” has completed, so refill
    * that half first. */
@@ -317,7 +313,7 @@ void sb16_play_wav(u8 *wav_data, u32 wav_size) {
    * second half before the first interrupt occurs. */
   u32 filled = 0;
   while (filled < SB16_DMA_BUFFER_SIZE) {
-    u32 chunk = SB16_DMA_BUFFER_SIZE - filled;
+    u32 chunk     = SB16_DMA_BUFFER_SIZE - filled;
     u32 remaining = wav_size - audio_position;
 
     if (chunk > remaining)
@@ -348,8 +344,8 @@ static void sb16_stop_locked(void) {
   sb16_ack_irq();
 
   sb16_is_playing = 0;
-  stream_paused = 0;
-  playback_kind = PLAYBACK_NONE;
+  stream_paused   = 0;
+  playback_kind   = PLAYBACK_NONE;
 }
 
 void sb16_stop(void) {
@@ -357,23 +353,23 @@ void sb16_stop(void) {
   sb16_stop_locked();
   current_audio_data = 0;
   current_audio_size = 0;
-  stream_owner_pid = 0;
+  stream_owner_pid   = 0;
   stream_read_pos = stream_write_pos = stream_used = 0;
   stream_dma_valid[0] = stream_dma_valid[1] = 0;
-  stream_dma_pending = 0;
-  stream_draining = 0;
+  stream_dma_pending                        = 0;
+  stream_draining                           = 0;
   irq_restore(rflags);
 }
 
 static void stream_reset_locked(void) {
-  stream_read_pos = 0;
-  stream_write_pos = 0;
-  stream_used = 0;
+  stream_read_pos     = 0;
+  stream_write_pos    = 0;
+  stream_used         = 0;
   stream_dma_valid[0] = 0;
   stream_dma_valid[1] = 0;
-  stream_dma_pending = 0;
-  stream_paused = 0;
-  stream_draining = 0;
+  stream_dma_pending  = 0;
+  stream_paused       = 0;
+  stream_draining     = 0;
   sb16_use_first_half = 1;
 }
 
@@ -387,13 +383,12 @@ static void stream_start_locked(int force) {
   stream_dma_pending = stream_fill_dma_half(0);
   stream_dma_pending += stream_fill_dma_half(1);
   sb16_use_first_half = 1;
-  playback_kind = PLAYBACK_STREAM;
+  playback_kind       = PLAYBACK_STREAM;
   sb16_arm(stream_rate);
 }
 
 int sb16_stream_open(int owner_pid, u32 sample_rate, u32 channels, u32 format) {
-  if (owner_pid <= 0 || channels != SB16_STREAM_CHANNELS ||
-      format != SB16_STREAM_FORMAT_S16_LE ||
+  if (owner_pid <= 0 || channels != SB16_STREAM_CHANNELS || format != SB16_STREAM_FORMAT_S16_LE ||
       sample_rate < SB16_STREAM_RATE_MIN || sample_rate > SB16_STREAM_RATE_MAX)
     return SB16_STREAM_ERR_INVALID;
 
@@ -412,7 +407,7 @@ int sb16_stream_open(int owner_pid, u32 sample_rate, u32 channels, u32 format) {
   current_audio_size = 0;
   stream_reset_locked();
   stream_owner_pid = owner_pid;
-  stream_rate = sample_rate;
+  stream_rate      = sample_rate;
   stream_underruns = 0;
   irq_restore(rflags);
   return 0;
@@ -428,7 +423,7 @@ long sb16_stream_write(int owner_pid, const void *data, u32 bytes) {
     return SB16_STREAM_ERR_NOT_OWNER;
   }
 
-  u32 free_bytes = SB16_STREAM_BUFFER_SIZE - stream_used;
+  u32 free_bytes  = SB16_STREAM_BUFFER_SIZE - stream_used;
   u32 write_bytes = bytes < free_bytes ? bytes : free_bytes;
   write_bytes &= ~3U;
 
@@ -439,8 +434,7 @@ long sb16_stream_write(int owner_pid, const void *data, u32 bytes) {
   if (write_bytes > first)
     memcpy(stream_ring, (const u8 *)data + first, write_bytes - first);
 
-  stream_write_pos =
-      (stream_write_pos + write_bytes) & (SB16_STREAM_BUFFER_SIZE - 1);
+  stream_write_pos = (stream_write_pos + write_bytes) & (SB16_STREAM_BUFFER_SIZE - 1);
   stream_used += write_bytes;
   stream_draining = 0;
   stream_start_locked(0);
@@ -453,20 +447,19 @@ int sb16_stream_status(struct sb16_stream_status *out) {
     return SB16_STREAM_ERR_INVALID;
 
   u64 rflags = irq_save();
-  *out = (struct sb16_stream_status){
-      .available = sb16_dma_buffer_phys != 0,
-      .playing =
-          playback_kind == PLAYBACK_STREAM && sb16_is_playing && !stream_paused,
-      .paused = stream_paused,
-      .sample_rate = stream_rate,
-      .channels = SB16_STREAM_CHANNELS,
-      .format = SB16_STREAM_FORMAT_S16_LE,
+  *out       = (struct sb16_stream_status){
+      .available     = sb16_dma_buffer_phys != 0,
+      .playing       = playback_kind == PLAYBACK_STREAM && sb16_is_playing && !stream_paused,
+      .paused        = stream_paused,
+      .sample_rate   = stream_rate,
+      .channels      = SB16_STREAM_CHANNELS,
+      .format        = SB16_STREAM_FORMAT_S16_LE,
       .ring_capacity = SB16_STREAM_BUFFER_SIZE,
-      .ring_queued = stream_used,
+      .ring_queued   = stream_used,
       .device_queued = stream_dma_pending,
-      .underruns = stream_underruns,
-      .volume = (u32)stream_volume,
-      .owner_pid = stream_owner_pid,
+      .underruns     = stream_underruns,
+      .volume        = (u32)stream_volume,
+      .owner_pid     = stream_owner_pid,
   };
   irq_restore(rflags);
   return 0;
@@ -489,9 +482,8 @@ int sb16_stream_begin_drain(int owner_pid) {
 }
 
 u32 sb16_stream_pending(int owner_pid) {
-  u64 rflags = irq_save();
-  u32 pending =
-      stream_owner_pid == owner_pid ? stream_used + stream_dma_pending : 0;
+  u64 rflags  = irq_save();
+  u32 pending = stream_owner_pid == owner_pid ? stream_used + stream_dma_pending : 0;
   irq_restore(rflags);
   return pending;
 }
@@ -589,7 +581,7 @@ static int sb16_match(const struct device *device) {
 
 static int sb16_probe(struct device *device) {
   struct isa_device *isa = &device->bus_info.isa;
-  u16 io_base = isa->io_base;
+  u16 io_base            = isa->io_base;
 
   outb(io_base + SB16_REG_DSP_RESET, 0x01);
   for (volatile int i = 0; i < 10000; i++)
@@ -605,7 +597,7 @@ static int sb16_probe(struct device *device) {
          * All subsequent callers assume this card’s state, which may not
          * correspond to the device at I/O 0x220. */
         sb16_base = io_base;
-        sb16_irq = (u8)(isa->irq ? isa->irq : SB16_DEFAULT_IRQ);
+        sb16_irq  = (u8)(isa->irq ? isa->irq : SB16_DEFAULT_IRQ);
 
         irq_install(sb16_irq, sb16_irq_handler);
         sb16_irq_hooked = 1;
@@ -636,7 +628,5 @@ static int sb16_probe(struct device *device) {
   return -1;
 }
 
-const struct driver sb16_driver = {.name = "SoundBlaster 16",
-                                   .bus = DEVICE_BUS_ISA,
-                                   .match = sb16_match,
-                                   .probe = sb16_probe};
+const struct driver sb16_driver = {
+    .name = "SoundBlaster 16", .bus = DEVICE_BUS_ISA, .match = sb16_match, .probe = sb16_probe};

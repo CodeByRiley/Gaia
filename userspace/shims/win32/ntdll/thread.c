@@ -18,7 +18,7 @@ struct thread_start {
 };
 void GaiaThreadEntry(void);
 void WINAPI ExitThread(DWORD code) {
-  TEB *t = NtCurrentTeb();
+  TEB *t                 = NtCurrentTeb();
   struct thread_start *r = t->ArbitraryUserPointer;
   if (r) {
     r->code = code;
@@ -33,16 +33,15 @@ void GaiaThreadStart(struct thread_start *r) {
   r->teb->ThreadId = gaia_tid();
   ExitThread(r->function(r->arg));
 }
-HANDLE WINAPI CreateThread(void *security, SIZE_T size,
-                           LPTHREAD_START_ROUTINE fn, void *arg, DWORD flags,
-                           DWORD *id) {
+HANDLE WINAPI CreateThread(void *security, SIZE_T size, LPTHREAD_START_ROUTINE fn, void *arg,
+                           DWORD flags, DWORD *id) {
   if (security || flags || !fn || size > 16 * 1024 * 1024) {
     SetLastError(87);
     return 0;
   }
   if (size < 65536)
     size = 65536;
-  size = (size + 4095) & ~4095ULL;
+  size                   = (size + 4095) & ~4095ULL;
   struct thread_start *r = RtlAllocateHeap((HANDLE)1, 8, sizeof(*r));
   if (!r)
     return 0;
@@ -56,20 +55,20 @@ HANDLE WINAPI CreateThread(void *security, SIZE_T size,
     SetLastError(8);
     return 0;
   }
-  r->function = fn;
-  r->arg = arg;
-  r->teb = (void *)(uintptr_t)teb;
-  r->stack = (void *)(uintptr_t)stack;
-  r->stack_size = size;
-  TEB *t = r->teb;
-  t->Self = t;
-  t->StackBase = (void *)(uintptr_t)(stack + size);
-  t->StackLimit = r->stack;
+  r->function                = fn;
+  r->arg                     = arg;
+  r->teb                     = (void *)(uintptr_t)teb;
+  r->stack                   = (void *)(uintptr_t)stack;
+  r->stack_size              = size;
+  TEB *t                     = r->teb;
+  t->Self                    = t;
+  t->StackBase               = (void *)(uintptr_t)(stack + size);
+  t->StackLimit              = r->stack;
   t->ProcessEnvironmentBlock = NtCurrentTeb()->ProcessEnvironmentBlock;
-  t->ProcessId = gaia_pid();
-  t->ArbitraryUserPointer = r;
-  r->pid = gaia_call(1100, (int64_t)(uintptr_t)GaiaThreadEntry, stack + size,
-                     (int64_t)(uintptr_t)r, 0, 0, 0);
+  t->ProcessId               = gaia_pid();
+  t->ArbitraryUserPointer    = r;
+  r->pid                     = gaia_call(
+      1100, (int64_t)(uintptr_t)GaiaThreadEntry, stack + size, (int64_t)(uintptr_t)r, 0, 0, 0);
   if (r->pid < 0) {
     gaia_unmap(r->stack, size);
     gaia_unmap(t, 8192);
@@ -82,9 +81,10 @@ HANDLE WINAPI CreateThread(void *security, SIZE_T size,
   HANDLE h = GaiaHandleCreate(GH_THREAD, (int64_t)(uintptr_t)r, 0);
   return h == INVALID_HANDLE_VALUE ? 0 : h;
 }
-DWORD GaiaWaitEvent(HANDLE,DWORD);
+DWORD GaiaWaitEvent(HANDLE, DWORD);
 DWORD WINAPI WaitForSingleObject(HANDLE h, DWORD timeout) {
-  if(GaiaHandleType(h)==GH_EVENT)return GaiaWaitEvent(h,timeout);
+  if (GaiaHandleType(h) == GH_EVENT)
+    return GaiaWaitEvent(h, timeout);
   int64_t value;
   if (!GaiaHandleLookup(h, GH_THREAD, &value, 0))
     return WAIT_FAILED;
@@ -105,4 +105,8 @@ DWORD WINAPI WaitForSingleObject(HANDLE h, DWORD timeout) {
   return WAIT_OBJECT_0;
 }
 
-void GaiaCloseThreadHandle(int64_t value){struct thread_start *r=(void *)(uintptr_t)value;if(__atomic_load_n(&r->done,__ATOMIC_ACQUIRE)&&__atomic_load_n(&r->joined,__ATOMIC_ACQUIRE))RtlFreeHeap((HANDLE)1,0,r);}
+void GaiaCloseThreadHandle(int64_t value) {
+  struct thread_start *r = (void *)(uintptr_t)value;
+  if (__atomic_load_n(&r->done, __ATOMIC_ACQUIRE) && __atomic_load_n(&r->joined, __ATOMIC_ACQUIRE))
+    RtlFreeHeap((HANDLE)1, 0, r);
+}

@@ -4,8 +4,13 @@
 #include <stdio.h>
 #include <string.h>
 DWORD GaiaError(int64_t r) { return (DWORD)-r; }
-BOOL WINAPI RtlFreeHeap(HANDLE h,ULONG f,void *p){(void)h;(void)f;(void)p;return TRUE;}
-void GaiaCloseThreadHandle(int64_t v){(void)v;}
+BOOL WINAPI RtlFreeHeap(HANDLE h, ULONG f, void *p) {
+  (void)h;
+  (void)f;
+  (void)p;
+  return TRUE;
+}
+void GaiaCloseThreadHandle(int64_t v) { (void)v; }
 static DWORD error;
 static int closed;
 void WINAPI SetLastError(DWORD e) { error = e; }

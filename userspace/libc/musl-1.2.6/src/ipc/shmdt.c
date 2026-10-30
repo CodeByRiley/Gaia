@@ -1,12 +1,11 @@
-#include <sys/shm.h>
-#include "syscall.h"
 #include "ipc.h"
+#include "syscall.h"
+#include <sys/shm.h>
 
-int shmdt(const void *addr)
-{
+int shmdt(const void *addr) {
 #ifndef SYS_ipc
-	return syscall(SYS_shmdt, addr);
+  return syscall(SYS_shmdt, addr);
 #else
-	return syscall(SYS_ipc, IPCOP_shmdt, 0, 0, 0, addr);
+  return syscall(SYS_ipc, IPCOP_shmdt, 0, 0, 0, addr);
 #endif
 }

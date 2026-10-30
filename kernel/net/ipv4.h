@@ -23,10 +23,10 @@
 #ifndef NET_IPV4_H
 #define NET_IPV4_H
 
-#include <utilities/types.h>
 #include <net/eth.h>
 #include <net/inet.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 #define IPV4_HDR_LEN 20
 #define IPV4_HEADROOM (ETH_HDR_LEN + IPV4_HDR_LEN)
@@ -55,11 +55,9 @@ void ipv4_input(const struct eth_hdr *eth, const u8 *packet, u16 len);
  *   1  queued behind an ARP request
  *  -1  no interface, no route, or payload over the MTU
  * `frame` must be writable for at least IPV4_HEADROOM + payload_len. */
-int ipv4_output_framed(u8 *frame, const u8 dst[IPV4_ALEN],
-                       u8 protocol, u16 payload_len);
+int ipv4_output_framed(u8 *frame, const u8 dst[IPV4_ALEN], u8 protocol, u16 payload_len);
 
 /* Copying convenience wrapper for callers without headroom. */
-int ipv4_output(const u8 dst[IPV4_ALEN], u8 protocol,
-                const void *payload, u16 payload_len);
+int ipv4_output(const u8 dst[IPV4_ALEN], u8 protocol, const void *payload, u16 payload_len);
 
 #endif /* NET_IPV4_H */

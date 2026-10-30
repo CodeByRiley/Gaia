@@ -1,8 +1,5 @@
 #define _GNU_SOURCE
-#include <unistd.h>
 #include "syscall.h"
+#include <unistd.h>
 
-int acct(const char *filename)
-{
-	return syscall(SYS_acct, filename);
-}
+int acct(const char *filename) { return syscall(SYS_acct, filename); }

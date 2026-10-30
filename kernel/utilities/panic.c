@@ -25,8 +25,7 @@
 
 #define PANIC_MESSAGE_SIZE 512
 
-static_assert(offsetof(struct interrupt_frame, rsp) ==
-                  offsetof(struct interrupt_frame, rflags) + 8,
+static_assert(offsetof(struct interrupt_frame, rsp) == offsetof(struct interrupt_frame, rflags) + 8,
               "interrupt_frame rsp must immediately follow rflags");
 
 struct panic_record {
@@ -74,7 +73,7 @@ static void panic_serialf(const char *fmt, ...) {
 
 static int kernel_address(u64 address) {
   u64 start = (u64)(uintptr_t)_kernel_start;
-  u64 end = (u64)(uintptr_t)_kernel_end;
+  u64 end   = (u64)(uintptr_t)_kernel_end;
   return address >= start && address < end;
 }
 
@@ -84,15 +83,14 @@ static int kernel_address(u64 address) {
  * caller-provided buffer so there are no allocations on the panic path.
  */
 static void panic_symstr(char *buf, usize bufsz, u64 address) {
-  u64 off = 0;
+  u64 off         = 0;
   const char *sym = symtab_resolve(address, &off);
 
   if (sym)
     snprintf(buf, bufsz, "%s+0x%llx", sym, (unsigned long long)off);
   else if (kernel_address(address))
     snprintf(
-        buf, bufsz, "kernel+0x%llx",
-        (unsigned long long)(address - (u64)(uintptr_t)_kernel_start));
+        buf, bufsz, "kernel+0x%llx", (unsigned long long)(address - (u64)(uintptr_t)_kernel_start));
   else
     snprintf(buf, bufsz, "0x%llx", (unsigned long long)address);
 }
@@ -100,8 +98,7 @@ static void panic_symstr(char *buf, usize bufsz, u64 address) {
 static void panic_address_line(const char *label, u64 address) {
   char symbuf[128];
   panic_symstr(symbuf, sizeof(symbuf), address);
-  panic_serialf("%-18s %016llx  %s\n", label, (unsigned long long)address,
-                symbuf);
+  panic_serialf("%-18s %016llx  %s\n", label, (unsigned long long)address, symbuf);
 }
 
 static struct panic_machine_state panic_read_machine(void) {
@@ -120,10 +117,9 @@ static struct task *panic_task(int cpu_id) {
   return cpu_id == 0 ? task_current() : 0;
 }
 
-static int panic_stack_bounds(int cpu_id, struct task *task, u64 *low,
-                              u64 *high) {
+static int panic_stack_bounds(int cpu_id, struct task *task, u64 *low, u64 *high) {
   if (cpu_id == 0 && task && task->kstack && task->syscall_kstack_top) {
-    *low = (u64)(uintptr_t)task->kstack;
+    *low  = (u64)(uintptr_t)task->kstack;
     *high = task->syscall_kstack_top;
     return 1;
   }
@@ -131,14 +127,13 @@ static int panic_stack_bounds(int cpu_id, struct task *task, u64 *low,
   struct cpu_local *cpu = percpu_get(cpu_id);
   if (cpu_id > 0 && cpu && cpu->kernel_rsp_top) {
     *high = cpu->kernel_rsp_top;
-    *low = *high - AP_KSTACK_BYTES;
+    *low  = *high - AP_KSTACK_BYTES;
     return 1;
   }
   return 0;
 }
 
-static void panic_backtrace(const struct panic_record *record,
-                            struct task *task) {
+static void panic_backtrace(const struct panic_record *record, struct task *task) {
   u64 low, high;
   serial_write_str("Backtrace (frame : return address):\n");
   if (!record->rbp || !panic_stack_bounds(record->cpu_id, task, &low, &high)) {
@@ -146,20 +141,23 @@ static void panic_backtrace(const struct panic_record *record,
     return;
   }
 
-  u64 frame = record->rbp;
+  u64 frame   = record->rbp;
   int emitted = 0;
   for (int i = 0; i < PANIC_BACKTRACE_MAX; i++) {
     if ((frame & 7) || frame < low || frame + 16 > high)
       break;
 
     const u64 *words = (const u64 *)(uintptr_t)frame;
-    u64 next = words[0];
-    u64 ret = words[1];
+    u64 next         = words[0];
+    u64 ret          = words[1];
 
     char symbuf[128];
     panic_symstr(symbuf, sizeof(symbuf), ret);
-    panic_serialf("  %02d: %016llx : %016llx  %s\n", i,
-                  (unsigned long long)frame, (unsigned long long)ret, symbuf);
+    panic_serialf("  %02d: %016llx : %016llx  %s\n",
+                  i,
+                  (unsigned long long)frame,
+                  (unsigned long long)ret,
+                  symbuf);
     emitted++;
 
     if (next <= frame || next + 16 > high || next - frame > 0x10000)
@@ -183,14 +181,22 @@ static void panic_report_registers(const struct interrupt_frame *f) {
                 "   r8=%016llx  r9=%016llx r10=%016llx r11=%016llx\n"
                 "  r12=%016llx r13=%016llx r14=%016llx r15=%016llx\n"
                 "   cs=%016llx  ss=%016llx flags=%016llx\n",
-                (unsigned long long)f->rax, (unsigned long long)f->rbx,
-                (unsigned long long)f->rcx, (unsigned long long)f->rdx,
-                (unsigned long long)f->rsi, (unsigned long long)f->rdi,
-                (unsigned long long)f->rbp, (unsigned long long)frame_rsp(f),
-                (unsigned long long)f->r8, (unsigned long long)f->r9,
-                (unsigned long long)f->r10, (unsigned long long)f->r11,
-                (unsigned long long)f->r12, (unsigned long long)f->r13,
-                (unsigned long long)f->r14, (unsigned long long)f->r15,
+                (unsigned long long)f->rax,
+                (unsigned long long)f->rbx,
+                (unsigned long long)f->rcx,
+                (unsigned long long)f->rdx,
+                (unsigned long long)f->rsi,
+                (unsigned long long)f->rdi,
+                (unsigned long long)f->rbp,
+                (unsigned long long)frame_rsp(f),
+                (unsigned long long)f->r8,
+                (unsigned long long)f->r9,
+                (unsigned long long)f->r10,
+                (unsigned long long)f->r11,
+                (unsigned long long)f->r12,
+                (unsigned long long)f->r13,
+                (unsigned long long)f->r14,
+                (unsigned long long)f->r15,
                 (unsigned long long)f->cs,
                 (unsigned long long)((f->cs & 3) == 3 ? f->ss : 0),
                 (unsigned long long)f->rflags);
@@ -204,18 +210,22 @@ static void panic_serial_report(const struct panic_record *record,
   char caller_sym[128];
   panic_symstr(caller_sym, sizeof(caller_sym), record->caller);
 
-  panic_serialf("panic(cpu %d caller %p): %s\n", record->cpu_id,
+  panic_serialf("panic(cpu %d caller %p): %s\n",
+                record->cpu_id,
                 (void *)(uintptr_t)record->caller,
                 record->message ? record->message : "unspecified panic");
   panic_serialf("  caller resolved: %s\n", caller_sym);
 
   if (record->exception && record->frame) {
     panic_serialf("Exception: vector %llu (%s), error=%#llx\n",
-                  (unsigned long long)record->frame->int_num, record->exception,
+                  (unsigned long long)record->frame->int_num,
+                  record->exception,
                   (unsigned long long)record->frame->err_code);
   }
   if (record->file) {
-    panic_serialf("Source: %s:%d in %s()\n", record->file, record->line,
+    panic_serialf("Source: %s:%d in %s()\n",
+                  record->file,
+                  record->line,
                   record->func ? record->func : "unknown");
   }
   if (record->has_fault_address)
@@ -223,24 +233,26 @@ static void panic_serial_report(const struct panic_record *record,
   panic_address_line("Instruction:", record->caller);
 
   if (task) {
-    panic_serialf("Panicked task: pid %d, name %s, state %d\n", task->pid,
-                  task->name[0] ? task->name : "unnamed", task->state);
+    panic_serialf("Panicked task: pid %d, name %s, state %d\n",
+                  task->pid,
+                  task->name[0] ? task->name : "unnamed",
+                  task->state);
   } else if (record->cpu_id > 0) {
     serial_write_str("Panicked context: AP kernel worker\n");
   } else {
     serial_write_str("Panicked task: scheduler not initialized\n");
   }
 
-  panic_serialf("Kernel version: Gaia x86_64 development (%s %s)\n", __DATE__,
-                __TIME__);
+  panic_serialf("Kernel version: Gaia x86_64 development (%s %s)\n", __DATE__, __TIME__);
   panic_serialf("Uptime ticks: %llu\n", (unsigned long long)pit_ticks());
-  panic_serialf(
-      "Control registers:\n"
-      "  cr0=%016llx cr2=%016llx cr3=%016llx cr4=%016llx\n"
-      "  rflags=%016llx\n",
-      (unsigned long long)machine->cr0, (unsigned long long)machine->cr2,
-      (unsigned long long)machine->cr3, (unsigned long long)machine->cr4,
-      (unsigned long long)machine->rflags);
+  panic_serialf("Control registers:\n"
+                "  cr0=%016llx cr2=%016llx cr3=%016llx cr4=%016llx\n"
+                "  rflags=%016llx\n",
+                (unsigned long long)machine->cr0,
+                (unsigned long long)machine->cr2,
+                (unsigned long long)machine->cr3,
+                (unsigned long long)machine->cr4,
+                (unsigned long long)machine->rflags);
 
   if (record->frame)
     panic_report_registers(record->frame);
@@ -257,23 +269,22 @@ static void panic_serial_report(const struct panic_record *record,
   serial_write_str("\nPlease restart the machine.\n");
 }
 
-static void screen_centered(struct gfx_surface *surface, int y,
-                            const char *text, u32 color, int scale) {
+static void screen_centered(struct gfx_surface *surface, int y, const char *text, u32 color,
+                            int scale) {
   int w = 0;
   gfx_text_size(text, scale, &w, 0);
   gfx_text(surface, (surface->w - w) / 2, y, text, color, scale);
 }
 
-static void screen_wrapped(struct gfx_surface *surface, int *y,
-                           const char *text, u32 color, int scale,
-                           int max_width) {
+static void screen_wrapped(struct gfx_surface *surface, int *y, const char *text, u32 color,
+                           int scale, int max_width) {
   int chars = max_width / (GFX_GLYPH_W * scale);
   if (chars < 8)
     return;
 
   const char *p = text ? text : "unspecified panic";
   while (*p && *y + GFX_GLYPH_H * scale < surface->h) {
-    int n = 0;
+    int n          = 0;
     int last_space = -1;
     while (p[n] && n < chars) {
       if (p[n] == ' ')
@@ -297,10 +308,10 @@ static void screen_wrapped(struct gfx_surface *surface, int *y,
 
 static void screen_power_symbol(struct gfx_surface *surface, int cx, int cy) {
   const int radius = 24;
-  const int inner = 20;
+  const int inner  = 20;
   for (int y = -radius; y <= radius; y++) {
     for (int x = -radius; x <= radius; x++) {
-      int d = x * x + y * y;
+      int d       = x * x + y * y;
       int top_gap = y < -7 && x > -9 && x < 9;
       if (!top_gap && d <= radius * radius && d >= inner * inner)
         gfx_pixel(surface, cx + x, cy + y, PANIC_FG);
@@ -316,8 +327,7 @@ static int panic_screen(const struct panic_record *record) {
     return 0;
 
   struct gfx_surface surface = framebuffer_get_gfx_surface();
-  if (!surface.px || surface.w < 320 || surface.h < 240 ||
-      surface.stride < surface.w)
+  if (!surface.px || surface.w < 320 || surface.h < 240 || surface.stride < surface.w)
     return 0;
 
   int headline_scale = surface.w >= 560 ? 2 : 1;
@@ -332,25 +342,25 @@ static int panic_screen(const struct panic_record *record) {
   screen_power_symbol(&surface, surface.w / 2, icon_y);
 
   int y = icon_y + 58;
-  screen_centered(&surface, y, "Your computer needs to restart.", PANIC_FG,
-                  headline_scale);
+  screen_centered(&surface, y, "Your computer needs to restart.", PANIC_FG, headline_scale);
   y += GFX_GLYPH_H * headline_scale + 18;
-  screen_centered(&surface, y,
-                  "Gaia stopped because the kernel encountered a problem.",
-                  PANIC_MUTED, 1);
+  screen_centered(
+      &surface, y, "Gaia stopped because the kernel encountered a problem.", PANIC_MUTED, 1);
   y += 28;
   screen_wrapped(&surface, &y, record->message, PANIC_FG, 1, surface.w - 64);
 
   int detail_y = surface.h - 68;
   if (detail_y > y + 12)
     y = detail_y;
-  snprintf(screen_line, sizeof(screen_line), "panic(cpu %d caller %p)",
-           record->cpu_id, (void *)(uintptr_t)record->caller);
+  snprintf(screen_line,
+           sizeof(screen_line),
+           "panic(cpu %d caller %p)",
+           record->cpu_id,
+           (void *)(uintptr_t)record->caller);
   screen_centered(&surface, y, screen_line, PANIC_MUTED, 1);
   y += 16;
-  screen_centered(&surface, y,
-                  "A detailed diagnostic report is available on serial.",
-                  PANIC_MUTED, 1);
+  screen_centered(
+      &surface, y, "A detailed diagnostic report is available on serial.", PANIC_MUTED, 1);
 
   framebuffer_mark_damage(0, 0, (u32)surface.w, (u32)surface.h);
   framebuffer_present();
@@ -395,8 +405,7 @@ static u64 panic_stop_code(const struct panic_record *record) {
   return 0x000000FFu;
 }
 
-static void diag_line(struct gfx_surface *surface, int *y, int x,
-                      const char *text, u32 color) {
+static void diag_line(struct gfx_surface *surface, int *y, int x, const char *text, u32 color) {
   const int line_h = GFX_GLYPH_H + 2;
   if (!text || *y + line_h > surface->h)
     return;
@@ -415,17 +424,19 @@ static void diag_rule(struct gfx_surface *surface, int *y) {
   *y += 6;
 }
 
-static void diag_hex2(struct gfx_surface *surface, int *y,
-                      const char *left_label, u64 left,
+static void diag_hex2(struct gfx_surface *surface, int *y, const char *left_label, u64 left,
                       const char *right_label, u64 right) {
-  snprintf(screen_line, sizeof(screen_line), "%-6s %016llx    %-6s %016llx",
-           left_label, (unsigned long long)left, right_label,
+  snprintf(screen_line,
+           sizeof(screen_line),
+           "%-6s %016llx    %-6s %016llx",
+           left_label,
+           (unsigned long long)left,
+           right_label,
            (unsigned long long)right);
   diag_line(surface, y, 8, screen_line, PANIC_FG);
 }
 
-static void diag_registers(struct gfx_surface *surface, int *y,
-                           const struct panic_record *record,
+static void diag_registers(struct gfx_surface *surface, int *y, const struct panic_record *record,
                            const struct panic_machine_state *machine) {
   diag_line(surface, y, 8, "CPU register dump", PANIC_MUTED);
   diag_hex2(surface, y, "CR0", machine->cr0, "CR2", machine->cr2);
@@ -454,12 +465,14 @@ static void diag_tasks(struct gfx_surface *surface, int *y) {
   int count = sched_snapshot(snaps, MAX_TASKS);
 
   diag_line(surface, y, 8, "Task table", PANIC_MUTED);
-  diag_line(surface, y, 8, "PID   PPID  STATE     TICKS              NAME",
-            PANIC_DIM);
+  diag_line(surface, y, 8, "PID   PPID  STATE     TICKS              NAME", PANIC_DIM);
   for (int i = 0; i < count && *y + GFX_GLYPH_H < surface->h; i++) {
-    snprintf(screen_line, sizeof(screen_line),
-             "%04d  %04d  %-8s  %016llx   %-15s", snaps[i].pid,
-             snaps[i].parent_pid, task_state_name(snaps[i].state),
+    snprintf(screen_line,
+             sizeof(screen_line),
+             "%04d  %04d  %-8s  %016llx   %-15s",
+             snaps[i].pid,
+             snaps[i].parent_pid,
+             task_state_name(snaps[i].state),
              (unsigned long long)snaps[i].ticks_run,
              snaps[i].name[0] ? snaps[i].name : "unnamed");
     diag_line(surface, y, 8, screen_line, PANIC_FG);
@@ -471,33 +484,40 @@ static void diag_drivers(struct gfx_surface *surface, int *y) {
   int count = driver_snapshot(snaps, DRIVER_SNAP_MAX);
 
   diag_line(surface, y, 8, "Kernel drivers", PANIC_MUTED);
-  snprintf(screen_line, sizeof(screen_line),
-           "%-4s  %-4s  %-4s   %-5s    %-8s %s", "IDX", "BUS", "POLL", "BOUND",
-           "ENABLED", "NAME");
+  snprintf(screen_line,
+           sizeof(screen_line),
+           "%-4s  %-4s  %-4s   %-5s    %-8s %s",
+           "IDX",
+           "BUS",
+           "POLL",
+           "BOUND",
+           "ENABLED",
+           "NAME");
   diag_line(surface, y, 8, screen_line, PANIC_DIM);
   for (int i = 0; i < count && *y + GFX_GLYPH_H < surface->h; i++) {
-    snprintf(screen_line, sizeof(screen_line),
-             "%04d  %-4s  %-4s   %05u    %-8s %-31s", i,
-             device_bus_name(snaps[i].bus), snaps[i].poll ? "yes" : "no",
-             snaps[i].bound_devices, snaps[i].enabled ? "yes" : "no",
+    snprintf(screen_line,
+             sizeof(screen_line),
+             "%04d  %-4s  %-4s   %05u    %-8s %-31s",
+             i,
+             device_bus_name(snaps[i].bus),
+             snaps[i].poll ? "yes" : "no",
+             snaps[i].bound_devices,
+             snaps[i].enabled ? "yes" : "no",
              snaps[i].name[0] ? snaps[i].name : "unnamed");
     diag_line(surface, y, 8, screen_line, PANIC_FG);
   }
 }
 
-static void diag_stack(struct gfx_surface *surface, int *y,
-                       const struct panic_record *record) {
+static void diag_stack(struct gfx_surface *surface, int *y, const struct panic_record *record) {
   struct task *task = panic_task(record->cpu_id);
   u64 low, high;
   u64 frame = record->rbp;
 
   diag_line(surface, y, 8, "Stack frames", PANIC_MUTED);
-  diag_line(surface, y, 8, "ADDRESS             NEXT               RETURN",
-            PANIC_DIM);
+  diag_line(surface, y, 8, "ADDRESS             NEXT               RETURN", PANIC_DIM);
 
   if (!frame || !panic_stack_bounds(record->cpu_id, task, &low, &high)) {
-    diag_line(surface, y, 8, "unavailable - no trusted kernel stack bounds",
-              PANIC_DIM);
+    diag_line(surface, y, 8, "unavailable - no trusted kernel stack bounds", PANIC_DIM);
     return;
   }
 
@@ -507,18 +527,18 @@ static void diag_stack(struct gfx_surface *surface, int *y,
       break;
 
     const u64 *words = (const u64 *)(uintptr_t)frame;
-    u64 next = words[0];
-    u64 ret = words[1];
+    u64 next         = words[0];
+    u64 ret          = words[1];
     char symbuf[128];
     panic_symstr(symbuf, sizeof(symbuf), ret);
-    snprintf(screen_line, sizeof(screen_line),
+    snprintf(screen_line,
+             sizeof(screen_line),
              "%016llx  %016llx  %016llx  %s",
              (unsigned long long)frame,
              (unsigned long long)next,
              (unsigned long long)ret,
              symbuf);
-    diag_line(surface, y, 8, screen_line,
-              kernel_address(ret) ? PANIC_FG : PANIC_MUTED);
+    diag_line(surface, y, 8, screen_line, kernel_address(ret) ? PANIC_FG : PANIC_MUTED);
     emitted++;
 
     if (next <= frame || next + 16 > high || next - frame > 0x10000)
@@ -527,8 +547,7 @@ static void diag_stack(struct gfx_surface *surface, int *y,
   }
 
   if (!emitted)
-    diag_line(surface, y, 8, "unavailable - frame pointer outside kernel stack",
-              PANIC_DIM);
+    diag_line(surface, y, 8, "unavailable - frame pointer outside kernel stack", PANIC_DIM);
 }
 
 static void panic_diagnostic_screen(const struct panic_record *record,
@@ -537,37 +556,43 @@ static void panic_diagnostic_screen(const struct panic_record *record,
     return;
 
   struct gfx_surface surface = framebuffer_get_gfx_surface();
-  if (!surface.px || surface.w < 320 || surface.h < 240 ||
-      surface.stride < surface.w)
+  if (!surface.px || surface.w < 320 || surface.h < 240 || surface.stride < surface.w)
     return;
 
   gfx_clear(&surface, PANIC_BG);
 
   int y = 8;
-  snprintf(screen_line, sizeof(screen_line), "*** STOP: 0x%08llx (%s)",
+  snprintf(screen_line,
+           sizeof(screen_line),
+           "*** STOP: 0x%08llx (%s)",
            (unsigned long long)panic_stop_code(record),
            record->exception ? record->exception : "GAIA_KERNEL_PANIC");
   diag_line(&surface, &y, 8, screen_line, PANIC_FG);
 
-  snprintf(screen_line, sizeof(screen_line),
+  snprintf(screen_line,
+           sizeof(screen_line),
            "GAIA_KERNEL_PANIC: Address %016llx base at %016llx - kernel",
            (unsigned long long)record->caller,
            (unsigned long long)(uintptr_t)_kernel_start);
   diag_line(&surface, &y, 8, screen_line, PANIC_FG);
 
-  snprintf(screen_line, sizeof(screen_line),
-           "CPU %d: Gaia x86_64 development  uptime ticks %llu", record->cpu_id,
+  snprintf(screen_line,
+           sizeof(screen_line),
+           "CPU %d: Gaia x86_64 development  uptime ticks %llu",
+           record->cpu_id,
            (unsigned long long)pit_ticks());
   diag_line(&surface, &y, 8, screen_line, PANIC_MUTED);
 
   if (record->file) {
-    snprintf(screen_line, sizeof(screen_line), "Source: %s:%d in %s()",
-             record->file, record->line,
+    snprintf(screen_line,
+             sizeof(screen_line),
+             "Source: %s:%d in %s()",
+             record->file,
+             record->line,
              record->func ? record->func : "unknown");
     diag_line(&surface, &y, 8, screen_line, PANIC_MUTED);
   }
-  diag_line(&surface, &y, 8,
-            record->message ? record->message : "unspecified panic", PANIC_FG);
+  diag_line(&surface, &y, 8, record->message ? record->message : "unspecified panic", PANIC_FG);
   diag_rule(&surface, &y);
 
   diag_registers(&surface, &y, record, machine);
@@ -581,23 +606,21 @@ static void panic_diagnostic_screen(const struct panic_record *record,
   int bottom = surface.h - (GFX_GLYPH_H + 8);
   if (bottom > y) {
     y = bottom;
-    diag_line(&surface, &y, 8, "Beginning dump of kernel diagnostic data",
-              PANIC_MUTED);
+    diag_line(&surface, &y, 8, "Beginning dump of kernel diagnostic data", PANIC_MUTED);
   }
 
   framebuffer_mark_damage(0, 0, (u32)surface.w, (u32)surface.h);
   framebuffer_present();
 }
 
-static NORETURN void
-panic_finish(struct panic_record *record) {
+static NORETURN void panic_finish(struct panic_record *record) {
   __asm__ volatile("cli");
 
   int expected = -1;
-  if (!__atomic_compare_exchange_n(&panic_owner, &expected, record->cpu_id, 0,
-                                   __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
-    panic_serialf("\nDOUBLE PANIC on cpu %d while panic owner is cpu %d\n",
-                  record->cpu_id, expected);
+  if (!__atomic_compare_exchange_n(
+          &panic_owner, &expected, record->cpu_id, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+    panic_serialf(
+        "\nDOUBLE PANIC on cpu %d while panic owner is cpu %d\n", record->cpu_id, expected);
     // serial_write_str(" while panic owner is cpu ");
     // serial_write_hex((u64)(u32)expected);
     panic_halt();
@@ -620,76 +643,69 @@ panic_finish(struct panic_record *record) {
 }
 
 NORETURN
-void panic_at(const char *msg,
-              const char *file,
-              int line,
-              const char *func)
-{
-    u64 rsp;
+void panic_at(const char *msg, const char *file, int line, const char *func) {
+  u64 rsp;
 
-    __asm__ volatile ("mov %%rsp, %0" : "=r"(rsp));
+  __asm__ volatile("mov %%rsp, %0" : "=r"(rsp));
 
-    int cpu_id = percpu_current_id();
+  int cpu_id = percpu_current_id();
 
-    if (cpu_id < 0 || cpu_id >= MAX_CPUS)
-        cpu_id = 0;
+  if (cpu_id < 0 || cpu_id >= MAX_CPUS)
+    cpu_id = 0;
 
-    struct panic_record *record = &panic_records[cpu_id];
+  struct panic_record *record = &panic_records[cpu_id];
 
-    *record = (struct panic_record){
-        .message = msg,
-        .file = file,
-        .func = func,
-        .line = line,
-        .cpu_id = cpu_id,
-        .caller = (u64)(uintptr_t)__builtin_return_address(0),
-        .rbp = (u64)(uintptr_t)__builtin_frame_address(0),
-        .rsp = rsp,
-    };
+  *record = (struct panic_record){
+      .message = msg,
+      .file    = file,
+      .func    = func,
+      .line    = line,
+      .cpu_id  = cpu_id,
+      .caller  = (u64)(uintptr_t)__builtin_return_address(0),
+      .rbp     = (u64)(uintptr_t)__builtin_frame_address(0),
+      .rsp     = rsp,
+  };
 
-    panic_finish(record);
+  panic_finish(record);
 }
 
-void panicf_at(const char *file,
-               int line,
-               const char *func,
-               const char *fmt, ...)
-{
-    int cpu_id = percpu_current_id();
+void panicf_at(const char *file, int line, const char *func, const char *fmt, ...) {
+  int cpu_id = percpu_current_id();
 
-    if (cpu_id < 0 || cpu_id >= MAX_CPUS)
-        cpu_id = 0;
+  if (cpu_id < 0 || cpu_id >= MAX_CPUS)
+    cpu_id = 0;
 
-    char *message = panic_messages[cpu_id];
+  char *message = panic_messages[cpu_id];
 
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(message, PANIC_MESSAGE_SIZE, fmt, ap);
-    va_end(ap);
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(message, PANIC_MESSAGE_SIZE, fmt, ap);
+  va_end(ap);
 
-    panic_at(message, file, line, func);
+  panic_at(message, file, line, func);
 }
 
-void panic_from_exception(const char *name, const struct interrupt_frame *frame,
-                          u64 fault_address, int has_fault_address) {
+void panic_from_exception(const char *name, const struct interrupt_frame *frame, u64 fault_address,
+                          int has_fault_address) {
   int cpu_id = percpu_current_id();
   if (cpu_id < 0 || cpu_id >= MAX_CPUS)
     cpu_id = 0;
   char *exception_message = exception_messages[cpu_id];
-  snprintf(exception_message, sizeof(exception_messages[cpu_id]),
-           "unhandled CPU exception: %s", name ? name : "unknown");
+  snprintf(exception_message,
+           sizeof(exception_messages[cpu_id]),
+           "unhandled CPU exception: %s",
+           name ? name : "unknown");
 
   struct panic_record *record = &panic_records[cpu_id];
-  *record = (struct panic_record){
-      .message = exception_message,
-      .exception = name ? name : "unknown",
-      .frame = frame,
-      .cpu_id = cpu_id,
-      .caller = frame ? frame->rip : 0,
-      .rbp =
-          (u64)(uintptr_t)__builtin_frame_address(0), // Trace kernel path
-      .rsp = frame ? frame_rsp(frame) : 0,
-      .fault_address = fault_address,
+  *record                     = (struct panic_record){
+      .message           = exception_message,
+      .exception         = name ? name : "unknown",
+      .frame             = frame,
+      .cpu_id            = cpu_id,
+      .caller            = frame ? frame->rip : 0,
+      .rbp               = (u64)(uintptr_t)__builtin_frame_address(0), // Trace kernel path
+      .rsp               = frame ? frame_rsp(frame) : 0,
+      .fault_address     = fault_address,
       .has_fault_address = has_fault_address,
   };
   panic_finish(record);

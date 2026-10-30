@@ -6,18 +6,12 @@ BOOL WINAPI RtlFreeHeap(HANDLE, ULONG, void *);
 void *WINAPI RtlReAllocateHeap(HANDLE, ULONG, void *, SIZE_T);
 SIZE_T WINAPI RtlSizeHeap(HANDLE, ULONG, const void *);
 HANDLE WINAPI GetProcessHeap(void) { return (HANDLE)1; }
-void *WINAPI HeapAlloc(HANDLE h, DWORD f, SIZE_T n) {
-  return RtlAllocateHeap(h, f, n);
-}
-BOOL WINAPI HeapFree(HANDLE h, DWORD f, void *p) {
-  return RtlFreeHeap(h, f, p);
-}
+void *WINAPI HeapAlloc(HANDLE h, DWORD f, SIZE_T n) { return RtlAllocateHeap(h, f, n); }
+BOOL WINAPI HeapFree(HANDLE h, DWORD f, void *p) { return RtlFreeHeap(h, f, p); }
 void *WINAPI HeapReAlloc(HANDLE h, DWORD f, void *p, SIZE_T n) {
   return RtlReAllocateHeap(h, f, p, n);
 }
-SIZE_T WINAPI HeapSize(HANDLE h, DWORD f, const void *p) {
-  return RtlSizeHeap(h, f, p);
-}
+SIZE_T WINAPI HeapSize(HANDLE h, DWORD f, const void *p) { return RtlSizeHeap(h, f, p); }
 struct mapping {
   void *base;
   SIZE_T size;
@@ -45,7 +39,7 @@ void *WINAPI VirtualAlloc(void *at, SIZE_T n, DWORD type, DWORD flags) {
     SetLastError(87);
     return 0;
   }
-  n = (n + 4095) & ~4095ULL;
+  n             = (n + 4095) & ~4095ULL;
   unsigned slot = 128;
   for (unsigned i = 0; i < 128; i++)
     if (!maps[i].base) {
@@ -95,7 +89,7 @@ BOOL WINAPI VirtualProtect(void *p, SIZE_T n, DWORD flags, DWORD *old) {
         SetLastError(GaiaError(r));
         return FALSE;
       }
-      *old = maps[i].protection;
+      *old               = maps[i].protection;
       maps[i].protection = flags;
       return TRUE;
     }

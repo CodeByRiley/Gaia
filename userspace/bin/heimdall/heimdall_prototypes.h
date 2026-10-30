@@ -3,8 +3,8 @@
 #ifndef HEIMDALL_PROTOTYPES_H
 #define HEIMDALL_PROTOTYPES_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 int cursor_w(void);
 int cursor_h(void);
 void update_client_size_limits(void);
@@ -45,8 +45,7 @@ void win_set_pos(int handle, int x, int y);
 int outer_w_dims(int cw);
 int outer_h_dims(int ch, int status_h);
 int status_h_of(int handle);
-int in_titlebar_btn(int win_x, int win_y, int outer_w,
-                           int idx_from_right, int mx, int my);
+int in_titlebar_btn(int win_x, int win_y, int outer_w, int idx_from_right, int mx, int my);
 int build_taskbar_entries(struct tb_entry *out, int max);
 int taskbar_y(void);
 int taskbar_btn_limit(void);
@@ -64,18 +63,14 @@ int clip_hits(int x, int y, int w, int h);
 int clip_contains_point(int x, int y);
 void fb_fill_rect(int x, int y, int w, int h, uint32_t color);
 void draw_glyph_fb(int x, int y, char c, uint32_t fg, uint32_t bg);
-void draw_text_fb(int x, int y, const char *s, int max_w, uint32_t fg,
-                         uint32_t bg);
-void titlebar_btn_rect(int win_x, int win_y, int outer_w,
-                              int idx_from_right, int *bx, int *by, int *bw,
-                              int *bh);
-void draw_button_mask(int x, int y,
-                             const uint8_t mask[TB_BTN_SIZE][TB_BTN_SIZE],
-                             uint32_t fg, uint32_t bg);
+void draw_text_fb(int x, int y, const char *s, int max_w, uint32_t fg, uint32_t bg);
+void titlebar_btn_rect(int win_x, int win_y, int outer_w, int idx_from_right, int *bx, int *by,
+                       int *bw, int *bh);
+void draw_button_mask(int x, int y, const uint8_t mask[TB_BTN_SIZE][TB_BTN_SIZE], uint32_t fg,
+                      uint32_t bg);
 void draw_chrome(const struct window *w, int focused);
 void blit_surface(const struct window *w);
-void blit_icon(int dst_x, int dst_y, int dst_w, int dst_h, int src_w,
-               int src_h, uint32_t *pixels);
+void blit_icon(int dst_x, int dst_y, int dst_w, int dst_h, int src_w, int src_h, uint32_t *pixels);
 void draw_start_button(int y);
 void clock_format(void);
 int clock_rect(int *cx, int *cy, int *cw, int *ch);
@@ -94,8 +89,7 @@ void con_wipe(struct console *con);
 void con_save(struct console *con);
 void con_restore(struct console *con);
 void con_putc(struct console *con, char c);
-void console_geometry(int slot, int *out_x, int *out_y, int *out_cw,
-                             int *out_ch);
+void console_geometry(int slot, int *out_x, int *out_y, int *out_cw, int *out_ch);
 int con_alloc_buffers(struct console *con, int slot);
 void con_set_title(struct console *con, int slot);
 struct console *console_open(void);
@@ -105,16 +99,14 @@ void launch_program(const char *path);
 void drain_tty_into_console(void);
 void compose_handle(int handle);
 void compose(void);
-void present_backbuffer_rects(const struct fb_rect *rects,
-                                     uint32_t rect_count);
+void present_backbuffer_rects(const struct fb_rect *rects, uint32_t rect_count);
 void present_backbuffer_rect(int x, int y, int w, int h);
 void present_full_desktop(void);
 void present_dirty(void);
 int cursor_scale(void);
 int cursor_rect(int32_t x, int32_t y, int scale, struct fb_rect *rect);
-void draw_cursor_with_repairs(int32_t x, int32_t y,
-                                     const struct fb_rect *repairs,
-                                     uint32_t repair_count);
+void draw_cursor_with_repairs(int32_t x, int32_t y, const struct fb_rect *repairs,
+                              uint32_t repair_count);
 void draw_cursor(int32_t x, int32_t y);
 void present_cursor_repair_at(int32_t x, int32_t y);
 void present_rect(int x, int y, int w, int h);
@@ -123,9 +115,8 @@ void draw_ghost(int x, int y, int w, int h);
 void compute_ghost(int mx, int my, int *gx, int *gy, int *gw, int *gh);
 struct window *find_slot(void);
 struct window *find_handle(int handle);
-int handle_create(int client_pid, int w, int h, const char *title,
-                         uint32_t flags, uint64_t *out_client_va,
-                         uint32_t *out_pitch, int *out_handle);
+int handle_create(int client_pid, int w, int h, const char *title, uint32_t flags,
+                  uint64_t *out_client_va, uint32_t *out_pitch, int *out_handle);
 int window_count(void);
 void handle_destroy_internal(int handle, int client_pid_check);
 void handle_destroy(int client_pid, int handle);
@@ -142,15 +133,13 @@ void prompt_freeze_rect(void);
 void prompt_rect(int *px, int *py, int *pw, int *ph);
 void prompt_btn_rect(int idx, int *bx, int *by, int *bw, int *bh);
 void prompt_send_result(int result);
-void handle_prompt_req(int owner_pid, int handle, int kind,
-                              const char *message);
+void handle_prompt_req(int owner_pid, int handle, int kind, const char *message);
 void prompt_abandon_for_owner(int owner_pid);
 void draw_prompt(void);
 int prompt_handle_key(int keycode, int shift);
 int prompt_handle_click(int mx, int my);
 void handle_set_status(int owner_pid, int handle, const char *text);
-void send_create_resp(int target_pid, int handle, uint64_t va,
-                             uint32_t pitch, int w, int h);
+void send_create_resp(int target_pid, int handle, uint64_t va, uint32_t pitch, int w, int h);
 void pump_ipc(void);
 void forward_input(int target_pid, int win_handle, const struct msg *m);
 void request_window_close(int handle, uint32_t now);

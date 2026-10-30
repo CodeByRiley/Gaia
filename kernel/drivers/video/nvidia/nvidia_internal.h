@@ -30,7 +30,7 @@ enum nvidia_vbios_source {
 
 /* Values follow NVIDIA's published nv_firmware_chip_family_t. */
 enum nvidia_firmware_family {
-  NVIDIA_FW_FAMILY_NONE = 0,
+  NVIDIA_FW_FAMILY_NONE  = 0,
   NVIDIA_FW_FAMILY_TU10X = 1,
   NVIDIA_FW_FAMILY_TU11X = 2,
   NVIDIA_FW_FAMILY_GA100 = 3,
@@ -107,8 +107,7 @@ struct nvidia_device {
 int nvidia_vbios_load(struct nvidia_device *device, u32 device_index);
 
 /* Find a BIT token by id. Returns 0 and fills *out on success. */
-int nvidia_bit_find_token(const struct nvidia_device *device, u8 id,
-                          struct nvidia_bit_token *out);
+int nvidia_bit_find_token(const struct nvidia_device *device, u8 id, struct nvidia_bit_token *out);
 
 /* Locate the FWSEC entry in the VBIOS falcon ucode table. */
 int nvidia_fwsec_locate(struct nvidia_device *device);

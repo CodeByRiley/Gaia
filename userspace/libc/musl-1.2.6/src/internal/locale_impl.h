@@ -1,18 +1,18 @@
 #ifndef _LOCALE_IMPL_H
 #define _LOCALE_IMPL_H
 
-#include <locale.h>
-#include <stdlib.h>
 #include "libc.h"
 #include "pthread_impl.h"
+#include <locale.h>
+#include <stdlib.h>
 
 #define LOCALE_NAME_MAX 23
 
 struct __locale_map {
-	const void *map;
-	size_t map_size;
-	char name[LOCALE_NAME_MAX+1];
-	const struct __locale_map *next;
+  const void *map;
+  size_t map_size;
+  char name[LOCALE_NAME_MAX + 1];
+  const struct __locale_map *next;
 };
 
 extern hidden volatile int __locale_lock[1];
@@ -34,8 +34,8 @@ hidden char *__gettextdomain(void);
 #define LCTRANS(msg, lc, loc) __lctrans(msg, (loc)->cat[(lc)])
 #define LCTRANS_CUR(msg) __lctrans_cur(msg)
 
-#define C_LOCALE ((locale_t)&__c_locale)
-#define UTF8_LOCALE ((locale_t)&__c_dot_utf8_locale)
+#define C_LOCALE ((locale_t) & __c_locale)
+#define UTF8_LOCALE ((locale_t) & __c_dot_utf8_locale)
 
 #define CURRENT_LOCALE (__pthread_self()->locale)
 

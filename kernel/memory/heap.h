@@ -8,12 +8,12 @@
 #ifndef HEAP_H
 #define HEAP_H
 
-#include <utilities/types.h>
 #include <stddef.h>
+#include <utilities/types.h>
 
-void  heap_init(void);
+void heap_init(void);
 void *kmalloc(usize size);
-void  kfree(void *ptr);
-void* large_alloc(usize size);
+void kfree(void *ptr);
+void *large_alloc(usize size);
 
 #endif

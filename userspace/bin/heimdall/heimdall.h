@@ -78,17 +78,17 @@ HEIMDALL_STATE int wallpaper_loaded HEIMDALL_STATE_INIT(0);
  * than a silently absent menu item. */
 #ifndef HEIMDALL_DECLARE_STATE
 const struct program start_menu_defaults[] = {
-    {"Skald (Shell)", "system/bin/sh.elf"},
-    {"Hermes File Explorer", "system/bin/hermes.elf"},
-    {"Text Editor", "system/bin/notepad.elf"},
-    {"About", "system/bin/about.elf"}};
+    {"Skald (Shell)",        "system/bin/sh.elf"     },
+    {"Hermes File Explorer", "system/bin/hermes.elf" },
+    {"Text Editor",          "system/bin/notepad.elf"},
+    {"About",                "system/bin/about.elf"  }
+};
 
 #else
 extern const struct program start_menu_defaults[4];
 #endif
 
-#define START_MENU_DEFAULT_COUNT                                               \
-  (int)(sizeof(start_menu_defaults) / sizeof(start_menu_defaults[0]))
+#define START_MENU_DEFAULT_COUNT (int)(sizeof(start_menu_defaults) / sizeof(start_menu_defaults[0]))
 
 /* Everything else is discovered by scanning the executable directories at
  * startup, so the menu tracks whatever is actually on the volume instead of
@@ -106,7 +106,7 @@ const char *start_menu_scan_dirs[] = {
 extern const char *const start_menu_scan_dirs[3];
 #endif
 
-#define START_MENU_SCAN_DIR_COUNT                                              \
+#define START_MENU_SCAN_DIR_COUNT                                                                  \
   (int)(sizeof(start_menu_scan_dirs) / sizeof(start_menu_scan_dirs[0]))
 
 #define START_MENU_MAX 16
@@ -141,8 +141,8 @@ int is_minimized(int handle);
 struct window *find_handle(int handle);
 struct console *con_for_handle(int handle);
 void con_redraw(struct console *c);
-void titlebar_btn_rect(int win_x, int win_y, int outer_w, int idx_from_right,
-                       int *bx, int *by, int *bw, int *bh);
+void titlebar_btn_rect(int win_x, int win_y, int outer_w, int idx_from_right, int *bx, int *by,
+                       int *bw, int *bh);
 
 /* Modal prompt. Defined down with the other IPC handlers but drawn from
  * compose() and driven from pump_input(), both of which come earlier. */
@@ -166,12 +166,18 @@ HEIMDALL_STATE uint32_t cursor_under[CURSOR_MAX_DRAW_DIM * CURSOR_MAX_DRAW_DIM];
 
 #ifndef HEIMDALL_DECLARE_STATE
 const uint8_t fallback_cursor_mask[CURSOR_H][CURSOR_W] = {
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {1, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-    {1, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0}, {1, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0},
-    {1, 2, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0}, {1, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 0},
-    {1, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0, 0}, {1, 1, 0, 0, 1, 2, 2, 1, 0, 0, 0, 0},
-    {0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {1, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+    {1, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0},
+    {1, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0},
+    {1, 2, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0},
+    {1, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 0},
+    {1, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0, 0},
+    {1, 1, 0, 0, 1, 2, 2, 1, 0, 0, 0, 0},
+    {0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 };
 #else
 extern const uint8_t fallback_cursor_mask[CURSOR_H][CURSOR_W];
@@ -232,7 +238,7 @@ extern const uint8_t fallback_cursor_mask[CURSOR_H][CURSOR_W];
 #define TASKBAR_BTN_W 120
 #define TASKBAR_BTN_GAP 2
 #define TASKBAR_PAD_Y 2
-#define TASKBAR_START_W                                                        \
+#define TASKBAR_START_W                                                                            \
   24 // size of the taskbar start button, should be similar to old NT / Windows
 
 /* Clock, right-aligned in the taskbar: time above date, the way Windows has
@@ -329,7 +335,8 @@ const uint8_t fallback_taskbar_start_mask[24][24] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+};
 #else
 extern const uint8_t fallback_taskbar_start_mask[24][24];
 #endif
@@ -339,12 +346,18 @@ extern const uint8_t fallback_taskbar_start_mask[24][24];
  * stamps `fg` only where the mask is 1. */
 #ifndef HEIMDALL_DECLARE_STATE
 const uint8_t fallback_btn_close_mask[TB_BTN_SIZE][TB_BTN_SIZE] = {
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0}, {0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0},
-    {0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0}, {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0},
-    {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0}, {0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0},
-    {0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0}, {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0},
+    {0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0},
+    {0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0},
+    {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0},
+    {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0},
+    {0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0},
+    {0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0},
+    {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 };
 #else
 extern const uint8_t fallback_btn_close_mask[TB_BTN_SIZE][TB_BTN_SIZE];
@@ -352,12 +365,18 @@ extern const uint8_t fallback_btn_close_mask[TB_BTN_SIZE][TB_BTN_SIZE];
 
 #ifndef HEIMDALL_DECLARE_STATE
 const uint8_t fallback_btn_maximise_mask[TB_BTN_SIZE][TB_BTN_SIZE] = {
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0}, {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
-    {0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0}, {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0},
-    {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0}, {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0},
-    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0}, {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+    {0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0},
+    {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0},
+    {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0},
+    {0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0},
+    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 };
 #else
 extern const uint8_t fallback_btn_maximise_mask[TB_BTN_SIZE][TB_BTN_SIZE];
@@ -365,12 +384,18 @@ extern const uint8_t fallback_btn_maximise_mask[TB_BTN_SIZE][TB_BTN_SIZE];
 
 #ifndef HEIMDALL_DECLARE_STATE
 const uint8_t fallback_btn_hide_mask[TB_BTN_SIZE][TB_BTN_SIZE] = {
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
-    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+    {0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 };
 #else
 extern const uint8_t fallback_btn_hide_mask[TB_BTN_SIZE][TB_BTN_SIZE];
@@ -401,7 +426,8 @@ const uint8_t fallback_internet_mask[TB_INTERNET_SIZE][TB_INTERNET_SIZE] = {
     {0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+};
 #else
 extern const uint8_t fallback_internet_mask[TB_INTERNET_SIZE][TB_INTERNET_SIZE];
 #endif

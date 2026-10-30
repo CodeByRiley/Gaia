@@ -20,8 +20,7 @@ static u16 fat_encode_date(const struct rtc_time *t) {
 }
 
 static u16 fat_encode_time(const struct rtc_time *t) {
-  return (u16)(((u16)t->hour << 11) | ((u16)t->minute << 5) |
-                    (t->second / 2));
+  return (u16)(((u16)t->hour << 11) | ((u16)t->minute << 5) | (t->second / 2));
 }
 
 /* Directory-entry helpers. */
@@ -36,21 +35,18 @@ static int entry_is_free(const struct dir_entry *entry) {
 }
 
 static int entry_is_usable(const struct dir_entry *entry) {
-  return !entry_is_free(entry) && !entry_is_lfn(entry) &&
-         !(entry->attr & 0x08);
+  return !entry_is_free(entry) && !entry_is_lfn(entry) && !(entry->attr & 0x08);
 }
 
 static int is_dot_entry(const struct dir_entry *entry) {
-  return entry->name[0] == '.' &&
-         (entry->name[1] == ' ' || entry->name[1] == '.');
+  return entry->name[0] == '.' && (entry->name[1] == ' ' || entry->name[1] == '.');
 }
 
 /* Directory cursor. */
 
-static int cursor_init(struct dir_cursor *cursor, struct fat_dir dir,
-                       u32 start_index) {
+static int cursor_init(struct dir_cursor *cursor, struct fat_dir dir, u32 start_index) {
   memset(cursor, 0, sizeof(*cursor));
-  cursor->dir = dir;
+  cursor->dir   = dir;
   cursor->index = start_index;
 
   if (dir_is_fixed_root(dir)) {
@@ -61,10 +57,10 @@ static int cursor_init(struct dir_cursor *cursor, struct fat_dir dir,
     return -1;
 
   u32 entries_per_cluster = cluster_bytes() / 32;
-  u32 clusters_to_skip = start_index / entries_per_cluster;
-  cursor->slot = start_index % entries_per_cluster;
-  cursor->cluster = dir.first_cluster;
-  cursor->clusters_seen = 1;
+  u32 clusters_to_skip    = start_index / entries_per_cluster;
+  cursor->slot            = start_index % entries_per_cluster;
+  cursor->cluster         = dir.first_cluster;
+  cursor->clusters_seen   = 1;
 
   while (clusters_to_skip--) {
     u32 next;
@@ -100,7 +96,7 @@ static struct dir_entry *cursor_next(struct dir_cursor *cursor) {
       return 0;
     }
     cursor->cluster = next;
-    cursor->slot = 0;
+    cursor->slot    = 0;
   }
 
   struct dir_entry *entries = (struct dir_entry *)cluster_data(cursor->cluster);
@@ -114,9 +110,9 @@ static struct dir_entry *cursor_next(struct dir_cursor *cursor) {
 
 /* Directory-slot allocation. */
 
-static int alloc_dir_slots(struct fat_dir dir, u32 count,
-                           struct dir_entry **out, u32 *start_index) {
-  u32 run = 0;
+static int alloc_dir_slots(struct fat_dir dir, u32 count, struct dir_entry **out,
+                           u32 *start_index) {
+  u32 run       = 0;
   u32 run_start = 0;
 
   if (dir_is_fixed_root(dir)) {
@@ -127,7 +123,8 @@ static int alloc_dir_slots(struct fat_dir dir, u32 count,
           run_start = i;
         out[run++] = &root[i];
         if (run == count) {
-          if (start_index) *start_index = run_start;
+          if (start_index)
+            *start_index = run_start;
           return 0;
         }
       } else {
@@ -141,7 +138,7 @@ static int alloc_dir_slots(struct fat_dir dir, u32 count,
   if (!cluster_is_valid(current))
     return -1;
   u32 entries_per_cluster = cluster_bytes() / sizeof(struct dir_entry);
-  u32 visited = 0;
+  u32 visited             = 0;
 
   for (;;) {
     struct dir_entry *entries = (struct dir_entry *)cluster_data(current);
@@ -153,7 +150,8 @@ static int alloc_dir_slots(struct fat_dir dir, u32 count,
           run_start = visited * entries_per_cluster + i;
         out[run++] = &entries[i];
         if (run == count) {
-          if (start_index) *start_index = run_start;
+          if (start_index)
+            *start_index = run_start;
           return 0;
         }
       } else {
@@ -197,21 +195,19 @@ int short_name_taken(struct fat_dir dir, const char name[11]) {
 
 u32 fat_impl_entry_get_cluster(void *entry) {
   struct dir_entry *e = (struct dir_entry *)entry;
-  u32 low = e->first_cluster_low;
+  u32 low             = e->first_cluster_low;
   if (fat_volume.type != FAT_TYPE_32)
     return low;
   return low | ((u32)e->first_cluster_high << 16);
 }
 
 void fat_impl_entry_set_cluster(void *entry, u32 cluster) {
-  struct dir_entry *e = (struct dir_entry *)entry;
-  e->first_cluster_low = (u16)(cluster & 0xFFFF);
+  struct dir_entry *e   = (struct dir_entry *)entry;
+  e->first_cluster_low  = (u16)(cluster & 0xFFFF);
   e->first_cluster_high = fat_volume.type == FAT_TYPE_32 ? (u16)(cluster >> 16) : 0;
 }
 
-u64 fat_impl_entry_get_size(void *entry) {
-  return ((struct dir_entry *)entry)->size;
-}
+u64 fat_impl_entry_get_size(void *entry) { return ((struct dir_entry *)entry)->size; }
 
 void fat_impl_entry_set_size(void *entry, u64 size) {
   ((struct dir_entry *)entry)->size = (u32)size;
@@ -227,19 +223,18 @@ void fat_impl_set_timestamp(void *entry) {
   u16 date = fat_encode_date(&now);
   u16 time = fat_encode_time(&now);
 
-  e->write_date = date;
-  e->write_time = time;
+  e->write_date  = date;
+  e->write_time  = time;
   e->access_date = date;
 
   if (e->create_date == 0 && e->create_time == 0) {
-    e->create_date = date;
-    e->create_time = time;
+    e->create_date       = date;
+    e->create_time       = time;
     e->create_time_tenth = 0;
   }
 }
 
-int fat_impl_find_entry(struct fat_dir dir, const char *name,
-                        struct found_entry *out) {
+int fat_impl_find_entry(struct fat_dir dir, const char *name, struct found_entry *out) {
   struct dir_cursor cursor;
   if (cursor_init(&cursor, dir, 0) != 0)
     return -1;
@@ -265,14 +260,13 @@ int fat_impl_find_entry(struct fat_dir dir, const char *name,
     char short_name[13];
     entry_short_name(entry, short_name);
 
-    if ((long_name && strcasecmp(long_name, name) == 0) ||
-        strcasecmp(short_name, name) == 0) {
+    if ((long_name && strcasecmp(long_name, name) == 0) || strcasecmp(short_name, name) == 0) {
       out->first_cluster = fat_impl_entry_get_cluster(entry);
-      out->size = entry->size;
-      out->attr = entry->attr;
-      out->index = long_name ? lfn.start_index : cursor.index - 1;
-      out->index_end = cursor.index - 1;
-      out->raw = entry;
+      out->size          = entry->size;
+      out->attr          = entry->attr;
+      out->index         = long_name ? lfn.start_index : cursor.index - 1;
+      out->index_end     = cursor.index - 1;
+      out->raw           = entry;
       return 0;
     }
     lfn_reset(&lfn);
@@ -280,21 +274,21 @@ int fat_impl_find_entry(struct fat_dir dir, const char *name,
   return -1;
 }
 
-int fat_impl_create_entry(struct fat_dir parent, const char *name,
-                          u8 attr, u32 cluster, struct found_entry *out) {
+int fat_impl_create_entry(struct fat_dir parent, const char *name, u8 attr, u32 cluster,
+                          struct found_entry *out) {
   u32 length = (u32)strlen(name);
   if (length == 0 || length > 255)
     return -1;
 
   char short_name[11];
-  u8 nt_case = 0;
+  u8 nt_case    = 0;
   u32 lfn_slots = 0;
 
   if (short_name_exact(name, length, short_name, &nt_case) != 0) {
     if (short_name_alias(parent, name, length, short_name) != 0)
       return -1;
     lfn_slots = (length + 12) / 13;
-    nt_case = 0;
+    nt_case   = 0;
   }
 
   struct dir_entry *slots[FAT_MAX_ENTRY_SLOTS];
@@ -313,7 +307,7 @@ int fat_impl_create_entry(struct fat_dir parent, const char *name,
   struct dir_entry *entry = slots[lfn_slots];
   memset(entry, 0, 32);
   memcpy(entry->name, short_name, 11);
-  entry->attr = attr;
+  entry->attr    = attr;
   entry->nt_case = nt_case;
   fat_impl_entry_set_cluster(entry, cluster);
   entry->size = 0;
@@ -324,11 +318,11 @@ int fat_impl_create_entry(struct fat_dir parent, const char *name,
     fat_flush_bytes(slots[i], sizeof(*slots[i]));
 
   out->first_cluster = cluster;
-  out->size = 0;
-  out->attr = attr;
-  out->index = start_index;
-  out->index_end = start_index + lfn_slots;
-  out->raw = entry;
+  out->size          = 0;
+  out->attr          = attr;
+  out->index         = start_index;
+  out->index_end     = start_index + lfn_slots;
+  out->raw           = entry;
   return 0;
 }
 
@@ -354,7 +348,7 @@ int fat_impl_init_dir_cluster(u32 cluster, struct fat_dir parent) {
   memset(&entries[0], 0, sizeof(entries[0]));
   memset(entries[0].name, ' ', FAT_NAME_LEN);
   entries[0].name[0] = '.';
-  entries[0].attr = FAT_ATTR_DIRECTORY;
+  entries[0].attr    = FAT_ATTR_DIRECTORY;
   fat_impl_entry_set_cluster(&entries[0], cluster);
   fat_impl_set_timestamp(&entries[0]);
 
@@ -362,7 +356,7 @@ int fat_impl_init_dir_cluster(u32 cluster, struct fat_dir parent) {
   memset(entries[1].name, ' ', FAT_NAME_LEN);
   entries[1].name[0] = '.';
   entries[1].name[1] = '.';
-  entries[1].attr = FAT_ATTR_DIRECTORY;
+  entries[1].attr    = FAT_ATTR_DIRECTORY;
   fat_impl_entry_set_cluster(&entries[1], parent.is_root ? 0 : parent.first_cluster);
   fat_impl_set_timestamp(&entries[1]);
 
@@ -374,7 +368,7 @@ int fat_impl_dir_is_empty(u32 cluster) {
   if (!cluster_is_valid(cluster))
     return -1;
 
-  struct fat_dir dir = { .first_cluster = cluster, .is_root = 0 };
+  struct fat_dir dir = {.first_cluster = cluster, .is_root = 0};
   struct dir_cursor cursor;
   if (cursor_init(&cursor, dir, 0) != 0)
     return -1;
@@ -393,15 +387,17 @@ int fat_impl_dir_is_empty(u32 cluster) {
 }
 
 int fat_impl_read_dir(struct fat_dir dir, u32 *index, char *buffer, usize length) {
-  if (!index || !buffer || !length) return -1;
+  if (!index || !buffer || !length)
+    return -1;
   usize written = 0;
   for (;;) {
     u32 before = *index;
     char name[FAT_LFN_MAX + 1];
     int is_directory;
     long result = fat_impl_read_dir_one(dir, index, name, sizeof(name), &is_directory);
-    if (result <= 0) return result < 0 && !written ? -1 : (int)written;
-    usize count = (usize)result - 1;
+    if (result <= 0)
+      return result < 0 && !written ? -1 : (int)written;
+    usize count    = (usize)result - 1;
     usize required = count + 1 + is_directory;
     if (required > length - written) {
       *index = before;
@@ -409,14 +405,16 @@ int fat_impl_read_dir(struct fat_dir dir, u32 *index, char *buffer, usize length
     }
     memcpy(buffer + written, name, count);
     written += count;
-    if (is_directory) buffer[written++] = '/';
+    if (is_directory)
+      buffer[written++] = '/';
     buffer[written++] = 0;
   }
 }
 
-long fat_impl_read_dir_one(struct fat_dir dir, u32 *index,
-                           char *buffer, usize length, int *is_dir) {
-  if (!index || !buffer || !length) return -1;
+long fat_impl_read_dir_one(struct fat_dir dir, u32 *index, char *buffer, usize length,
+                           int *is_dir) {
+  if (!index || !buffer || !length)
+    return -1;
   struct dir_cursor cursor;
   if (cursor_init(&cursor, dir, *index) != 0)
     return -1;
@@ -445,7 +443,8 @@ long fat_impl_read_dir_one(struct fat_dir dir, u32 *index,
       name = short_name;
     }
     usize name_length = strlen(name);
-    if (name_length + 1 > length) return -1;
+    if (name_length + 1 > length)
+      return -1;
     memcpy(buffer, name, name_length + 1);
     if (is_dir)
       *is_dir = (entry->attr & FAT_ATTR_DIRECTORY) ? 1 : 0;

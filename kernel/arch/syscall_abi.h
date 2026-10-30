@@ -12,7 +12,7 @@
 #include <stdint.h>
 
 #define STAT_TYPE_FILE 0
-#define STAT_TYPE_DIR  1
+#define STAT_TYPE_DIR 1
 
 struct stat_user {
   uint64_t size;
@@ -31,13 +31,13 @@ struct proc_info {
   char name[PROC_NAME_MAX];
 };
 
-#define PROC_STATE_RUNNING  0
-#define PROC_STATE_BLOCKED  1
-#define PROC_STATE_ZOMBIE   2
-#define PROC_STATE_READY    3
-#define PROC_STATE_DEAD     4
+#define PROC_STATE_RUNNING 0
+#define PROC_STATE_BLOCKED 1
+#define PROC_STATE_ZOMBIE 2
+#define PROC_STATE_READY 3
+#define PROC_STATE_DEAD 4
 #define PROC_STATE_SLEEPING 5
-#define PROC_STATE_LOADING  6
+#define PROC_STATE_LOADING 6
 
 struct mem_stats {
   uint64_t total_frames;
@@ -60,11 +60,11 @@ struct mem_stats {
  * normally installed machine it is the first partition, and a root search that
  * takes the first thing to mount lands on it instead of on the system volume.
  * It stays published, because updating a bootloader means writing to it. */
-#define BLOCKDEV_WRITABLE    0x1u
-#define BLOCKDEV_REMOVABLE   0x2u
-#define BLOCKDEV_PARTITION   0x4u
+#define BLOCKDEV_WRITABLE 0x1u
+#define BLOCKDEV_REMOVABLE 0x2u
+#define BLOCKDEV_PARTITION 0x4u
 #define BLOCKDEV_PARTITIONED 0x8u
-#define BLOCKDEV_ESP         0x10u
+#define BLOCKDEV_ESP 0x10u
 
 struct blockdev_info {
   uint64_t sectors;
@@ -129,14 +129,14 @@ struct audio_status {
   int32_t owner_pid;
 };
 
-#define MSG_NONE       0
-#define MSG_KEY_DOWN   1
-#define MSG_KEY_UP     2
+#define MSG_NONE 0
+#define MSG_KEY_DOWN 1
+#define MSG_KEY_UP 2
 #define MSG_MOUSE_MOVE 3
 #define MSG_MOUSE_DOWN 4
-#define MSG_MOUSE_UP   5
-#define MSG_TIMER      6
-#define MSG_QUIT       7
+#define MSG_MOUSE_UP 5
+#define MSG_TIMER 6
+#define MSG_QUIT 7
 
 struct msg {
   uint16_t type;
@@ -147,7 +147,7 @@ struct msg {
 };
 
 #define IPC_PEER_EXITED 0x180
-#define IPC_USER_FIRST  0x200
+#define IPC_USER_FIRST 0x200
 
 struct ipc_msg {
   uint32_t type;
@@ -176,8 +176,7 @@ _Static_assert(offsetof(struct proc_info, pid) == 8, "proc_info.pid ABI");
 _Static_assert(offsetof(struct proc_info, name) == 20, "proc_info.name ABI");
 _Static_assert(sizeof(struct mem_stats) == 24, "mem_stats ABI");
 _Static_assert(sizeof(struct blockdev_info) == 40, "blockdev_info ABI");
-_Static_assert(offsetof(struct blockdev_info, name) == 24,
-               "blockdev_info.name ABI");
+_Static_assert(offsetof(struct blockdev_info, name) == 24, "blockdev_info.name ABI");
 _Static_assert(sizeof(struct net_frame) == 160, "net_frame ABI");
 _Static_assert(offsetof(struct net_frame, data) == 32, "net_frame.data ABI");
 _Static_assert(sizeof(struct net_stats) == 80, "net_stats ABI");

@@ -1,9 +1,9 @@
 #ifndef KERNEL_UTILITIES_SYMTAB_H
 #define KERNEL_UTILITIES_SYMTAB_H
 
-#include <utilities/types.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 /*
  * Minimal kernel symbol table for panic backtraces.
@@ -16,8 +16,8 @@
  * any load-address changes without regeneration of individual entries.
  */
 struct ksym {
-    u64 offset;
-    const char *name;
+  u64 offset;
+  const char *name;
 };
 
 /*

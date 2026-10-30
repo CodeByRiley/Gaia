@@ -43,8 +43,8 @@
 #include <fs/vfs/vfs.h>
 #include <input/keyboard.h>
 #include <input/mouse.h>
-#include <loader/process.h>
 #include <loader/pe.h>
+#include <loader/process.h>
 #include <memory/heap.h>
 #include <memory/hhdm.h>
 #include <memory/pmm.h>
@@ -58,8 +58,8 @@
 #include <sched/sched.h>
 #include <sched/signal.h>
 #include <stddef.h>
-#include <sync/waitqueue.h>
 #include <stdint.h>
+#include <sync/waitqueue.h>
 #include <utilities/errno.h>
 #include <utilities/log.h>
 #include <utilities/string.h>
@@ -88,8 +88,7 @@
 /* Flags that must never remain active while the SYSCALL entry stub executes.
  * R11 still retains the userspace image, which the return validator sanitizes
  * independently before iretq. */
-#define SYSCALL_ENTRY_RFLAGS_MASK                                              \
-  (RFLAGS_TF | RFLAGS_IF | RFLAGS_DF | RFLAGS_NT | RFLAGS_AC)
+#define SYSCALL_ENTRY_RFLAGS_MASK (RFLAGS_TF | RFLAGS_IF | RFLAGS_DF | RFLAGS_NT | RFLAGS_AC)
 
 _Static_assert((SYSCALL_ENTRY_RFLAGS_MASK & RFLAGS_DF) != 0,
                "SYSCALL assembly relies on FMASK to clear DF before C entry");
@@ -97,9 +96,9 @@ _Static_assert((SYSCALL_ENTRY_RFLAGS_MASK & RFLAGS_DF) != 0,
 /* Arithmetic/debug state belongs to userspace. Privileged and virtual-8086
  * controls are deliberately absent, reserved bits are cleared, and IF plus
  * the architecturally fixed bit are restored below. */
-#define USER_RETURN_RFLAGS_ALLOWED                                             \
-  (RFLAGS_CF | RFLAGS_PF | RFLAGS_AF | RFLAGS_ZF | RFLAGS_SF | RFLAGS_TF |     \
-   RFLAGS_IF | RFLAGS_DF | RFLAGS_OF | RFLAGS_ID)
+#define USER_RETURN_RFLAGS_ALLOWED                                                                 \
+  (RFLAGS_CF | RFLAGS_PF | RFLAGS_AF | RFLAGS_ZF | RFLAGS_SF | RFLAGS_TF | RFLAGS_IF | RFLAGS_DF | \
+   RFLAGS_OF | RFLAGS_ID)
 
 #define GDT_RPL_USER 3
 #define SYSRET_STAR_BASE ((GDT_USER_CODE | GDT_RPL_USER) - 16)
@@ -204,8 +203,11 @@ struct linux_kstat {
 
 /* TCGETS uses the kernel's 36-byte x86-64 layout, not libc's larger
  * termios structure. Writing 64 bytes overwrites glibc's stack guard. */
-struct linux_termios {u32 iflag,oflag,cflag,lflag;u8 line,cc[19];};
-_Static_assert(sizeof(struct linux_termios)==36,"Linux TCGETS ABI");
+struct linux_termios {
+  u32 iflag, oflag, cflag, lflag;
+  u8 line, cc[19];
+};
+_Static_assert(sizeof(struct linux_termios) == 36, "Linux TCGETS ABI");
 
 struct linux_timespec {
   int64_t tv_sec;
@@ -241,8 +243,7 @@ struct linux_utsname {
   char domainname[65];
 };
 
-_Static_assert(sizeof(struct linux_utsname) == 390,
-               "Linux x86_64 utsname ABI size");
+_Static_assert(sizeof(struct linux_utsname) == 390, "Linux x86_64 utsname ABI size");
 
 #define LINUX_SIGSET_BYTES 8
 #define LINUX_SIGKILL 9
@@ -278,10 +279,8 @@ static long sys_uname(struct linux_utsname *out) {
   return 0;
 }
 
-static long sys_rt_sigaction(int signal,
-                             const struct task_signal_action *action,
-                             struct task_signal_action *old_action,
-                             usize sigset_bytes) {
+static long sys_rt_sigaction(int signal, const struct task_signal_action *action,
+                             struct task_signal_action *old_action, usize sigset_bytes) {
   struct task *task = task_current();
   if (!task || !task->context || signal < 1 || signal > TASK_SIGNAL_COUNT ||
       sigset_bytes != LINUX_SIGSET_BYTES)
@@ -295,9 +294,8 @@ static long sys_rt_sigaction(int signal,
 
   /* Copy through locals so act == oldact consumes the new disposition before
    * returning the previous one, matching the Linux syscall contract. */
-  struct task_signal_action next = {0};
-  struct task_signal_action previous =
-      task->context->signal_actions[signal - 1];
+  struct task_signal_action next     = {0};
+  struct task_signal_action previous = task->context->signal_actions[signal - 1];
   if (action)
     next = *action;
   if (action)
@@ -326,10 +324,10 @@ static int fd_alloc_for(struct task *t, struct vfs_file *f) {
 static long sys_fb_info(struct fb_info *out) {
   if (!out || !user_buffer_ok(out, sizeof(*out), 1))
     return -EFAULT;
-  out->width = framebuffer_width();
+  out->width  = framebuffer_width();
   out->height = framebuffer_height();
-  out->pitch = framebuffer_pitch();
-  out->bpp = 32;
+  out->pitch  = framebuffer_pitch();
+  out->bpp    = 32;
   return 0;
 }
 
@@ -350,13 +348,13 @@ static long sys_fb_map(void) {
      This remains correct across process_exec (the first probe misses) while
      making a resize that merely exposes more rows proportional to the growth.
    */
-  u32 pages = framebuffer_num_pages();
+  u32 pages         = framebuffer_num_pages();
   u32 first_missing = 0;
   if (task_pml4(t)) {
     u32 lo = 0, hi = pages;
     while (lo < hi) {
-      u32 mid = lo + (hi - lo) / 2;
-      u64 va = USER_FB_BASE + (u64)mid * 4096;
+      u32 mid  = lo + (hi - lo) / 2;
+      u64 va   = USER_FB_BASE + (u64)mid * 4096;
       u64 phys = framebuffer_phys_for_page(mid);
       if (phys && vmm_translate_in(t->vm->user_pml4, va) == phys)
         lo = mid + 1;
@@ -373,7 +371,8 @@ static long sys_fb_map(void) {
     /* The framebuffer pool belongs to the display subsystem. Mark this as a
        borrowed mapping so munmap/task teardown removes the PTE without
        returning the still-live scanout frame to the PMM. */
-    if (vmm_map(USER_FB_BASE + (u64)i * 4096, phys,
+    if (vmm_map(USER_FB_BASE + (u64)i * 4096,
+                phys,
                 VMM_PRESENT | VMM_WRITE | VMM_USER | VMM_SHARED) != 0) {
       return -ENOMEM;
     }
@@ -382,7 +381,7 @@ static long sys_fb_map(void) {
 }
 
 static int fb_source_span(u64 source_pitch, u64 *source_bytes) {
-  u64 width = framebuffer_width();
+  u64 width  = framebuffer_width();
   u64 height = framebuffer_height();
   if (!source_bytes || width == 0 || height == 0 || source_pitch > UINT32_MAX ||
       source_pitch < width * 4ULL) {
@@ -409,9 +408,8 @@ static long sys_fb_register(const void *pixels, u64 source_pitch) {
   if (!user_buffer_ok(pixels, source_bytes, 0))
     return -EFAULT;
 
-  return framebuffer_register_user(task->vm->user_pml4, task->pid,
-                                   (u64)(uintptr_t)pixels, (u32)source_pitch,
-                                   source_bytes);
+  return framebuffer_register_user(
+      task->vm->user_pml4, task->pid, (u64)(uintptr_t)pixels, (u32)source_pitch, source_bytes);
 }
 
 static long sys_fb_unregister(void) {
@@ -421,8 +419,8 @@ static long sys_fb_unregister(void) {
   return framebuffer_unregister_user(task->vm->user_pml4, task->pid);
 }
 
-static long sys_fb_present(const void *pixels, u64 source_pitch,
-                           const struct fb_rect *user_rects, u64 rect_count) {
+static long sys_fb_present(const void *pixels, u64 source_pitch, const struct fb_rect *user_rects,
+                           u64 rect_count) {
   struct task *task = task_current();
   u64 source_bytes;
   if (!task_pml4(task))
@@ -436,8 +434,7 @@ static long sys_fb_present(const void *pixels, u64 source_pitch,
     return -EINVAL;
 
   int registered = framebuffer_user_buffer_registered(
-      task->vm->user_pml4, task->pid, (u64)(uintptr_t)pixels, (u32)source_pitch,
-      source_bytes);
+      task->vm->user_pml4, task->pid, (u64)(uintptr_t)pixels, (u32)source_pitch, source_bytes);
   if ((!registered && !user_buffer_ok(pixels, source_bytes, 0)) ||
       !user_buffer_ok(user_rects, rect_count * sizeof(*user_rects), 0)) {
     return -EFAULT;
@@ -448,9 +445,12 @@ static long sys_fb_present(const void *pixels, u64 source_pitch,
    * stable until the synchronous copy completes. */
   struct fb_rect rects[FB_PRESENT_MAX_RECTS];
   memcpy(rects, user_rects, rect_count * sizeof(*user_rects));
-  return framebuffer_present_user(task->vm->user_pml4, task->pid,
-                                  (u64)(uintptr_t)pixels, (u32)source_pitch,
-                                  rects, (u32)rect_count);
+  return framebuffer_present_user(task->vm->user_pml4,
+                                  task->pid,
+                                  (u64)(uintptr_t)pixels,
+                                  (u32)source_pitch,
+                                  rects,
+                                  (u32)rect_count);
 }
 
 /* Translate PROT_* into PTE bits. Returns 0 for a protection this VMM
@@ -590,14 +590,13 @@ static u64 rdmsr(u32 msr) {
 
 void syscall_init_this_cpu(u64 kernel_stack_top) {
   struct cpu_local *cpu = percpu_this();
-  if (!cpu || cpu->self != cpu || !kernel_stack_top ||
-      (kernel_stack_top & 0xFULL)) {
+  if (!cpu || cpu->self != cpu || !kernel_stack_top || (kernel_stack_top & 0xFULL)) {
     log_write("syscall: invalid CPU-local entry stack", KERNEL, LOG_ERROR);
     return;
   }
 
   cpu->kernel_rsp_top = kernel_stack_top;
-  cpu->user_rsp_save = 0;
+  cpu->user_rsp_save  = 0;
 
   wrmsr(MSR_EFER, rdmsr(MSR_EFER) | 1); // SCE
   /* SYSRET forms SS as STAR[63:48] + 8 and CS as STAR[63:48] + 16.
@@ -615,8 +614,7 @@ static int user_return_address_ok(u64 address, int allow_stack_top) {
     return 0;
   if (address < USER_VA_MAX)
     return 1;
-  if (address >= USER_STACK_LOW &&
-      address < USER_STACK_TOP + (u64)allow_stack_top)
+  if (address >= USER_STACK_LOW && address < USER_STACK_TOP + (u64)allow_stack_top)
     return 1;
   return 0;
 }
@@ -634,8 +632,7 @@ int syscall_prepare_return(struct syscall_frame *f) {
     return -1;
 
   u64 rip_entry = vmm_entry_in(task->vm->user_pml4, f->rip);
-  if (!(rip_entry & VMM_PRESENT) || !(rip_entry & VMM_USER) ||
-      (rip_entry & VMM_NX))
+  if (!(rip_entry & VMM_PRESENT) || !(rip_entry & VMM_USER) || (rip_entry & VMM_NX))
     return -1;
 
   f->rflags &= USER_RETURN_RFLAGS_ALLOWED;
@@ -674,7 +671,7 @@ static long sys_write(long fd, const void *buf, long n) {
     return n;
   }
 
-  int write_end = 0;
+  int write_end     = 0;
   struct pipe *pipe = task_fd_pipe(t, (int)fd, &write_end);
   if (pipe) {
     if (!write_end)
@@ -774,9 +771,7 @@ static long sys_con_push(void) { return tty_push_ch(caller_tty()); }
 
 static long sys_con_pop(void) { return tty_pop_ch(caller_tty()); }
 
-static long sys_con_zoom(long delta) {
-  return tty_zoom_ch(caller_tty(), (int)delta);
-}
+static long sys_con_zoom(long delta) { return tty_zoom_ch(caller_tty(), (int)delta); }
 
 static long sys_sleep_ticks(long n) {
   if (n <= 0) {
@@ -798,13 +793,11 @@ static int audio_caller_pid(void) {
 }
 
 static long sys_audio_open(long sample_rate, long channels, long format) {
-  return sb16_stream_open(audio_caller_pid(), (u32)sample_rate, (u32)channels,
-                          (u32)format);
+  return sb16_stream_open(audio_caller_pid(), (u32)sample_rate, (u32)channels, (u32)format);
 }
 
 static long sys_audio_write(const void *pcm, long bytes) {
-  if (bytes < 0 || bytes > (int)AUDIO_WRITE_MAX ||
-      !user_buffer_ok(pcm, (u64)bytes, 0))
+  if (bytes < 0 || bytes > (int)AUDIO_WRITE_MAX || !user_buffer_ok(pcm, (u64)bytes, 0))
     return SB16_STREAM_ERR_INVALID;
   return sb16_stream_write(audio_caller_pid(), pcm, (u32)bytes);
 }
@@ -819,24 +812,24 @@ static long sys_audio_status(struct audio_status *out) {
     return result;
 
   *out = (struct audio_status){
-      .available = status.available,
-      .playing = status.playing,
-      .paused = status.paused,
-      .sample_rate = status.sample_rate,
-      .channels = status.channels,
-      .format = status.format,
+      .available     = status.available,
+      .playing       = status.playing,
+      .paused        = status.paused,
+      .sample_rate   = status.sample_rate,
+      .channels      = status.channels,
+      .format        = status.format,
       .ring_capacity = status.ring_capacity,
-      .ring_queued = status.ring_queued,
+      .ring_queued   = status.ring_queued,
       .device_queued = status.device_queued,
-      .underruns = status.underruns,
-      .volume = status.volume,
-      .owner_pid = status.owner_pid,
+      .underruns     = status.underruns,
+      .volume        = status.volume,
+      .owner_pid     = status.owner_pid,
   };
   return 0;
 }
 
 static long sys_audio_drain(void) {
-  int pid = audio_caller_pid();
+  int pid    = audio_caller_pid();
   int result = sb16_stream_begin_drain(pid);
   if (result != 0)
     return result;
@@ -846,21 +839,15 @@ static long sys_audio_drain(void) {
   return sb16_stream_finish_drain(pid);
 }
 
-static long sys_audio_close(void) {
-  return sb16_stream_close(audio_caller_pid());
-}
+static long sys_audio_close(void) { return sb16_stream_close(audio_caller_pid()); }
 
 static long sys_audio_set_volume(long percent) {
   return sb16_stream_set_volume(audio_caller_pid(), (int)percent);
 }
 
-static long sys_audio_pause(void) {
-  return sb16_stream_pause(audio_caller_pid());
-}
+static long sys_audio_pause(void) { return sb16_stream_pause(audio_caller_pid()); }
 
-static long sys_audio_resume(void) {
-  return sb16_stream_resume(audio_caller_pid());
-}
+static long sys_audio_resume(void) { return sb16_stream_resume(audio_caller_pid()); }
 
 // #endregion CONSOLE + SLEEP + PID
 
@@ -884,8 +871,7 @@ static long sys_ipc_recv(struct ipc_msg *out) {
 /* Share `npages` worth of the caller's pages starting at `in_va` (page-
  * aligned) into the target process's address space. Kernel picks the
  * target VA via the target task's bump allocator. */
-static long sys_shmem_share(long target_pid, u64 in_va, long npages,
-                            u64 *out_target_va) {
+static long sys_shmem_share(long target_pid, u64 in_va, long npages, u64 *out_target_va) {
   if (!out_target_va)
     return -EFAULT;
   if (target_pid <= 0 || npages <= 0)
@@ -902,7 +888,8 @@ static long sys_shmem_share(long target_pid, u64 in_va, long npages,
   struct task *target = task_find((int)target_pid);
   if (!task_pml4(target))
     return -ESRCH;
-  /* Validate the result slot before creating mappings or changing accounting. */
+  /* Validate the result slot before creating mappings or changing accounting.
+   */
   if (!user_buffer_ok(out_target_va, sizeof(*out_target_va), 1))
     return -EFAULT;
   if (target->vm->shmem_next_va == 0)
@@ -917,8 +904,7 @@ static long sys_shmem_share(long target_pid, u64 in_va, long npages,
     u64 phys = vmm_translate_in(me->vm->user_pml4, in_va + (u64)i * 4096);
     if (!phys)
       return -EFAULT;
-    if (vmm_map_in(target->vm->user_pml4, target_va + (u64)i * 4096, phys,
-                   flags) != 0) {
+    if (vmm_map_in(target->vm->user_pml4, target_va + (u64)i * 4096, phys, flags) != 0) {
       return -ENOMEM;
     }
   }
@@ -980,7 +966,7 @@ static long sys_shmem_unshare(long target_pid, u64 va, long npages) {
   long removed = 0;
   for (long i = 0; i < npages; i++) {
     u64 target_va = va + (u64)i * 4096;
-    u64 entry = vmm_entry_in(target->vm->user_pml4, target_va);
+    u64 entry     = vmm_entry_in(target->vm->user_pml4, target_va);
     if (!entry || !(entry & VMM_SHARED))
       continue;
     vmm_unmap_in(target->vm->user_pml4, target_va);
@@ -1087,8 +1073,7 @@ static void delay_seconds(long seconds) {
 static void hw_shutdown(void) {
   log_write("powering off...", KERNEL, LOG_INFO);
   if (vfs_sync_all()) {
-    log_write("shutdown: filesystem sync failed; refusing poweroff", KERNEL,
-              LOG_ERROR);
+    log_write("shutdown: filesystem sync failed; refusing poweroff", KERNEL, LOG_ERROR);
     return;
   }
   outw(0x604, 0x2000);  /* QEMU >= 2.0 (PIIX ACPI) */
@@ -1104,8 +1089,7 @@ static void hw_shutdown(void) {
 static void hw_reboot(void) {
   log_write("rebooting...", KERNEL, LOG_INFO);
   if (vfs_sync_all()) {
-    log_write("reboot: filesystem sync failed; refusing reset", KERNEL,
-              LOG_ERROR);
+    log_write("reboot: filesystem sync failed; refusing reset", KERNEL, LOG_ERROR);
     return;
   }
   /* drain 8042 input buffer */
@@ -1152,8 +1136,7 @@ static long sys_reboot(long time) {
 
 static int path_is_absolute(const char *path) { return path && path[0] == '/'; }
 
-static int path_append_component(char *out, usize *len, usize max,
-                                 const char *start, usize n) {
+static int path_append_component(char *out, usize *len, usize max, const char *start, usize n) {
   if (n == 0 || (n == 1 && start[0] == '.'))
     return 0;
 
@@ -1161,7 +1144,7 @@ static int path_append_component(char *out, usize *len, usize max,
     if (*len <= 1) {
       out[0] = '/';
       out[1] = 0;
-      *len = 1;
+      *len   = 1;
       return 0;
     }
 
@@ -1196,9 +1179,9 @@ static int resolve_path(const char *path, char *out, usize max) {
     return -1;
 
   usize len = 0;
-  out[0] = '/';
-  out[1] = 0;
-  len = 1;
+  out[0]    = '/';
+  out[1]    = 0;
+  len       = 1;
 
   if (!path_is_absolute(path)) {
     len = 0;
@@ -1210,7 +1193,7 @@ static int resolve_path(const char *path, char *out, usize max) {
     if (len == 0) {
       out[0] = '/';
       out[1] = 0;
-      len = 1;
+      len    = 1;
     }
   }
 
@@ -1245,8 +1228,10 @@ static long sys_open(const char *path, int flags) {
   memset(f, 0, sizeof(*f));
 
   int rc = vfs_open(resolved, f);
-  if(rc==0 && (flags & (O_CREAT|O_EXCL))==(O_CREAT|O_EXCL)) {
-    vfs_close(f);kfree(f);return -EEXIST;
+  if (rc == 0 && (flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
+    vfs_close(f);
+    kfree(f);
+    return -EEXIST;
   }
   if (rc == 0 && f->type == VFS_NODE_DIRECTORY) {
     if ((flags & (O_CREAT | O_TRUNC)) != 0) {
@@ -1270,8 +1255,8 @@ static long sys_open(const char *path, int flags) {
       kfree(f);
       return -ENOMEM;
     }
-    slot->type = TASK_FD_DIRECTORY;
-    slot->file = f;
+    slot->type      = TASK_FD_DIRECTORY;
+    slot->file      = f;
     slot->dir_index = 0;
     return fd;
   }
@@ -1330,7 +1315,7 @@ static long sys_read(int fd, void *buf, usize n) {
     return sys_tty_read_input((char *)buf, (long)n);
   }
 
-  int write_end = 0;
+  int write_end     = 0;
   struct pipe *pipe = task_fd_pipe(t, fd, &write_end);
   if (pipe) {
     if (write_end)
@@ -1344,17 +1329,15 @@ static long sys_read(int fd, void *buf, usize n) {
   if (sock) {
     if (!buf || !user_buffer_ok(buf, n, 1))
       return -EFAULT;
-    return socket_recvfrom(sock, buf, n, NULL,
-                           fd_nonblocking(t, fd) ? SOCKET_RECV_NONBLOCK : 0);
+    return socket_recvfrom(sock, buf, n, NULL, fd_nonblocking(t, fd) ? SOCKET_RECV_NONBLOCK : 0);
   }
 
   if (!t || !task_fd_file(t, fd) || task_fd_is_dir(t, fd))
     return -EBADF;
 
   struct vfs_file *file = task_fd_file(t, fd);
-  usize available =
-      file->position < file->size ? (usize)(file->size - file->position) : 0;
-  usize transfer = n < available ? n : available;
+  usize available       = file->position < file->size ? (usize)(file->size - file->position) : 0;
+  usize transfer        = n < available ? n : available;
   if (!user_buffer_ok(buf, transfer, 1))
     return -EFAULT;
   return (long)vfs_read(file, buf, n);
@@ -1374,21 +1357,20 @@ static long sys_read(int fd, void *buf, usize n) {
 // }
 
 static void stat_from_vfs(const struct vfs_stat *fs, struct stat_user *out) {
-  out->size = fs->size;
+  out->size          = fs->size;
   out->first_cluster = (u32)fs->inode;
-  out->type = fs->type == VFS_NODE_DIRECTORY ? STAT_TYPE_DIR : STAT_TYPE_FILE;
-  out->attr = fs->attributes;
+  out->type          = fs->type == VFS_NODE_DIRECTORY ? STAT_TYPE_DIR : STAT_TYPE_FILE;
+  out->attr          = fs->attributes;
 }
 
-static void linux_stat_from_vfs(const struct vfs_stat *fs,
-                                struct linux_kstat *out) {
+static void linux_stat_from_vfs(const struct vfs_stat *fs, struct linux_kstat *out) {
   memset(out, 0, sizeof(*out));
-  out->st_ino = fs->inode ? fs->inode : 1;
-  out->st_nlink = 1;
-  out->st_mode = fs->mode;
-  out->st_size = fs->type == VFS_NODE_DIRECTORY ? 0 : (i64)fs->size;
+  out->st_ino     = fs->inode ? fs->inode : 1;
+  out->st_nlink   = 1;
+  out->st_mode    = fs->mode;
+  out->st_size    = fs->type == VFS_NODE_DIRECTORY ? 0 : (i64)fs->size;
   out->st_blksize = fs->block_size ? fs->block_size : 4096;
-  out->st_blocks = (i64)fs->blocks;
+  out->st_blocks  = (i64)fs->blocks;
 }
 
 static long sys_stat_raw(const char *path, struct stat_user *out) {
@@ -1467,8 +1449,8 @@ static long sys_fstat(int fd, struct linux_kstat *out) {
   if (task_fd_is_console(t, fd) || task_fd_pipe(t, fd, NULL)) {
     int console = task_fd_is_console(t, fd);
     memset(out, 0, sizeof(*out));
-    out->st_nlink = 1;
-    out->st_mode = console ? (S_IFCHR | 0620) : (S_IFIFO | 0600);
+    out->st_nlink   = 1;
+    out->st_mode    = console ? (S_IFCHR | 0620) : (S_IFIFO | 0600);
     out->st_blksize = console ? 1024 : PIPE_CAPACITY;
     return 0;
   }
@@ -1491,11 +1473,9 @@ static long sys_fstat(int fd, struct linux_kstat *out) {
 
 static long sys_lseek(int fd, long off, int whence) {
   struct task *t = task_current();
-  if (task_fd_is_console(t, fd) || task_fd_pipe(t, fd, NULL) ||
-      task_fd_socket(t, fd))
+  if (task_fd_is_console(t, fd) || task_fd_pipe(t, fd, NULL) || task_fd_socket(t, fd))
     return -ESPIPE;
-  if (!t || fd < 0 || fd >= TASK_MAX_FDS || !task_fd_file(t, fd) ||
-      task_fd_is_dir(t, fd))
+  if (!t || fd < 0 || fd >= TASK_MAX_FDS || !task_fd_file(t, fd) || task_fd_is_dir(t, fd))
     return -EBADF;
   struct vfs_file *f = task_fd_file(t, fd);
   u64 base;
@@ -1529,7 +1509,7 @@ static long sys_lseek(int fd, long off, int whence) {
  * spelled. Every allocation starts at fd 3, so it could not be reused by
  * open() anyway. */
 static long sys_close(int fd) {
-  struct task *t = task_current();
+  struct task *t       = task_current();
   struct task_fd *slot = task_fd_slot(t, fd);
   if (!slot)
     return -EBADF;
@@ -1650,7 +1630,7 @@ static long sys_wait4(int pid, int *status, int options, void *rusage) {
     return -EINVAL;
 
   long code = 0;
-  long rc = task_wait_child(pid, &code, (options & WNOHANG) != 0);
+  long rc   = task_wait_child(pid, &code, (options & WNOHANG) != 0);
   if (rc > 0) {
     if (status) {
       if (code < 0 && code > -64)
@@ -1697,21 +1677,20 @@ static long sys_getdents64(int fd, void *user_buf, usize len) {
   if (!user_buffer_ok(user_buf, len, 1))
     return -EFAULT;
 
-  char *out = (char *)user_buf;
+  char *out     = (char *)user_buf;
   usize written = 0;
   for (;;) {
     u32 before = task_fd_slot(t, fd)->dir_index;
     struct vfs_dirent entry;
-    long rc = vfs_read_dir_one(task_fd_slot(t, fd)->dir_path,
-                               &task_fd_slot(t, fd)->dir_index, &entry);
+    long rc =
+        vfs_read_dir_one(task_fd_slot(t, fd)->dir_path, &task_fd_slot(t, fd)->dir_index, &entry);
     if (rc == 0)
       break;
     if (rc < 0)
       return written ? (long)written : -1;
 
     usize name_len = strlen(entry.name);
-    usize reclen = align_up_size(
-        offsetof(struct linux_dirent64, d_name) + name_len + 1, 8);
+    usize reclen   = align_up_size(offsetof(struct linux_dirent64, d_name) + name_len + 1, 8);
     if (reclen > len - written) {
       task_fd_slot(t, fd)->dir_index = before;
       break;
@@ -1719,10 +1698,10 @@ static long sys_getdents64(int fd, void *user_buf, usize len) {
 
     struct linux_dirent64 *de = (struct linux_dirent64 *)(out + written);
     memset(de, 0, reclen);
-    de->d_ino = entry.inode ? entry.inode : 1;
-    de->d_off = (int64_t)task_fd_slot(t, fd)->dir_index;
+    de->d_ino    = entry.inode ? entry.inode : 1;
+    de->d_off    = (int64_t)task_fd_slot(t, fd)->dir_index;
     de->d_reclen = (u16)reclen;
-    de->d_type = entry.type == VFS_NODE_DIRECTORY ? DT_DIR : DT_REG;
+    de->d_type   = entry.type == VFS_NODE_DIRECTORY ? DT_DIR : DT_REG;
     memcpy(de->d_name, entry.name, name_len + 1);
     written += reclen;
   }
@@ -1731,15 +1710,22 @@ static long sys_getdents64(int fd, void *user_buf, usize len) {
 }
 
 static long sys_brk(u64 addr) {
-  struct task *t=task_current();
-  if(!t||!t->vm||!t->vm->brk_base)return -ENOSYS;
-  struct task_vm *vm=t->vm;
-  if(!addr)return vm->brk_current;
-  if(addr<vm->brk_base||addr>=USER_FB_BASE)return vm->brk_current;
-  u64 old=(vm->brk_current+4095)&~4095ULL,new_end=(addr+4095)&~4095ULL;
-  if(new_end>old && !uvm_reserve(vm,old,new_end-old,VMM_PRESENT|VMM_USER|VMM_WRITE|VMM_NX,1))return vm->brk_current;
-  if(new_end<old && uvm_release(vm,new_end,old-new_end))return vm->brk_current;
-  vm->brk_current=addr;return addr;
+  struct task *t = task_current();
+  if (!t || !t->vm || !t->vm->brk_base)
+    return -ENOSYS;
+  struct task_vm *vm = t->vm;
+  if (!addr)
+    return vm->brk_current;
+  if (addr < vm->brk_base || addr >= USER_FB_BASE)
+    return vm->brk_current;
+  u64 old = (vm->brk_current + 4095) & ~4095ULL, new_end = (addr + 4095) & ~4095ULL;
+  if (new_end > old &&
+      !uvm_reserve(vm, old, new_end - old, VMM_PRESENT | VMM_USER | VMM_WRITE | VMM_NX, 1))
+    return vm->brk_current;
+  if (new_end < old && uvm_release(vm, new_end, old - new_end))
+    return vm->brk_current;
+  vm->brk_current = addr;
+  return addr;
 }
 
 static long sys_readv(int fd, const struct linux_iovec *iov, long iovcnt) {
@@ -1860,7 +1846,7 @@ static u64 ms_to_ticks(long ms) {
 static long poll_scan(struct task *t, struct linux_pollfd *fds, long nfds) {
   long ready = 0;
   for (long i = 0; i < nfds; i++) {
-    int fd = fds[i].fd;
+    int fd         = fds[i].fd;
     fds[i].revents = 0;
     if (fd < 0)
       continue; /* POSIX: negative fds are skipped, not invalid. */
@@ -1869,10 +1855,10 @@ static long poll_scan(struct task *t, struct linux_pollfd *fds, long nfds) {
       ready++;
       continue;
     }
-    short want = fds[i].events;
-    short got = 0;
-    int write_end = 0;
-    struct pipe *pipe = task_fd_pipe(t, fd, &write_end);
+    short want          = fds[i].events;
+    short got           = 0;
+    int write_end       = 0;
+    struct pipe *pipe   = task_fd_pipe(t, fd, &write_end);
     struct socket *sock = task_fd_socket(t, fd);
     if (pipe && !write_end) {
       if ((want & POLLIN) && pipe->count)
@@ -1907,7 +1893,7 @@ static long sys_poll(struct linux_pollfd *fds, long nfds, long timeout_ms) {
     return -EFAULT;
 
   struct task *t = task_current();
-  u64 deadline = 0;
+  u64 deadline   = 0;
   if (timeout_ms > 0) {
     deadline = pit_ticks() + ms_to_ticks(timeout_ms);
     if (deadline == 0)
@@ -1933,8 +1919,8 @@ static long sys_poll(struct linux_pollfd *fds, long nfds, long timeout_ms) {
       int fd = fds[i].fd;
       if (fd < 0)
         continue;
-      int write_end = 0;
-      struct pipe *pipe = task_fd_pipe(t, fd, &write_end);
+      int write_end       = 0;
+      struct pipe *pipe   = task_fd_pipe(t, fd, &write_end);
       struct socket *sock = task_fd_socket(t, fd);
       if (pipe && !write_end && (fds[i].events & POLLIN))
         wq_add(&pipe->readable, &entries[waiting++]);
@@ -1984,10 +1970,10 @@ static long sys_ioctl(int fd, long request, void *arg) {
     if (!user_buffer_ok(arg, sizeof(struct linux_winsize), 1))
       return -EFAULT;
     struct linux_winsize *ws = (struct linux_winsize *)arg;
-    ws->ws_row = 25;
-    ws->ws_col = 80;
-    ws->ws_xpixel = (u16)framebuffer_width();
-    ws->ws_ypixel = (u16)framebuffer_height();
+    ws->ws_row               = 25;
+    ws->ws_col               = 80;
+    ws->ws_xpixel            = (u16)framebuffer_width();
+    ws->ws_ypixel            = (u16)framebuffer_height();
     return 0;
   }
 
@@ -2008,11 +1994,11 @@ static long sys_ioctl(int fd, long request, void *arg) {
 
 /* Uptime. This is what CLOCK_MONOTONIC means and all it should ever mean. */
 static void monotonic_timespec(struct linux_timespec *ts) {
-  u64 freq = pit_get_freq();
+  u64 freq  = pit_get_freq();
   u64 ticks = pit_ticks();
   if (!freq)
     freq = 100;
-  ts->tv_sec = (int64_t)(ticks / freq);
+  ts->tv_sec  = (int64_t)(ticks / freq);
   ts->tv_nsec = (int64_t)(((ticks % freq) * 1000000000ULL) / freq);
 }
 
@@ -2033,7 +2019,7 @@ static void realtime_timespec(struct linux_timespec *ts) {
   u64 freq = pit_get_freq();
   if (!freq)
     freq = 100;
-  ts->tv_sec = (int64_t)epoch;
+  ts->tv_sec  = (int64_t)epoch;
   ts->tv_nsec = (int64_t)(((pit_ticks() % freq) * 1000000000ULL) / freq);
 }
 
@@ -2064,13 +2050,12 @@ static long sys_gettimeofday(struct linux_timeval *tv, void *tz) {
   /* gettimeofday is wall clock by definition, never uptime. */
   struct linux_timespec ts;
   realtime_timespec(&ts);
-  tv->tv_sec = ts.tv_sec;
+  tv->tv_sec  = ts.tv_sec;
   tv->tv_usec = ts.tv_nsec / 1000;
   return 0;
 }
 
-static long sys_nanosleep(const struct linux_timespec *req,
-                          struct linux_timespec *rem) {
+static long sys_nanosleep(const struct linux_timespec *req, struct linux_timespec *rem) {
   if (!req || !user_buffer_ok(req, sizeof(*req), 0))
     return -EFAULT;
   if (req->tv_sec < 0 || req->tv_nsec < 0 || req->tv_nsec >= 1000000000LL)
@@ -2088,14 +2073,13 @@ static long sys_nanosleep(const struct linux_timespec *req,
   if (ticks)
     task_sleep_ticks(ticks);
   if (rem) {
-    rem->tv_sec = 0;
+    rem->tv_sec  = 0;
     rem->tv_nsec = 0;
   }
   return 0;
 }
 
-static long sys_fstatat(int dirfd, const char *path, struct linux_kstat *out,
-                        int flags) {
+static long sys_fstatat(int dirfd, const char *path, struct linux_kstat *out, int flags) {
   if (!out)
     return -EFAULT;
   if ((flags & AT_EMPTY_PATH) && path && !path[0] && dirfd >= 0)
@@ -2113,9 +2097,9 @@ static long sys_set_tid_address(u64 clear_tid_addr) {
   return t ? t->pid : -ESRCH;
 }
 
-static long sys_linux_futex(u32 *addr, int op, u32 val,
-                            const struct linux_timespec *timeout) {
-  if(timeout && (op & FUTEX_CMD_MASK)==FUTEX_WAIT)return -ENOSYS;
+static long sys_linux_futex(u32 *addr, int op, u32 val, const struct linux_timespec *timeout) {
+  if (timeout && (op & FUTEX_CMD_MASK) == FUTEX_WAIT)
+    return -ENOSYS;
   switch (op & FUTEX_CMD_MASK) {
   case FUTEX_WAIT:
     return sys_futex_wait(addr, val);
@@ -2166,8 +2150,8 @@ static int copy_user_string(const char *user, char *out, usize max) {
 
 #define DEV_PREFIX "/dev/"
 
-static long sys_mount(const char *source, const char *target,
-                      const char *fstype, u64 flags, const void *data) {
+static long sys_mount(const char *source, const char *target, const char *fstype, u64 flags,
+                      const void *data) {
   /* No mount flag and no option string is honoured yet, and no filesystem
    * here parses one. Refusing beats accepting an MS_RDONLY that silently
    * mounts read-write, or an option string that silently does nothing. */
@@ -2220,13 +2204,13 @@ static long sys_mount(const char *source, const char *target,
    * backend copies the descriptor during attach rather than retaining the
    * pointer. It borrows the adapter behind .context, which is static. */
   const char *mounted = 0;
-  long result = type[0] ? vfs_attach(resolved, type, &transport)
-                        : vfs_attach_auto(resolved, &transport, &mounted);
+  long result         = type[0] ? vfs_attach(resolved, type, &transport)
+                                : vfs_attach_auto(resolved, &transport, &mounted);
   if (result != 0)
     return result;
 
-  log_write_fmt(FILESYS, LOG_INFO, "mount: %s (%s) at %s", name,
-                type[0] ? type : mounted, resolved);
+  log_write_fmt(
+      FILESYS, LOG_INFO, "mount: %s (%s) at %s", name, type[0] ? type : mounted, resolved);
   return 0;
 }
 
@@ -2293,7 +2277,8 @@ static int raw_block_device(const char *source, struct block_device *out) {
   if (result)
     return result < 0 ? (int)result : -EIO;
   const char *name = !strncmp(device, DEV_PREFIX, sizeof(DEV_PREFIX) - 1)
-      ? device + sizeof(DEV_PREFIX) - 1 : device;
+                         ? device + sizeof(DEV_PREFIX) - 1
+                         : device;
   return blockdev_lookup(name, out);
 }
 static long sys_blockdev_read(const char *source, u64 lba, u64 count, void *out) {
@@ -2396,10 +2381,10 @@ static long sys_proc_list(struct proc_info *out, long max) {
   struct task_snap snap[64];
   int n = sched_snapshot(snap, (int)max);
   for (int i = 0; i < n; i++) {
-    out[i].ticks_run = snap[i].ticks_run;
-    out[i].pid = snap[i].pid;
+    out[i].ticks_run  = snap[i].ticks_run;
+    out[i].pid        = snap[i].pid;
     out[i].parent_pid = snap[i].parent_pid;
-    out[i].state = snap[i].state;
+    out[i].state      = snap[i].state;
     for (usize k = 0; k < sizeof(out[i].name); k++) {
       out[i].name[k] = snap[i].name[k];
     }
@@ -2411,8 +2396,8 @@ static long sys_mem_stats(struct mem_stats *out) {
   if (!out || !user_buffer_ok(out, sizeof(*out), 1))
     return -EFAULT;
   out->total_frames = pmm_usable_frames();
-  out->used_frames = pmm_used_frames();
-  out->frame_size = 4096;
+  out->used_frames  = pmm_used_frames();
+  out->frame_size   = 4096;
   return 0;
 }
 
@@ -2426,8 +2411,7 @@ static long sys_net_stats(struct net_stats *out) {
   return netmon_read_stats(out);
 }
 
-static long sys_net_capture(u64 *cursor, struct net_frame *out,
-                            long max) {
+static long sys_net_capture(u64 *cursor, struct net_frame *out, long max) {
   if (max <= 0)
     return -EINVAL;
   if (max > NETMON_CAPTURE_BATCH)
@@ -2460,8 +2444,8 @@ static int sock_fd_alloc(struct task *t, struct socket *sock) {
     if (!slot || slot->type != TASK_FD_UNUSED)
       continue;
     task_fd_clear(slot);
-    slot->type = TASK_FD_SOCKET;
-    slot->socket = sock;
+    slot->type    = TASK_FD_SOCKET;
+    slot->socket  = sock;
     sock->fd_refs = 1;
     return fd;
   }
@@ -2500,7 +2484,7 @@ static long sys_socket(int domain, int type, int protocol) {
 }
 
 static long sys_bind(int fd, const struct sockaddr_in *addr, u32 addrlen) {
-  struct task *t = task_current();
+  struct task *t      = task_current();
   struct socket *sock = sock_from_fd(t, fd);
   if (!sock)
     return -ENOTSOCK;
@@ -2530,7 +2514,7 @@ static long sys_bind(int fd, const struct sockaddr_in *addr, u32 addrlen) {
 static long sys_sendto(int fd, const void *buf, usize len, int flags,
                        const struct sockaddr_in *dest, u32 addrlen) {
   (void)flags;
-  struct task *t = task_current();
+  struct task *t      = task_current();
   struct socket *sock = sock_from_fd(t, fd);
   if (!sock)
     return -ENOTSOCK;
@@ -2552,7 +2536,7 @@ static long sys_sendto(int fd, const void *buf, usize len, int flags,
     struct sockaddr_in local;
     memset(&local, 0, sizeof(local));
     local.family = AF_INET;
-    local.port = socket_alloc_ephemeral_port();
+    local.port   = socket_alloc_ephemeral_port();
     if (local.port == 0 || socket_bind(sock, &local) != 0)
       return -EADDRINUSE;
   }
@@ -2560,9 +2544,9 @@ static long sys_sendto(int fd, const void *buf, usize len, int flags,
   return socket_sendto(sock, buf, len, &remote);
 }
 
-static long sys_recvfrom(int fd, void *buf, usize len, int flags,
-                         struct sockaddr_in *src, u32 *addrlen) {
-  struct task *t = task_current();
+static long sys_recvfrom(int fd, void *buf, usize len, int flags, struct sockaddr_in *src,
+                         u32 *addrlen) {
+  struct task *t      = task_current();
   struct socket *sock = sock_from_fd(t, fd);
   if (!sock)
     return -ENOTSOCK;
@@ -2576,8 +2560,7 @@ static long sys_recvfrom(int fd, void *buf, usize len, int flags,
     return -EFAULT;
 
   int nonblock = (flags & MSG_DONTWAIT) || fd_nonblocking(t, fd);
-  long n = socket_recvfrom(sock, buf, len, src,
-                           nonblock ? SOCKET_RECV_NONBLOCK : 0);
+  long n       = socket_recvfrom(sock, buf, len, src, nonblock ? SOCKET_RECV_NONBLOCK : 0);
   if (n >= 0 && addrlen)
     *addrlen = sizeof(*src);
   return n;
@@ -2594,8 +2577,7 @@ static long sys_net_ping(struct net_ping *req) {
     return -EINVAL;
 
   u32 rtt_ms = 0;
-  long rc =
-      icmp_ping(local.dst, local.ident, local.seq, local.timeout_ms, &rtt_ms);
+  long rc    = icmp_ping(local.dst, local.ident, local.seq, local.timeout_ms, &rtt_ms);
   if (rc == 0)
     req->rtt_ms = rtt_ms;
   return rc;
@@ -2604,13 +2586,15 @@ static long sys_net_ping(struct net_ping *req) {
 static long sys_arch_prctl(long code, u64 addr) {
   switch (code) {
   case 0x1001: /* ARCH_SET_GS: swapgs protects kernel cpu_local state. */
-    if (addr >= USER_VA_MAX) return -EINVAL;
-    task_current()->context->gs_base=addr;
-    wrmsr(0xC0000102u,addr);
+    if (addr >= USER_VA_MAX)
+      return -EINVAL;
+    task_current()->context->gs_base = addr;
+    wrmsr(0xC0000102u, addr);
     return 0;
   case 0x1004: /* ARCH_GET_GS */
-    if (!user_buffer_ok((void *)(uintptr_t)addr,8,1)) return -EFAULT;
-    *(u64 *)(uintptr_t)addr=task_current()->context->gs_base;
+    if (!user_buffer_ok((void *)(uintptr_t)addr, 8, 1))
+      return -EFAULT;
+    *(u64 *)(uintptr_t)addr = task_current()->context->gs_base;
     return 0;
   case ARCH_SET_FS:
     if (addr >= USER_VA_MAX)
@@ -2642,8 +2626,7 @@ static long sys_thread_exit(void) {
   /* Threads share one PML4, so the last one out frees it. The decrement
    * must be atomic: two threads exiting concurrently would otherwise both
    * read the same count and either double-free or leak the address space. */
-  int new_count =
-      __atomic_sub_fetch(t->vm->pml4_ref_count, 1, __ATOMIC_ACQ_REL);
+  int new_count = __atomic_sub_fetch(t->vm->pml4_ref_count, 1, __ATOMIC_ACQ_REL);
 
   if (new_count <= 0) {
     kfree(t->vm->pml4_ref_count);
@@ -2652,7 +2635,7 @@ static long sys_thread_exit(void) {
   } else {
     /* Detach from the shared PML4 first , task_exit_thread must not
      * reap an address space its siblings are still running on. */
-    t->vm->user_pml4 = 0;
+    t->vm->user_pml4      = 0;
     t->vm->pml4_ref_count = 0;
     task_exit_thread();
   }
@@ -2722,9 +2705,9 @@ static long sys_futex_wake(u32 *addr) {
 
 long syscall_dispatch(struct syscall_frame *f) {
   long num = (long)f->rax;
-  long a1 = (long)f->rdi;
-  long a2 = (long)f->rsi;
-  long a3 = (long)f->rdx;
+  long a1  = (long)f->rdi;
+  long a2  = (long)f->rsi;
+  long a3  = (long)f->rdx;
   /* r10, not rcx: the syscall instruction clobbers rcx with the return RIP,
    * so the ABI substitutes r10 for the fourth argument. */
   long a4 = (long)f->r10;
@@ -2734,7 +2717,6 @@ long syscall_dispatch(struct syscall_frame *f) {
   long a6 = (long)f->r9;
 
   long ret = -ENOSYS;
-
 
   switch (num) {
   case SYS_WRITE:
@@ -2753,10 +2735,17 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_read((uintptr_t)a1, (void *)(uintptr_t)a2, (uintptr_t)a3);
     break;
   case SYS_OPENAT: {
-    const char *path=(const char *)(uintptr_t)a2;
-    if(!path || !user_buffer_ok(path,1,0)) {ret=-EFAULT;break;}
-    if((int)a1!=AT_FDCWD && *path!='/') {ret=-ENOSYS;break;}
-    ret=sys_open(path,(int)a3);break;
+    const char *path = (const char *)(uintptr_t)a2;
+    if (!path || !user_buffer_ok(path, 1, 0)) {
+      ret = -EFAULT;
+      break;
+    }
+    if ((int)a1 != AT_FDCWD && *path != '/') {
+      ret = -ENOSYS;
+      break;
+    }
+    ret = sys_open(path, (int)a3);
+    break;
   }
   case SYS_OPEN:
     ret = sys_open((const char *)(uintptr_t)a1, (uintptr_t)a2);
@@ -2780,8 +2769,7 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_dup3((int)a1, (int)a2, (int)a3);
     break;
   case SYS_WAIT4:
-    ret = sys_wait4((int)a1, (int *)(uintptr_t)a2, (int)a3,
-                    (void *)(uintptr_t)a4);
+    ret = sys_wait4((int)a1, (int *)(uintptr_t)a2, (int)a3, (void *)(uintptr_t)a4);
     break;
   case SYS_LSEEK:
     ret = sys_lseek((uintptr_t)a1, (uintptr_t)a2, (uintptr_t)a3);
@@ -2799,27 +2787,26 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_brk((u64)(uintptr_t)a1);
     break;
   case SYS_RT_SIGACTION:
-    ret = sys_rt_sigaction(
-        (int)a1, (const struct task_signal_action *)(uintptr_t)a2,
-        (struct task_signal_action *)(uintptr_t)a3, (usize)a4);
+    ret = sys_rt_sigaction((int)a1,
+                           (const struct task_signal_action *)(uintptr_t)a2,
+                           (struct task_signal_action *)(uintptr_t)a3,
+                           (usize)a4);
     break;
   case SYS_STAT:
-    ret = sys_stat((const char *)(uintptr_t)a1,
-                   (struct linux_kstat *)(uintptr_t)a2);
+    ret = sys_stat((const char *)(uintptr_t)a1, (struct linux_kstat *)(uintptr_t)a2);
     break;
   case SYS_FSTAT:
     ret = sys_fstat((int)a1, (struct linux_kstat *)(uintptr_t)a2);
     break;
   case SYS_STAT_RAW:
-    ret = sys_stat_raw((const char *)(uintptr_t)a1,
-                       (struct stat_user *)(uintptr_t)a2);
+    ret = sys_stat_raw((const char *)(uintptr_t)a1, (struct stat_user *)(uintptr_t)a2);
     break;
   case SYS_FSTAT_RAW:
     ret = sys_fstat_raw((int)a1, (struct stat_user *)(uintptr_t)a2);
     break;
   case SYS_FSTATAT:
-    ret = sys_fstatat((int)a1, (const char *)(uintptr_t)a2,
-                      (struct linux_kstat *)(uintptr_t)a3, (int)a4);
+    ret = sys_fstatat(
+        (int)a1, (const char *)(uintptr_t)a2, (struct linux_kstat *)(uintptr_t)a3, (int)a4);
     break;
   /* 217 is getdents64 and nothing else. It used to also carry Gaia's
    * index-based walk, disambiguated by testing whether the first argument
@@ -2833,8 +2820,8 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_readdir((u32 *)(uintptr_t)a1, (char *)(uintptr_t)a2, a3);
     break;
   case SYS_READDIR_PATH:
-    ret = sys_readdir_path((const char *)(uintptr_t)a1, (u32 *)(uintptr_t)a2,
-                           (char *)(uintptr_t)a3, (usize)a4);
+    ret = sys_readdir_path(
+        (const char *)(uintptr_t)a1, (u32 *)(uintptr_t)a2, (char *)(uintptr_t)a3, (usize)a4);
     break;
   case SYS_SET_TID_ADDRESS:
     ret = sys_set_tid_address((u64)(uintptr_t)a1);
@@ -2856,8 +2843,7 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_clock_gettime(a1, (struct linux_timespec *)(uintptr_t)a2);
     break;
   case SYS_GETTIMEOFDAY:
-    ret = sys_gettimeofday((struct linux_timeval *)(uintptr_t)a1,
-                           (void *)(uintptr_t)a2);
+    ret = sys_gettimeofday((struct linux_timeval *)(uintptr_t)a1, (void *)(uintptr_t)a2);
     break;
   case SYS_NANOSLEEP:
     ret = sys_nanosleep((const struct linux_timespec *)(uintptr_t)a1,
@@ -2885,8 +2871,7 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_msg_peek((struct msg *)(uintptr_t)a1);
     break;
   case SYS_MOUSE_POS:
-    ret = sys_mouse_pos((int32_t *)(uintptr_t)a1, (int32_t *)(uintptr_t)a2,
-                        (u8 *)(uintptr_t)a3);
+    ret = sys_mouse_pos((int32_t *)(uintptr_t)a1, (int32_t *)(uintptr_t)a2, (u8 *)(uintptr_t)a3);
     break;
   case SYS_CON_WRITE:
     ret = sys_con_write((const char *)(uintptr_t)a1, (uintptr_t)a2);
@@ -2936,8 +2921,7 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_ipc_recv((struct ipc_msg *)(uintptr_t)a1);
     break;
   case SYS_SHMEM_SHARE:
-    ret = sys_shmem_share((uintptr_t)a1, (u64)(uintptr_t)a2, (uintptr_t)a3,
-                          (u64 *)(uintptr_t)a4);
+    ret = sys_shmem_share((uintptr_t)a1, (u64)(uintptr_t)a2, (uintptr_t)a3, (u64 *)(uintptr_t)a4);
     break;
   case SYS_SHMEM_UNSHARE:
     ret = sys_shmem_unshare((uintptr_t)a1, (u64)(uintptr_t)a2, (uintptr_t)a3);
@@ -2966,8 +2950,7 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_tty_free((long)a1);
     break;
   case SYS_TTY_SPAWN:
-    ret = sys_tty_spawn((const char *)(uintptr_t)a1,
-                        (char *const *)(uintptr_t)a2, (long)a3);
+    ret = sys_tty_spawn((const char *)(uintptr_t)a1, (char *const *)(uintptr_t)a2, (long)a3);
     break;
   case SYS_FB_INFO:
     ret = sys_fb_info((struct fb_info *)(uintptr_t)a1);
@@ -2980,8 +2963,8 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = 0;
     break;
   case SYS_FB_PRESENT:
-    ret = sys_fb_present((const void *)(uintptr_t)a1, (u64)a2,
-                         (const struct fb_rect *)(uintptr_t)a3, (u64)a4);
+    ret = sys_fb_present(
+        (const void *)(uintptr_t)a1, (u64)a2, (const struct fb_rect *)(uintptr_t)a3, (u64)a4);
     break;
   case SYS_FB_REGISTER:
     ret = sys_fb_register((const void *)(uintptr_t)a1, (u64)a2);
@@ -3002,8 +2985,10 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_rmdir((const char *)(uintptr_t)a1);
     break;
   case SYS_MOUNT:
-    ret = sys_mount((const char *)(uintptr_t)a1, (const char *)(uintptr_t)a2,
-                    (const char *)(uintptr_t)a3, (u64)a4,
+    ret = sys_mount((const char *)(uintptr_t)a1,
+                    (const char *)(uintptr_t)a2,
+                    (const char *)(uintptr_t)a3,
+                    (u64)a4,
                     (const void *)(uintptr_t)a5);
     break;
   case SYS_UMOUNT:
@@ -3013,12 +2998,11 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_blockdev_list((struct blockdev_info *)(uintptr_t)a1, (long)a2);
     break;
   case SYS_BLKDEV_READ:
-    ret = sys_blockdev_read((const char *)(uintptr_t)a1, (u64)a2, (u64)a3,
-                            (void *)(uintptr_t)a4);
+    ret = sys_blockdev_read((const char *)(uintptr_t)a1, (u64)a2, (u64)a3, (void *)(uintptr_t)a4);
     break;
   case SYS_BLKDEV_WRITE:
-    ret = sys_blockdev_write((const char *)(uintptr_t)a1, (u64)a2, (u64)a3,
-                             (const void *)(uintptr_t)a4);
+    ret = sys_blockdev_write(
+        (const char *)(uintptr_t)a1, (u64)a2, (u64)a3, (const void *)(uintptr_t)a4);
     break;
   case SYS_BLKDEV_FLUSH:
     ret = sys_blockdev_flush((const char *)(uintptr_t)a1);
@@ -3049,8 +3033,7 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_get_pid();
     break;
   case SYS_RT_SIGPROCMASK:
-    ret = signal_sigprocmask((int)a1, (const u64 *)(uintptr_t)a2,
-                             (u64 *)(uintptr_t)a3, (usize)a4);
+    ret = signal_sigprocmask((int)a1, (const u64 *)(uintptr_t)a2, (u64 *)(uintptr_t)a3, (usize)a4);
     break;
   case SYS_RT_SIGPENDING:
     ret = signal_sigpending((u64 *)(uintptr_t)a1, (usize)a2);
@@ -3078,19 +3061,30 @@ long syscall_dispatch(struct syscall_frame *f) {
     break;
   case SYS_PE_MODULE:
   case SYS_PE_SYMBOL: {
-    struct task *t=task_current();
-    const char *input=(const char *)(uintptr_t)(num==SYS_PE_MODULE?a1:a2);
-    char name[128]; usize i=0;
-    if(input) {
-      for(;i<sizeof(name);i++) {
-        if(!user_buffer_ok(input+i,1,0))break;
-        name[i]=input[i];if(!name[i])break;
+    struct task *t    = task_current();
+    const char *input = (const char *)(uintptr_t)(num == SYS_PE_MODULE ? a1 : a2);
+    char name[128];
+    usize i = 0;
+    if (input) {
+      for (; i < sizeof(name); i++) {
+        if (!user_buffer_ok(input + i, 1, 0))
+          break;
+        name[i] = input[i];
+        if (!name[i])
+          break;
       }
-      if(i==sizeof(name) || !user_buffer_ok(input+i,1,0)) {ret=-EFAULT;break;}
+      if (i == sizeof(name) || !user_buffer_ok(input + i, 1, 0)) {
+        ret = -EFAULT;
+        break;
+      }
     }
-    if(!t || !t->vm || !t->vm->pe_process){ret=-EINVAL;break;}
-    ret=num==SYS_PE_MODULE ? (long)pe_process_module(t->vm->pe_process,input?name:0,(int)a2) :
-        (long)pe_process_symbol(t->vm->pe_process,(u64)a1,input?name:0,(u32)a3);
+    if (!t || !t->vm || !t->vm->pe_process) {
+      ret = -EINVAL;
+      break;
+    }
+    ret = num == SYS_PE_MODULE
+              ? (long)pe_process_module(t->vm->pe_process, input ? name : 0, (int)a2)
+              : (long)pe_process_symbol(t->vm->pe_process, (u64)a1, input ? name : 0, (u32)a3);
     break;
   }
   case SYS_THREAD_CREATE:
@@ -3103,8 +3097,8 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_thread_join((uintptr_t)a1);
     break;
   case SYS_FUTEX:
-    ret = sys_linux_futex((u32 *)(uintptr_t)a1, (int)a2, (u32)a3,
-                          (const struct linux_timespec *)(uintptr_t)a4);
+    ret = sys_linux_futex(
+        (u32 *)(uintptr_t)a1, (int)a2, (u32)a3, (const struct linux_timespec *)(uintptr_t)a4);
     break;
   case SYS_FUTEX_WAIT:
     ret = sys_futex_wait((u32 *)(uintptr_t)a1, (u32)a2);
@@ -3116,8 +3110,7 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_net_stats((struct net_stats *)(uintptr_t)a1);
     break;
   case SYS_NET_CAPTURE:
-    ret = sys_net_capture((u64 *)(uintptr_t)a1,
-                          (struct net_frame *)(uintptr_t)a2, (long)a3);
+    ret = sys_net_capture((u64 *)(uintptr_t)a1, (struct net_frame *)(uintptr_t)a2, (long)a3);
     break;
   case SYS_NET_PING:
     ret = sys_net_ping((struct net_ping *)(uintptr_t)a1);
@@ -3129,13 +3122,20 @@ long syscall_dispatch(struct syscall_frame *f) {
     ret = sys_bind((int)a1, (const struct sockaddr_in *)(uintptr_t)a2, (u32)a3);
     break;
   case SYS_SENDTO:
-    ret = sys_sendto((int)a1, (const void *)(uintptr_t)a2, (usize)a3, (int)a4,
-                     (const struct sockaddr_in *)(uintptr_t)a5, (u32)a6);
+    ret = sys_sendto((int)a1,
+                     (const void *)(uintptr_t)a2,
+                     (usize)a3,
+                     (int)a4,
+                     (const struct sockaddr_in *)(uintptr_t)a5,
+                     (u32)a6);
     break;
   case SYS_RECVFROM:
-    ret =
-        sys_recvfrom((int)a1, (void *)(uintptr_t)a2, (usize)a3, (int)a4,
-                     (struct sockaddr_in *)(uintptr_t)a5, (u32 *)(uintptr_t)a6);
+    ret = sys_recvfrom((int)a1,
+                       (void *)(uintptr_t)a2,
+                       (usize)a3,
+                       (int)a4,
+                       (struct sockaddr_in *)(uintptr_t)a5,
+                       (u32 *)(uintptr_t)a6);
     break;
   default:
     log_write_hex("unknown syscall =", num, KERNEL, LOG_ERROR);
@@ -3145,8 +3145,7 @@ long syscall_dispatch(struct syscall_frame *f) {
    * are exactly what syscall_prepare_return checks. */
   signal_deliver_syscall(f);
   if (syscall_prepare_return(f) != 0) {
-    log_write("syscall: rejected invalid ring-3 return frame", KERNEL,
-              LOG_ERROR);
+    log_write("syscall: rejected invalid ring-3 return frame", KERNEL, LOG_ERROR);
     task_exit(-11);
   }
   return ret;

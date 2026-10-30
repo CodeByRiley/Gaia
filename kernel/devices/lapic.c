@@ -18,9 +18,7 @@ static volatile u8 *lapic_mmio = 0;
 
 u32 lapic_read(u32 reg) { return *(volatile u32 *)(lapic_mmio + reg); }
 
-void lapic_write(u32 reg, u32 val) {
-  *(volatile u32 *)(lapic_mmio + reg) = val;
-}
+void lapic_write(u32 reg, u32 val) { *(volatile u32 *)(lapic_mmio + reg) = val; }
 
 u32 lapic_id(void) { return lapic_read(LAPIC_REG_ID) >> 24; }
 
@@ -48,8 +46,7 @@ void lapic_init(u64 mmio_phys) {
     return;
   /* Map a single 4 KiB page. Mark uncacheable via PCD/PWT so MMIO loads
    * and stores don't get reordered or coalesced by the cache. */
-  vmm_map(LAPIC_VIRT_BASE, mmio_phys,
-          VMM_PRESENT | VMM_WRITE | VMM_PCD | VMM_PWT);
+  vmm_map(LAPIC_VIRT_BASE, mmio_phys, VMM_PRESENT | VMM_WRITE | VMM_PCD | VMM_PWT);
   lapic_mmio = (volatile u8 *)LAPIC_VIRT_BASE;
   lapic_enable_this_cpu();
   log_write_hex("LAPIC: mapped phys =", mmio_phys, KERNEL, LOG_INFO);
@@ -69,22 +66,22 @@ static void icr_wait(void) {
 
 void lapic_send_init(u8 apic_id) {
   lapic_write(LAPIC_REG_ICR_HIGH, (u32)apic_id << 24);
-  lapic_write(LAPIC_REG_ICR_LOW, LAPIC_ICR_INIT | LAPIC_ICR_PHYSICAL |
-                                     LAPIC_ICR_ASSERT | LAPIC_ICR_LEVEL_LEVEL);
+  lapic_write(LAPIC_REG_ICR_LOW,
+              LAPIC_ICR_INIT | LAPIC_ICR_PHYSICAL | LAPIC_ICR_ASSERT | LAPIC_ICR_LEVEL_LEVEL);
   icr_wait();
 }
 
 void lapic_send_startup(u8 apic_id, u8 vector) {
   lapic_write(LAPIC_REG_ICR_HIGH, (u32)apic_id << 24);
-  lapic_write(LAPIC_REG_ICR_LOW, LAPIC_ICR_STARTUP | LAPIC_ICR_PHYSICAL |
-                                     LAPIC_ICR_ASSERT | (u32)vector);
+  lapic_write(LAPIC_REG_ICR_LOW,
+              LAPIC_ICR_STARTUP | LAPIC_ICR_PHYSICAL | LAPIC_ICR_ASSERT | (u32)vector);
   icr_wait();
 }
 
 void lapic_send_fixed(u8 apic_id, u8 vector) {
   lapic_write(LAPIC_REG_ICR_HIGH, (u32)apic_id << 24);
-  lapic_write(LAPIC_REG_ICR_LOW, LAPIC_ICR_FIXED | LAPIC_ICR_PHYSICAL |
-                                     LAPIC_ICR_ASSERT | LAPIC_ICR_LEVEL_EDGE |
-                                     vector);
+  lapic_write(LAPIC_REG_ICR_LOW,
+              LAPIC_ICR_FIXED | LAPIC_ICR_PHYSICAL | LAPIC_ICR_ASSERT | LAPIC_ICR_LEVEL_EDGE |
+                  vector);
   icr_wait();
 }

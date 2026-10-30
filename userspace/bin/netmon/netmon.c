@@ -93,17 +93,15 @@ struct netmon {
 
 /* ---------------- formatting helpers ----------------------------------- */
 
-static uint16_t be16(const uint8_t *p) {
-  return (uint16_t)((p[0] << 8) | p[1]);
-}
+static uint16_t be16(const uint8_t *p) { return (uint16_t)((p[0] << 8) | p[1]); }
 
 static void fmt_ip(char *out, size_t cap, const uint8_t *ip) {
   snprintf(out, cap, "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
 }
 
 static void fmt_mac(char *out, size_t cap, const uint8_t *mac) {
-  snprintf(out, cap, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2],
-           mac[3], mac[4], mac[5]);
+  snprintf(
+      out, cap, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
 /* One-line description of a frame, in the spirit of tcpdump's default
@@ -112,16 +110,16 @@ static void fmt_mac(char *out, size_t cap, const uint8_t *mac) {
  */
 static void summarize(const struct net_frame *f, char *out, size_t cap) {
   const uint8_t *p = f->data;
-  uint32_t n = f->captured;
+  uint32_t n       = f->captured;
 
   if (n < ETH_HDR_LEN) {
     snprintf(out, cap, "runt (%u bytes captured)", n);
     return;
   }
 
-  uint16_t type = be16(p + 12);
+  uint16_t type       = be16(p + 12);
   const uint8_t *body = p + ETH_HDR_LEN;
-  uint32_t body_len = n - ETH_HDR_LEN;
+  uint32_t body_len   = n - ETH_HDR_LEN;
 
   if (type == ETH_TYPE_ARP) {
     if (body_len < 28) {
@@ -157,14 +155,14 @@ static void summarize(const struct net_frame *f, char *out, size_t cap) {
     return;
   }
 
-  uint32_t ihl = (uint32_t)(body[0] & 0x0Fu) * 4u;
+  uint32_t ihl  = (uint32_t)(body[0] & 0x0Fu) * 4u;
   uint8_t proto = body[9];
   char src[16], dst[16];
   fmt_ip(src, sizeof(src), body + 12);
   fmt_ip(dst, sizeof(dst), body + 16);
 
   const uint8_t *l4 = body + ihl;
-  uint32_t l4_len = body_len > ihl ? body_len - ihl : 0;
+  uint32_t l4_len   = body_len > ihl ? body_len - ihl : 0;
 
   if (proto == IP_PROTO_ICMP && l4_len >= 4) {
     const char *kind = 0;
@@ -192,8 +190,13 @@ static void summarize(const struct net_frame *f, char *out, size_t cap) {
   }
 
   if ((proto == IP_PROTO_TCP || proto == IP_PROTO_UDP) && l4_len >= 4) {
-    snprintf(out, cap, "%s  %s:%u > %s:%u",
-             proto == IP_PROTO_TCP ? "TCP" : "UDP", src, be16(l4), dst,
+    snprintf(out,
+             cap,
+             "%s  %s:%u > %s:%u",
+             proto == IP_PROTO_TCP ? "TCP" : "UDP",
+             src,
+             be16(l4),
+             dst,
              be16(l4 + 2));
     return;
   }
@@ -215,7 +218,7 @@ static void history_push(struct netmon *nm, const struct net_frame *f) {
   }
 
   nm->history[nm->first] = *f;
-  nm->first = (nm->first + 1) % HISTORY;
+  nm->first              = (nm->first + 1) % HISTORY;
   /* The oldest frame just went away, so every index shifted down one.
    * Move the selection and the viewport with it, or both would slide
    * onto a neighbouring frame with no input from the user. */
@@ -239,7 +242,7 @@ static void drain_capture(struct netmon *nm) {
    * gets picked up next frame. */
   for (int round = 0; round < 8; round++) {
     uint64_t asked = nm->cursor;
-    long n = net_capture(&nm->cursor, batch, NET_CAPTURE_BATCH);
+    long n         = net_capture(&nm->cursor, batch, NET_CAPTURE_BATCH);
     if (n <= 0)
       break;
     if (batch[0].seq > asked)
@@ -253,18 +256,20 @@ static void drain_capture(struct netmon *nm) {
 
 /* ---------------- drawing ---------------------------------------------- */
 
-static void draw_header(struct gfx_surface *s, struct ui_context *ui,
-                        struct gfx_rect r, const struct net_stats *st,
-                        const struct netmon *nm) {
+static void draw_header(struct gfx_surface *s, struct ui_context *ui, struct gfx_rect r,
+                        const struct net_stats *st, const struct netmon *nm) {
   ui_panel(ui, r);
   struct gfx_rect in = gfx_rect_inset(r, 6);
   char line[128];
 
   if (!st->present) {
     gfx_text(s, in.x, in.y, "no NIC bound", COL_BAD, 1);
-    gfx_text(s, in.x, in.y + ROW_H * 2,
+    gfx_text(s,
+             in.x,
+             in.y + ROW_H * 2,
              "e1000 never probed - check the PCI scan on the serial log",
-             COL_DIM, 1);
+             COL_DIM,
+             1);
     return;
   }
 
@@ -273,41 +278,45 @@ static void draw_header(struct gfx_surface *s, struct ui_context *ui,
   fmt_ip(ip, sizeof(ip), st->ipv4);
 
   gfx_text(s, in.x, in.y, "e1000", COL_TEXT, 1);
-  gfx_text(s, in.x + 56, in.y, st->link_up ? "link up" : "link down",
-           st->link_up ? COL_OK : COL_BAD, 1);
+  gfx_text(
+      s, in.x + 56, in.y, st->link_up ? "link up" : "link down", st->link_up ? COL_OK : COL_BAD, 1);
   snprintf(line, sizeof(line), "%u Mb/s", st->speed_mbps);
   gfx_text(s, in.x + 144, in.y, line, COL_DIM, 1);
   snprintf(line, sizeof(line), "MAC %s    IP %s", mac, ip);
   gfx_text(s, in.x + 232, in.y, line, COL_DIM, 1);
 
-  snprintf(line, sizeof(line), "RX %llu frames  %llu bytes",
-           (unsigned long long)st->rx_frames, (unsigned long long)st->rx_bytes);
+  snprintf(line,
+           sizeof(line),
+           "RX %llu frames  %llu bytes",
+           (unsigned long long)st->rx_frames,
+           (unsigned long long)st->rx_bytes);
   gfx_text(s, in.x, in.y + ROW_H * 2, line, COL_RX, 1);
 
-  snprintf(line, sizeof(line), "TX %llu frames  %llu bytes",
-           (unsigned long long)st->tx_frames, (unsigned long long)st->tx_bytes);
+  snprintf(line,
+           sizeof(line),
+           "TX %llu frames  %llu bytes",
+           (unsigned long long)st->tx_frames,
+           (unsigned long long)st->tx_bytes);
   gfx_text(s, in.x + 288, in.y + ROW_H * 2, line, COL_TX, 1);
 
-  snprintf(line, sizeof(line), "held %d%s", nm->count,
-           nm->paused ? "   PAUSED" : "");
-  gfx_text(s, in.x + 576, in.y + ROW_H * 2, line, nm->paused ? COL_TX : COL_DIM,
-           1);
+  snprintf(line, sizeof(line), "held %d%s", nm->count, nm->paused ? "   PAUSED" : "");
+  gfx_text(s, in.x + 576, in.y + ROW_H * 2, line, nm->paused ? COL_TX : COL_DIM, 1);
 
   if (nm->missed) {
-    snprintf(line, sizeof(line), "%llu frames lost to ring overwrite",
-             (unsigned long long)nm->missed);
+    snprintf(
+        line, sizeof(line), "%llu frames lost to ring overwrite", (unsigned long long)nm->missed);
     gfx_text(s, in.x, in.y + ROW_H * 3, line, COL_BAD, 1);
   }
 }
 
-static void draw_list(struct gfx_surface *s, struct ui_context *ui,
-                      struct gfx_rect r, struct netmon *nm) {
+static void draw_list(struct gfx_surface *s, struct ui_context *ui, struct gfx_rect r,
+                      struct netmon *nm) {
   ui_well(ui, r);
   struct gfx_rect in = gfx_rect_inset(r, 4);
   gfx_fill(s, in, COL_BG);
 
   struct gfx_rect prev = gfx_clip_push(s, in);
-  int rows = in.h / ROW_H;
+  int rows             = in.h / ROW_H;
 
   gfx_text(s, in.x + 4, in.y, "SEQ      DIR  LEN    SUMMARY", COL_DIM, 1);
 
@@ -317,29 +326,32 @@ static void draw_list(struct gfx_surface *s, struct ui_context *ui,
       break;
 
     const struct net_frame *f = frame_at(nm, index);
-    int y = in.y + (i + 1) * ROW_H;
+    int y                     = in.y + (i + 1) * ROW_H;
 
     if (index == nm->selected)
       gfx_fill(s, gfx_rect_make(in.x, y - 1, in.w, ROW_H), COL_SEL);
 
     char line[168], summary[120];
     summarize(f, summary, sizeof(summary));
-    snprintf(line, sizeof(line), "%-8llu %s   %-6u %s",
+    snprintf(line,
+             sizeof(line),
+             "%-8llu %s   %-6u %s",
              (unsigned long long)f->seq,
-             f->direction == NET_DIR_TX ? "TX" : "RX", f->length, summary);
-    gfx_text(s, in.x + 4, y, line, f->direction == NET_DIR_TX ? COL_TX : COL_RX,
-             1);
+             f->direction == NET_DIR_TX ? "TX" : "RX",
+             f->length,
+             summary);
+    gfx_text(s, in.x + 4, y, line, f->direction == NET_DIR_TX ? COL_TX : COL_RX, 1);
   }
 
   if (nm->count == 0)
-    gfx_text(s, in.x + 4, in.y + ROW_H * 2,
-             "nothing captured yet - try: ping 10.0.2.30", COL_DIM, 1);
+    gfx_text(
+        s, in.x + 4, in.y + ROW_H * 2, "nothing captured yet - try: ping 10.0.2.30", COL_DIM, 1);
 
   gfx_clip_set(s, prev);
 }
 
-static void draw_hex(struct gfx_surface *s, struct ui_context *ui,
-                     struct gfx_rect r, struct netmon *nm) {
+static void draw_hex(struct gfx_surface *s, struct ui_context *ui, struct gfx_rect r,
+                     struct netmon *nm) {
   ui_well(ui, r);
   struct gfx_rect in = gfx_rect_inset(r, 4);
   gfx_fill(s, in, COL_BG);
@@ -350,7 +362,7 @@ static void draw_hex(struct gfx_surface *s, struct ui_context *ui,
   }
 
   const struct net_frame *f = frame_at(nm, nm->selected);
-  struct gfx_rect prev = gfx_clip_push(s, in);
+  struct gfx_rect prev      = gfx_clip_push(s, in);
 
   for (int row = 0; row < HEX_ROWS; row++) {
     uint32_t base = (uint32_t)row * HEX_COLS;
@@ -362,7 +374,7 @@ static void draw_hex(struct gfx_surface *s, struct ui_context *ui,
 
     for (int col = 0; col < HEX_COLS; col++) {
       uint32_t off = base + (uint32_t)col;
-      size_t room = sizeof(line) - (size_t)at;
+      size_t room  = sizeof(line) - (size_t)at;
       if (off < f->captured)
         at += snprintf(line + at, room, "%02x ", f->data[off]);
       else
@@ -374,10 +386,10 @@ static void draw_hex(struct gfx_surface *s, struct ui_context *ui,
     at += snprintf(line + at, sizeof(line) - (size_t)at, " |");
     for (int col = 0; col < HEX_COLS; col++) {
       uint32_t off = base + (uint32_t)col;
-      char c = ' ';
+      char c       = ' ';
       if (off < f->captured) {
         uint8_t b = f->data[off];
-        c = (b >= 0x20 && b < 0x7F) ? (char)b : '.';
+        c         = (b >= 0x20 && b < 0x7F) ? (char)b : '.';
       }
       if ((size_t)at + 2 < sizeof(line))
         line[at++] = c;
@@ -391,8 +403,7 @@ static void draw_hex(struct gfx_surface *s, struct ui_context *ui,
 
   if (f->captured < f->length) {
     char note[80];
-    snprintf(note, sizeof(note), "%u of %u bytes captured", f->captured,
-             f->length);
+    snprintf(note, sizeof(note), "%u of %u bytes captured", f->captured, f->length);
     gfx_text(s, in.x + in.w - 200, in.y, note, COL_DIM, 1);
   }
 
@@ -404,7 +415,7 @@ static void draw_hex(struct gfx_surface *s, struct ui_context *ui,
 static void clamp_view(struct netmon *nm, int rows) {
   if (nm->count == 0) {
     nm->selected = -1;
-    nm->scroll = 0;
+    nm->scroll   = 0;
     return;
   }
   if (nm->selected < 0)
@@ -456,22 +467,22 @@ static int netmon_event(struct app *a, const struct wm_event *ev, void *ctx) {
       break;
     case KEY_HOME:
       nm->selected = 0;
-      nm->follow = 0;
+      nm->follow   = 0;
       break;
     case KEY_END:
       nm->selected = nm->count - 1;
-      nm->follow = 1;
+      nm->follow   = 1;
       break;
     case KEY_P:
       nm->paused = !nm->paused;
       break;
     case KEY_C:
-      nm->count = 0;
-      nm->first = 0;
+      nm->count    = 0;
+      nm->first    = 0;
       nm->selected = -1;
-      nm->scroll = 0;
-      nm->missed = 0;
-      nm->follow = 1;
+      nm->scroll   = 0;
+      nm->missed   = 0;
+      nm->follow   = 1;
       break;
     default:
       break;
@@ -496,7 +507,7 @@ static int netmon_idle(struct app *a, void *ctx) {
 }
 
 static void netmon_draw(struct app *a, void *ctx) {
-  struct netmon *nm = ctx;
+  struct netmon *nm     = ctx;
   struct gfx_surface *s = &a->surface;
 
   if (nm->paused)
@@ -512,15 +523,13 @@ static void netmon_draw(struct app *a, void *ctx) {
   net_stats(&st);
 
   int header_h = ROW_H * 4 + 12;
-  int hex_h = HEX_ROWS * ROW_H + 12;
+  int hex_h    = HEX_ROWS * ROW_H + 12;
 
-  struct gfx_rect header =
-      gfx_rect_make(MARGIN, MARGIN, s->w - MARGIN * 2, header_h);
-  int list_y = header.y + header.h + MARGIN;
-  int hex_y = s->h - MARGIN - hex_h;
-  struct gfx_rect list = gfx_rect_make(MARGIN, list_y, s->w - MARGIN * 2,
-                                       hex_y - MARGIN - list_y);
-  struct gfx_rect hex = gfx_rect_make(MARGIN, hex_y, s->w - MARGIN * 2, hex_h);
+  struct gfx_rect header = gfx_rect_make(MARGIN, MARGIN, s->w - MARGIN * 2, header_h);
+  int list_y             = header.y + header.h + MARGIN;
+  int hex_y              = s->h - MARGIN - hex_h;
+  struct gfx_rect list = gfx_rect_make(MARGIN, list_y, s->w - MARGIN * 2, hex_y - MARGIN - list_y);
+  struct gfx_rect hex  = gfx_rect_make(MARGIN, hex_y, s->w - MARGIN * 2, hex_h);
 
   nm->list_rows = (gfx_rect_inset(list, 4).h / ROW_H) - 1;
   if (nm->list_rows < 1)
@@ -540,19 +549,18 @@ int main(void) {
    * user stack crt1 hands out. */
   static struct netmon nm;
   nm.selected = -1;
-  nm.follow = 1;
+  nm.follow   = 1;
 
   if (app_open_ex(&nm.app, WIN_W, WIN_H, "netmon", WM_CREATE_STATUSBAR) != 0) {
     printf("netmon: app_open failed\n");
     return 1;
   }
-  wm_window_set_status(nm.app.window.handle,
-                       "ESC quit  UP/DN PGUP/PGDN  P pause  C clear");
+  wm_window_set_status(nm.app.window.handle, "ESC quit  UP/DN PGUP/PGDN  P pause  C clear");
 
   static const struct app_callbacks cb = {
       .event = netmon_event,
-      .draw = netmon_draw,
-      .idle = netmon_idle,
+      .draw  = netmon_draw,
+      .idle  = netmon_idle,
   };
   return app_run(&nm.app, &cb, &nm);
 }

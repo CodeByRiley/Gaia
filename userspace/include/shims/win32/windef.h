@@ -14,8 +14,8 @@ typedef uint16_t WORD, WCHAR, ATOM;
 typedef uint8_t BYTE;
 typedef uint64_t ULONG_PTR, DWORD_PTR, SIZE_T, WPARAM;
 typedef int64_t LONG_PTR, LPARAM, LRESULT;
-typedef void *HANDLE, *HMODULE, *HINSTANCE, *HWND, *HDC, *HBRUSH, *HGDIOBJ,
-    *HICON, *HCURSOR, *HMENU, *LPVOID;
+typedef void *HANDLE, *HMODULE, *HINSTANCE, *HWND, *HDC, *HBRUSH, *HGDIOBJ, *HICON, *HCURSOR,
+    *HMENU, *LPVOID;
 typedef const void *LPCVOID;
 typedef char CHAR, *LPSTR;
 typedef const char *LPCSTR;
@@ -41,6 +41,5 @@ typedef struct {
 } FILETIME;
 typedef void(WINAPI *FARPROC)(void);
 #define INVALID_HANDLE_VALUE ((HANDLE)(intptr_t)-1)
-#define RGB(r, g, b)                                                           \
-  ((COLORREF)((BYTE)(r) | ((WORD)(BYTE)(g) << 8) | ((DWORD)(BYTE)(b) << 16)))
+#define RGB(r, g, b) ((COLORREF)((BYTE)(r) | ((WORD)(BYTE)(g) << 8) | ((DWORD)(BYTE)(b) << 16)))
 #endif

@@ -10,47 +10,44 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include <utilities/types.h>
-#include <stdint.h>
-#include <stdarg.h>
 #include <devices/serial.h>
 #include <display/print.h>
-#include <utilities/types.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include <utilities/printf.h>
-
-
+#include <utilities/types.h>
 
 /* Severity. Filtering uses >= comparison: callers can set a floor and
  * lower-severity events get dropped. */
 enum log_level {
-    LOG_DEBUG = 0,
-    LOG_INFO  = 1,
-    LOG_WARN  = 2,
-    LOG_ERROR = 3,
-    LOG_FATAL = 4,
+  LOG_DEBUG = 0,
+  LOG_INFO  = 1,
+  LOG_WARN  = 2,
+  LOG_ERROR = 3,
+  LOG_FATAL = 4,
 };
 
 /* Subsystem tag, used as a per-source prefix on serial output. */
 enum log_type {
-    KERNEL  = 0,
-    SYSTEM  = 1,
-    USER    = 2,
-    FILESYS = 3,
+  KERNEL  = 0,
+  SYSTEM  = 1,
+  USER    = 2,
+  FILESYS = 3,
 };
 
 /* Generic log record. Only one of the optional payload fields is meant
  * to be populated at a time; the `has_*` flags pick which one renders. */
 struct log_entry {
-    char           message[256];
-    u64       timestamp;
-    enum log_level level;
-    enum log_type  type;
-    u8        has_string;
-    u8        has_hex;
-    u8        has_int;
-    u64       hex_value;
-    const char    *string_value;
-    int64          int_value;
+  char message[256];
+  u64 timestamp;
+  enum log_level level;
+  enum log_type type;
+  u8 has_string;
+  u8 has_hex;
+  u8 has_int;
+  u64 hex_value;
+  const char *string_value;
+  int64 int_value;
 };
 
 /* Plain message , no payload. */
@@ -62,16 +59,12 @@ void log_write_entry(struct log_entry *entry);
 /* CPU exception logger , pretty-prints the IDT vector, name, error code,
  * and faulting RIP. Page faults are serial-only because framebuffer output
  * may itself be the failing mapping. */
-void log_write_exception(u64 int_num, const char *name,
-                         u64 err_code, u64 rip);
+void log_write_exception(u64 int_num, const char *name, u64 err_code, u64 rip);
 
 /* Convenience wrappers that produce a single-payload entry. */
-void log_write_hex(const char *message, u64 value,
-                   u8 raw_type, u8 raw_level);
-void log_write_int(const char *message, int64_t value,
-                   u8 raw_type, u8 raw_level);
-void log_write_string(const char *message, const char *val,
-                      u8 raw_type, u8 raw_level);
+void log_write_hex(const char *message, u64 value, u8 raw_type, u8 raw_level);
+void log_write_int(const char *message, int64_t value, u8 raw_type, u8 raw_level);
+void log_write_string(const char *message, const char *val, u8 raw_type, u8 raw_level);
 
 /* printf-style logging */
 void log_write_fmt(u8 raw_type, u8 raw_level, const char *fmt, ...);

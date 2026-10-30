@@ -20,9 +20,9 @@
 #ifndef NET_ETH_H
 #define NET_ETH_H
 
-#include <utilities/types.h>
 #include <net/inet.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 #define ETH_ALEN 6
 #define ETH_HDR_LEN 14
@@ -46,11 +46,9 @@ void eth_input(const u8 *frame, u16 len);
 
 /* Fill in the header of a frame whose payload already sits at
  * frame + ETH_HDR_LEN, then transmit. Returns 0 or -1. */
-int eth_output_framed(u8 *frame, const u8 dst[ETH_ALEN],
-                      u16 type, u16 payload_len);
+int eth_output_framed(u8 *frame, const u8 dst[ETH_ALEN], u16 type, u16 payload_len);
 
 /* Copy `payload` behind a fresh header and transmit. Returns 0 or -1. */
-int eth_output(const u8 dst[ETH_ALEN], u16 type, const void *payload,
-               u16 payload_len);
+int eth_output(const u8 dst[ETH_ALEN], u16 type, const void *payload, u16 payload_len);
 
 #endif /* NET_ETH_H */

@@ -36,8 +36,8 @@
 /* For declaring aliases or preventing strict aliasing optimisations */
 #define MAY_ALIAS __attribute__((may_alias))
 
-#define PRINTF_FORMAT(format_index, first_arg_index) \
-    __attribute__((format(printf, format_index, first_arg_index)))
+#define PRINTF_FORMAT(format_index, first_arg_index)                                               \
+  __attribute__((format(printf, format_index, first_arg_index)))
 
 /* --- Linux-style short names --------------------------------------- */
 typedef unsigned char uchar;
@@ -99,7 +99,7 @@ typedef u8 byte;
 /* --- Lowercase bool alias used by some legacy code paths ----------- */
 typedef enum boolean {
   FALSE = 0,
-  TRUE = 1,
+  TRUE  = 1,
 } boolean;
 
 typedef void (*func_ptr)(void);
@@ -117,7 +117,6 @@ typedef struct M4_i {
 typedef struct M4_f {
   float elements[4][4];
 } M4_f;
-
 
 /* --- Common Helper Macros ------------------------------------------ */
 #ifndef NULL
@@ -138,7 +137,6 @@ typedef struct M4_f {
 #define OFFSET_OF(type, member) __builtin_offsetof(type, member)
 
 /* Container_of macro (crucial for intrusive linked lists in kernels) */
-#define CONTAINER_OF(ptr, type, member)                                        \
-  ((type *)((char *)(ptr) - OFFSET_OF(type, member)))
+#define CONTAINER_OF(ptr, type, member) ((type *)((char *)(ptr) - OFFSET_OF(type, member)))
 
 #endif

@@ -68,12 +68,12 @@ static void memory_init(u64 mb2_addr) {
 
 static void acpi_and_smp_init(u64 mb2_addr) {
   u8 bsp_lapic_id = 0;
-  int cpu_count = 1;
+  int cpu_count   = 1;
 
   if (acpi_init(mb2_addr) == 0) {
     lapic_init(acpi_lapic_phys());
     bsp_lapic_id = (u8)lapic_id();
-    cpu_count = acpi_cpu_count();
+    cpu_count    = acpi_cpu_count();
   } else {
     log_write("ACPI: SMP unavailable, staying UP", KERNEL, LOG_INFO);
   }
@@ -191,13 +191,11 @@ static void late_init(void) {
  * can exit without consequence. */
 static void init_task_entry(void) {
   char *heimdall_argv[] = {(char *)"heimdall", NULL};
-  long heimdall_pid =
-      process_spawn_async("/system/bin/heimdall.elf", heimdall_argv);
+  long heimdall_pid     = process_spawn_async("/system/bin/heimdall.elf", heimdall_argv);
   if (heimdall_pid < 0)
     log_write("heimdall: launch failed , TTY-only mode", USER, LOG_INFO);
   else
-    log_write_hex("heimdall: launched pid: ", (u64)heimdall_pid, USER,
-                  LOG_INFO);
+    log_write_hex("heimdall: launched pid: ", (u64)heimdall_pid, USER, LOG_INFO);
 
   for (int i = 0; i < WM_REGISTER_GRACE_TICKS && msg_input_owner() == 0; i++)
     task_sleep_ticks(1);
@@ -205,7 +203,7 @@ static void init_task_entry(void) {
   for (;;) {
     if (msg_input_owner() == 0) {
       char *sh_argv[] = {(char *)"sh", NULL};
-      long code = process_exec("/system/bin/sh.elf", sh_argv);
+      long code       = process_exec("/system/bin/sh.elf", sh_argv);
       log_write_hex("fallback shell exited code =", (u64)code, USER, LOG_INFO);
     }
     task_sleep_ticks(50);

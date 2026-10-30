@@ -27,8 +27,8 @@
 #include <display/framebuffer.h>
 #include <drivers/sound/sb16.h>
 #include <fs/vfs/vfs.h>
-#include <loader/process.h>
 #include <loader/pe.h>
+#include <loader/process.h>
 #include <memory/heap.h>
 #include <memory/hhdm.h>
 #include <msg/msg.h>
@@ -36,9 +36,9 @@
 #include <net/ksocket.h>
 #include <sched/sched.h>
 #include <sched/signal.h>
+#include <stdint.h>
 #include <sync/waitqueue.h>
 #include <utilities/errno.h>
-#include <stdint.h>
 #include <utilities/log.h>
 #include <utilities/panic.h>
 #include <utilities/string.h>
@@ -83,16 +83,13 @@ void task_inherit_cwd(struct task *child, struct task *parent) {
   if (child == NULL || child->files == NULL)
     return;
 
-  if (parent == NULL || parent->files == NULL ||
-      parent->files->cwd[0] == '\0') {
+  if (parent == NULL || parent->files == NULL || parent->files->cwd[0] == '\0') {
     child->files->cwd[0] = '/';
     child->files->cwd[1] = '\0';
     return;
   }
 
-  for (i = 0;
-       i + 1 < sizeof(child->files->cwd) && parent->files->cwd[i] != '\0';
-       i++) {
+  for (i = 0; i + 1 < sizeof(child->files->cwd) && parent->files->cwd[i] != '\0'; i++) {
     child->files->cwd[i] = parent->files->cwd[i];
   }
 
@@ -105,18 +102,15 @@ void task_inherit_tty(struct task *child, struct task *parent) {
   child->tty = parent ? parent->tty : 0;
 }
 
-extern void context_switch(u64 *old_rsp_ptr, u64 new_rsp, u64 new_cr3,
-                           void *old_fxstate, void *new_fxstate);
-extern void context_enter(u64 new_rsp, u64 new_cr3, void *new_fxstate)
-    NORETURN;
+extern void context_switch(u64 *old_rsp_ptr, u64 new_rsp, u64 new_cr3, void *old_fxstate,
+                           void *new_fxstate);
+extern void context_enter(u64 new_rsp, u64 new_cr3, void *new_fxstate) NORETURN;
 
 /* Capture the CPU's current x87/SSE state into `buf`. Match the FXSAVE64
  * layout restored by context_switch, including the full x87 pointers.
  * A fresh task's first context_switch restores a valid snapshot rather
  * than relying on zeroed task storage for its FPU environment. */
-static void fxstate_init(void *buf) {
-  __asm__ volatile("fxsave64 (%0)" ::"r"(buf) : "memory");
-}
+static void fxstate_init(void *buf) { __asm__ volatile("fxsave64 (%0)" ::"r"(buf) : "memory"); }
 extern u64 *kernel_pml4;
 
 /* Free a process PML4 , defined in loader/process.c. */
@@ -137,7 +131,7 @@ static u64 sched_rdmsr(u32 msr) {
 }
 
 static struct task tasks[MAX_TASKS];
-static int next_pid = 1;
+static int next_pid         = 1;
 static struct task *current = 0;
 /* One round-robin queue per priority level; see SCHED_PRIO_* in sched.h. */
 static struct task *ready_head[SCHED_PRIO_LEVELS] = {0};
@@ -180,12 +174,11 @@ static void exit_record_add(int pid, int parent_pid, long code) {
       slot = &exit_records[i];
   }
   if (slot->pid != 0)
-    log_write_hex("sched: exit records full, dropped pid", (u64)slot->pid,
-                  KERNEL, LOG_WARN);
-  slot->pid = pid;
+    log_write_hex("sched: exit records full, dropped pid", (u64)slot->pid, KERNEL, LOG_WARN);
+  slot->pid        = pid;
   slot->parent_pid = parent_pid;
-  slot->code = code;
-  slot->seq = ++exit_record_seq;
+  slot->code       = code;
+  slot->seq        = ++exit_record_seq;
 }
 
 /* A parent that exits can never collect its children's codes. */
@@ -218,7 +211,7 @@ static int need_resched = 0;
  * reschedule, so it satisfies any pending note and restarts slice accounting
  * for the incoming task. */
 static void sched_reschedule_done(void) {
-  slice_ticks = 0;
+  slice_ticks  = 0;
   need_resched = 0;
 }
 
@@ -288,8 +281,7 @@ static int task_state_alloc(struct task *t, int with_vm) {
   if (!t->input)
     goto fail;
   memset(t->input, 0, sizeof(*t->input));
-  t->input->ring =
-      (struct msg *)kmalloc(sizeof(struct msg) * INPUT_RING_SIZE_LOCAL);
+  t->input->ring = (struct msg *)kmalloc(sizeof(struct msg) * INPUT_RING_SIZE_LOCAL);
   if (!t->input->ring)
     goto fail;
   memset(t->input->ring, 0, sizeof(struct msg) * INPUT_RING_SIZE_LOCAL);
@@ -298,8 +290,7 @@ static int task_state_alloc(struct task *t, int with_vm) {
   if (!t->ipc)
     goto fail;
   memset(t->ipc, 0, sizeof(*t->ipc));
-  t->ipc->ring =
-      (struct ipc_msg *)kmalloc(sizeof(struct ipc_msg) * IPC_RING_SIZE_LOCAL);
+  t->ipc->ring = (struct ipc_msg *)kmalloc(sizeof(struct ipc_msg) * IPC_RING_SIZE_LOCAL);
   if (!t->ipc->ring)
     goto fail;
   memset(t->ipc->ring, 0, sizeof(struct ipc_msg) * IPC_RING_SIZE_LOCAL);
@@ -334,10 +325,10 @@ void task_fd_clear(struct task_fd *slot) {
     kfree(slot->dir_path);
     slot->dir_path = 0;
   }
-  slot->type = TASK_FD_UNUSED;
-  slot->object = 0;
+  slot->type      = TASK_FD_UNUSED;
+  slot->object    = 0;
   slot->dir_index = 0;
-  slot->flags = 0;
+  slot->flags     = 0;
 }
 
 void task_fd_release(struct task_fd *slot) {
@@ -375,8 +366,7 @@ void task_fd_release(struct task_fd *slot) {
   task_fd_clear(slot);
 }
 
-int task_fd_dup(struct task_fd *dst, const struct task_fd *src,
-                int src_is_console) {
+int task_fd_dup(struct task_fd *dst, const struct task_fd *src, int src_is_console) {
   if (!dst || !src)
     return -1;
   task_fd_clear(dst);
@@ -386,8 +376,7 @@ int task_fd_dup(struct task_fd *dst, const struct task_fd *src,
     return 0;
   }
 
-  if (src->type == TASK_FD_DIRECTORY &&
-      task_fd_set_dir_path(dst, src->dir_path) != 0)
+  if (src->type == TASK_FD_DIRECTORY && task_fd_set_dir_path(dst, src->dir_path) != 0)
     return -1;
 
   switch (src->type) {
@@ -408,9 +397,9 @@ int task_fd_dup(struct task_fd *dst, const struct task_fd *src,
   }
 
   /* The copy shares the open file, so it shares its status flags too. */
-  dst->type = src->type;
-  dst->object = src->object;
-  dst->flags = src->flags;
+  dst->type      = src->type;
+  dst->object    = src->object;
+  dst->flags     = src->flags;
   dst->dir_index = src->dir_index;
   return 0;
 }
@@ -494,7 +483,7 @@ static void ready_push(struct task *t) {
     ready_head[p] = ready_tail[p] = t;
   else {
     ready_tail[p]->next = t;
-    ready_tail[p] = t;
+    ready_tail[p]       = t;
   }
 
   /* Every wake path funnels through here , sleep expiry, IPC unblock, futex,
@@ -561,7 +550,7 @@ static struct task *ready_pop(void) {
   else if (low_starve < SCHED_LOW_FLOOR)
     low_starve++;
 
-  struct task *t = ready_head[level];
+  struct task *t    = ready_head[level];
   ready_head[level] = t->next;
   if (!ready_head[level])
     ready_tail[level] = 0;
@@ -599,7 +588,7 @@ int sched_set_priority(struct task *t, int prio) {
     /* Only re-queue if it is actually on a ready list; a running, blocked
      * or sleeping task just picks the new level up next time it is pushed. */
     int queued = (ready_remove(t) == 0);
-    t->prio = prio;
+    t->prio    = prio;
     if (queued)
       ready_push(t);
   }
@@ -647,13 +636,13 @@ static u64 build_initial_frame(void *kstack_base, void (*trampoline)(void)) {
    * the trampoline still has to look like a normal SysV C callee: rsp % 16
    * must be 8 on function entry. */
   u64 *sp = (u64 *)(kstack_aligned_top(kstack_base) - 8);
-  *--sp = (u64)trampoline; /* ret addr */
-  *--sp = 0;               /* rbx */
-  *--sp = 0;               /* rbp */
-  *--sp = 0;               /* r12 */
-  *--sp = 0;               /* r13 */
-  *--sp = 0;               /* r14 */
-  *--sp = 0;               /* r15 */
+  *--sp   = (u64)trampoline; /* ret addr */
+  *--sp   = 0;               /* rbx */
+  *--sp   = 0;               /* rbp */
+  *--sp   = 0;               /* r12 */
+  *--sp   = 0;               /* r13 */
+  *--sp   = 0;               /* r14 */
+  *--sp   = 0;               /* r15 */
   return (u64)sp;
 }
 
@@ -662,14 +651,14 @@ void sched_init(void) {
   struct cpu_local *cpu = percpu_this();
   /* Bootstrap: caller of sched_init becomes init task. No fake frame
    * needed , its rsp gets captured at the first context_switch. */
-  struct task *t = alloc_slot();
-  t->pid = next_pid++;
-  t->state = TASK_RUNNING;
-  t->prio = SCHED_PRIO_NORMAL;
-  t->cr3 = virt_to_phys(kernel_pml4);
-  t->kstack = 0;
+  struct task *t   = alloc_slot();
+  t->pid           = next_pid++;
+  t->state         = TASK_RUNNING;
+  t->prio          = SCHED_PRIO_NORMAL;
+  t->cr3           = virt_to_phys(kernel_pml4);
+  t->kstack        = 0;
   t->kthread_entry = 0;
-  t->vm = 0;
+  t->vm            = 0;
   /* syscall_init_this_cpu staged the BSP's bootstrap entry stack before the
    * scheduler came online. Keep it in the init task so every task has a
    * complete entry-stack contract even though init itself is kernel-only. */
@@ -679,7 +668,7 @@ void sched_init(void) {
   task_set_cwd_root(t);
   fxstate_init(t->context->fxstate);
   task_set_name(t, "init");
-  current = t;
+  current      = t;
   cpu->current = t;
   log_write("sched: init task pid=1 ready", KERNEL, LOG_INFO);
 
@@ -690,7 +679,7 @@ void sched_init(void) {
   if (idle) {
     task_set_name(idle, "idle");
     ready_remove(idle);
-    idle_task = idle;
+    idle_task      = idle;
     cpu->idle_task = idle;
   }
   log_write("sched: idle task spawned", KERNEL, LOG_INFO);
@@ -733,10 +722,10 @@ int sched_snapshot(struct task_snap *out, int max) {
     struct task *t = &tasks[i];
     if (t->pid == 0)
       continue;
-    out[n].pid = t->pid;
+    out[n].pid        = t->pid;
     out[n].parent_pid = t->parent_pid;
-    out[n].state = (int)t->state;
-    out[n].ticks_run = t->ticks_run;
+    out[n].state      = (int)t->state;
+    out[n].ticks_run  = t->ticks_run;
     for (usize k = 0; k < sizeof(out[n].name); k++) {
       out[n].name[k] = t->name[k];
     }
@@ -768,20 +757,20 @@ struct task *task_spawn(void (*entry)(void)) {
     return 0;
   }
 
-  u64 stack_top = kstack_aligned_top(stack_base);
-  t->saved_rsp = build_initial_frame(stack_base, kthread_trampoline);
-  t->cr3 = virt_to_phys(kernel_pml4);
+  u64 stack_top         = kstack_aligned_top(stack_base);
+  t->saved_rsp          = build_initial_frame(stack_base, kthread_trampoline);
+  t->cr3                = virt_to_phys(kernel_pml4);
   t->syscall_kstack_top = stack_top;
-  t->state = TASK_READY;
-  t->prio = SCHED_PRIO_NORMAL; /* callers raise it explicitly if needed */
-  t->pid = next_pid++;
-  t->parent_pid = 0;
-  t->waiting_for_pid = 0;
-  t->exit_code = 0;
-  t->kstack = stack_base;
-  t->kthread_entry = entry;
-  t->vm = 0; /* kernel thread: runs on the kernel address space */
-  t->next = 0;
+  t->state              = TASK_READY;
+  t->prio               = SCHED_PRIO_NORMAL; /* callers raise it explicitly if needed */
+  t->pid                = next_pid++;
+  t->parent_pid         = 0;
+  t->waiting_for_pid    = 0;
+  t->exit_code          = 0;
+  t->kstack             = stack_base;
+  t->kthread_entry      = entry;
+  t->vm                 = 0; /* kernel thread: runs on the kernel address space */
+  t->next               = 0;
 
   /* State before cwd: the working directory lives in t->files now, so
    * setting it first would write into a table that does not exist yet. */
@@ -797,8 +786,7 @@ struct task *task_spawn(void (*entry)(void)) {
   return t;
 }
 
-struct task *task_spawn_user(u64 *user_pml4, u64 entry, u64 user_rsp,
-                             int parent_pid) {
+struct task *task_spawn_user(u64 *user_pml4, u64 entry, u64 user_rsp, int parent_pid) {
   struct task *t = alloc_slot();
   if (!t) {
     log_write("sched: task table full", KERNEL, LOG_ERROR);
@@ -811,19 +799,19 @@ struct task *task_spawn_user(u64 *user_pml4, u64 entry, u64 user_rsp,
     return 0;
   }
 
-  u64 stack_top = kstack_aligned_top(stack_base);
-  t->saved_rsp = build_initial_frame(stack_base, user_task_trampoline);
-  t->cr3 = virt_to_phys(user_pml4);
+  u64 stack_top         = kstack_aligned_top(stack_base);
+  t->saved_rsp          = build_initial_frame(stack_base, user_task_trampoline);
+  t->cr3                = virt_to_phys(user_pml4);
   t->syscall_kstack_top = stack_top;
-  t->state = TASK_READY;
-  t->prio = SCHED_PRIO_NORMAL;
-  t->pid = next_pid++;
-  t->parent_pid = parent_pid;
-  t->waiting_for_pid = 0;
-  t->exit_code = 0;
-  t->kstack = stack_base;
-  t->kthread_entry = 0;
-  t->next = 0;
+  t->state              = TASK_READY;
+  t->prio               = SCHED_PRIO_NORMAL;
+  t->pid                = next_pid++;
+  t->parent_pid         = parent_pid;
+  t->waiting_for_pid    = 0;
+  t->exit_code          = 0;
+  t->kstack             = stack_base;
+  t->kthread_entry      = 0;
+  t->next               = 0;
 
   if (task_state_alloc(t, 1) != 0) {
     kfree(stack_base);
@@ -831,11 +819,11 @@ struct task *task_spawn_user(u64 *user_pml4, u64 entry, u64 user_rsp,
     return 0;
   }
 
-  t->context->user_entry = entry;
+  t->context->user_entry       = entry;
   t->context->user_rsp_initial = user_rsp;
-  t->context->fs_base = 0;
-  t->vm->user_pml4 = user_pml4;
-  t->vm->pml4_ref_count = (int *)kmalloc(sizeof(int));
+  t->context->fs_base          = 0;
+  t->vm->user_pml4             = user_pml4;
+  t->vm->pml4_ref_count        = (int *)kmalloc(sizeof(int));
   if (!t->vm->pml4_ref_count) {
     task_state_free(t);
     kfree(stack_base);
@@ -868,15 +856,15 @@ struct task *task_reserve_user(int parent_pid) {
   }
 
   memset(t, 0, sizeof(*t));
-  u64 stack_top = kstack_aligned_top(stack_base);
-  t->saved_rsp = build_initial_frame(stack_base, user_task_trampoline);
-  t->cr3 = virt_to_phys(kernel_pml4);
-  t->syscall_kstack_top = stack_top;
-  t->state = TASK_LOADING;
-  t->prio = SCHED_PRIO_NORMAL;
-  t->pid = next_pid++;
-  t->parent_pid = parent_pid;
-  t->kstack = stack_base;
+  u64 stack_top              = kstack_aligned_top(stack_base);
+  t->saved_rsp               = build_initial_frame(stack_base, user_task_trampoline);
+  t->cr3                     = virt_to_phys(kernel_pml4);
+  t->syscall_kstack_top      = stack_top;
+  t->state                   = TASK_LOADING;
+  t->prio                    = SCHED_PRIO_NORMAL;
+  t->pid                     = next_pid++;
+  t->parent_pid              = parent_pid;
+  t->kstack                  = stack_base;
   t->input_owner_restore_pid = -1;
 
   /* The address space arrives later, in task_activate_reserved_user, but the
@@ -895,8 +883,7 @@ struct task *task_reserve_user(int parent_pid) {
   return t;
 }
 
-int task_activate_reserved_user(struct task *t, u64 *user_pml4, u64 entry,
-                                u64 user_rsp) {
+int task_activate_reserved_user(struct task *t, u64 *user_pml4, u64 entry, u64 user_rsp) {
   if (!t || t->state != TASK_LOADING || !user_pml4 || !entry)
     return -1;
   if (!t->vm || !t->context)
@@ -907,12 +894,12 @@ int task_activate_reserved_user(struct task *t, u64 *user_pml4, u64 entry,
     return -1;
   *refs = 1;
 
-  t->cr3 = virt_to_phys(user_pml4);
-  t->vm->user_pml4 = user_pml4;
-  t->vm->pml4_ref_count = refs;
-  t->context->user_entry = entry;
+  t->cr3                       = virt_to_phys(user_pml4);
+  t->vm->user_pml4             = user_pml4;
+  t->vm->pml4_ref_count        = refs;
+  t->context->user_entry       = entry;
   t->context->user_rsp_initial = user_rsp;
-  t->state = TASK_READY;
+  t->state                     = TASK_READY;
   ready_push(t);
   return 0;
 }
@@ -925,8 +912,8 @@ void task_fail_reserved_user(struct task *t, long code) {
 
 struct task *task_spawn_thread(u64 entry, u64 user_stack) {
   struct task *parent = task_current();
-  if (!parent || !parent->vm || !parent->vm->user_pml4 ||
-      !parent->vm->pml4_ref_count || !parent->context)
+  if (!parent || !parent->vm || !parent->vm->user_pml4 || !parent->vm->pml4_ref_count ||
+      !parent->context)
     return 0;
 
   struct task *t = alloc_slot();
@@ -942,7 +929,7 @@ struct task *task_spawn_thread(u64 entry, u64 user_stack) {
   }
 
   u64 stack_top = kstack_aligned_top(stack_base);
-  t->saved_rsp = build_initial_frame(stack_base, user_task_trampoline);
+  t->saved_rsp  = build_initial_frame(stack_base, user_task_trampoline);
 
   t->cr3 = parent->cr3;
 
@@ -950,16 +937,16 @@ struct task *task_spawn_thread(u64 entry, u64 user_stack) {
    * corrupt each other the first time both entered a syscall. */
   t->syscall_kstack_top = stack_top;
 
-  t->state = TASK_READY;
-  t->prio = SCHED_PRIO_NORMAL;
-  t->pid = next_pid++;
-  t->parent_pid = parent->pid;
+  t->state           = TASK_READY;
+  t->prio            = SCHED_PRIO_NORMAL;
+  t->pid             = next_pid++;
+  t->parent_pid      = parent->pid;
   t->waiting_for_pid = 0;
-  t->exit_code = 0;
-  t->kstack = stack_base;
-  t->kthread_entry = 0;
-  t->next = 0;
-  t->is_thread = 1;
+  t->exit_code       = 0;
+  t->kstack          = stack_base;
+  t->kthread_entry   = 0;
+  t->next            = 0;
+  t->is_thread       = 1;
 
   if (task_state_alloc(t, 1) != 0) {
     kfree(stack_base);
@@ -975,11 +962,12 @@ struct task *task_spawn_thread(u64 entry, u64 user_stack) {
   t->vm = parent->vm;
   __atomic_add_fetch(t->vm->pml4_ref_count, 1, __ATOMIC_ACQ_REL);
 
-  t->context->user_entry = entry;
+  t->context->user_entry       = entry;
   t->context->user_rsp_initial = user_stack;
-  t->context->fs_base = parent->context->fs_base;
-  t->context->abi_personality = parent->context->abi_personality;
-  memcpy(t->context->signal_actions, parent->context->signal_actions,
+  t->context->fs_base          = parent->context->fs_base;
+  t->context->abi_personality  = parent->context->abi_personality;
+  memcpy(t->context->signal_actions,
+         parent->context->signal_actions,
          sizeof(t->context->signal_actions));
 
   task_inherit_cwd(t, parent);
@@ -996,14 +984,15 @@ struct task *task_spawn_thread(u64 entry, u64 user_stack) {
  * going through task_set_fs_base, so the stored task value is not a cache. */
 static void stage_for(struct task *next, struct task *prev) {
   struct cpu_local *cpu = percpu_this();
-  cpu->kernel_rsp_top = next->syscall_kstack_top;
-  cpu->current = next;
+  cpu->kernel_rsp_top   = next->syscall_kstack_top;
+  cpu->current          = next;
   /* In ring 0, KERNEL_GS_BASE holds the swapped-out user GS. */
-  if (prev) prev->context->gs_base = sched_rdmsr(0xC0000102u);
+  if (prev)
+    prev->context->gs_base = sched_rdmsr(0xC0000102u);
   sched_wrmsr(0xC0000102u, next->context->gs_base);
   u64 next_fs = next->context->fs_base;
   if (prev) {
-    u64 active_fs = sched_rdmsr(MSR_FS_BASE);
+    u64 active_fs          = sched_rdmsr(MSR_FS_BASE);
     prev->context->fs_base = active_fs;
     if (active_fs != next_fs)
       sched_wrmsr(MSR_FS_BASE, next_fs);
@@ -1029,16 +1018,16 @@ void task_yield(void) {
   }
 
   struct task *prev = current;
-  prev->state = TASK_READY;
+  prev->state       = TASK_READY;
   if (prev != idle_task)
     ready_push(prev);
 
   next->state = TASK_RUNNING;
-  current = next;
+  current     = next;
   stage_for(next, prev);
 
-  context_switch(&prev->saved_rsp, next->saved_rsp, next->cr3,
-                 prev->context->fxstate, next->context->fxstate);
+  context_switch(
+      &prev->saved_rsp, next->saved_rsp, next->cr3, prev->context->fxstate, next->context->fxstate);
   /* REMOVED: irq_restore(rflags); */
 }
 
@@ -1061,7 +1050,7 @@ void sched_preempt_tick(void) {
   }
 
   u32 frequency = pit_get_freq();
-  u32 quantum = (frequency * SCHED_QUANTUM_MS + 999U) / 1000U;
+  u32 quantum   = (frequency * SCHED_QUANTUM_MS + 999U) / 1000U;
   if (quantum == 0)
     quantum = 1;
 
@@ -1084,16 +1073,16 @@ void task_block(int waiting_for_pid) {
   /* REMOVED: The entire !next fallback block.
    * next is guaranteed to be the idle task at worst. */
 
-  struct task *prev = current;
-  prev->state = TASK_BLOCKED;
+  struct task *prev     = current;
+  prev->state           = TASK_BLOCKED;
   prev->waiting_for_pid = waiting_for_pid;
 
   next->state = TASK_RUNNING;
-  current = next;
+  current     = next;
   stage_for(next, prev);
 
-  context_switch(&prev->saved_rsp, next->saved_rsp, next->cr3,
-                 prev->context->fxstate, next->context->fxstate);
+  context_switch(
+      &prev->saved_rsp, next->saved_rsp, next->cr3, prev->context->fxstate, next->context->fxstate);
   /* REMOVED: irq_restore(rflags); */
 }
 
@@ -1101,13 +1090,13 @@ void task_wakeup(struct task *t) {
   if (!t || t->state != TASK_BLOCKED)
     return;
   block_clear_deadline(t);
-  t->state = TASK_READY;
+  t->state           = TASK_READY;
   t->waiting_for_pid = 0;
   ready_push(t);
 }
 
 int task_block_until(u64 deadline) {
-  u64 rflags = irq_save();
+  u64 rflags     = irq_save();
   struct task *t = current;
   /* A signal already waiting would otherwise sleep until the data it is
    * meant to interrupt arrives. */
@@ -1115,8 +1104,8 @@ int task_block_until(u64 deadline) {
     irq_restore(rflags);
     return -EINTR;
   }
-  t->block_timed_out = 0;
-  t->block_interrupted = 0;
+  t->block_timed_out     = 0;
+  t->block_interrupted   = 0;
   t->block_interruptible = 1;
   if (deadline) {
     t->block_deadline = deadline;
@@ -1124,11 +1113,9 @@ int task_block_until(u64 deadline) {
   }
   /* -1 is not a pid, so no process exit can mistake us for its waiter. */
   task_block(-1);
-  int rc = t->block_interrupted ? -EINTR
-           : t->block_timed_out ? -ETIMEDOUT
-                                : 0;
-  t->block_timed_out = 0;
-  t->block_interrupted = 0;
+  int rc                 = t->block_interrupted ? -EINTR : t->block_timed_out ? -ETIMEDOUT : 0;
+  t->block_timed_out     = 0;
+  t->block_interrupted   = 0;
   t->block_interruptible = 0;
   irq_restore(rflags);
   return rc;
@@ -1165,7 +1152,7 @@ void task_sleep_ticks(u64 ticks) {
   u64 rflags = irq_save();
   sched_reschedule_done();
   current->wake_tick = pit_ticks() + ticks;
-  current->state = TASK_SLEEPING;
+  current->state     = TASK_SLEEPING;
   n_sleeping++;
 
   struct task *next = ready_pop();
@@ -1177,11 +1164,11 @@ void task_sleep_ticks(u64 ticks) {
   struct task *prev = current;
 
   next->state = TASK_RUNNING;
-  current = next;
+  current     = next;
   stage_for(next, prev);
 
-  context_switch(&prev->saved_rsp, next->saved_rsp, next->cr3,
-                 prev->context->fxstate, next->context->fxstate);
+  context_switch(
+      &prev->saved_rsp, next->saved_rsp, next->cr3, prev->context->fxstate, next->context->fxstate);
   /* REMOVED: irq_restore(rflags); */
 }
 
@@ -1201,8 +1188,7 @@ void sched_wake_sleepers(void) {
       t->state = TASK_READY;
       n_sleeping--;
       ready_push(t);
-    } else if (t->state == TASK_BLOCKED && t->block_deadline &&
-               t->block_deadline <= now) {
+    } else if (t->state == TASK_BLOCKED && t->block_deadline && t->block_deadline <= now) {
       t->block_timed_out = 1;
       task_wakeup(t);
     }
@@ -1224,7 +1210,7 @@ void sleep_ms(u32 ms) {
 
   /* Round up: a sub-tick sleep must still yield at least one tick, or
    * sleep_ms(1) at 100 Hz would return immediately. */
-  u32 freq = pit_get_freq();
+  u32 freq           = pit_get_freq();
   u64 ticks_to_sleep = ((u64)ms * freq + 999) / 1000;
 
   task_sleep_ticks(ticks_to_sleep);
@@ -1282,7 +1268,7 @@ static void mark_task_exited(struct task *task, long code) {
    * When it exits, hand ownership back to the saved owner if it still exists.
    */
   if (msg_input_owner() == task->pid) {
-    int restore_pid = task->input_owner_restore_pid;
+    int restore_pid      = task->input_owner_restore_pid;
     struct task *restore = task_find(restore_pid);
     if (restore_pid > 0 && restore && restore->state != TASK_ZOMBIE) {
       msg_input_owner_force(restore_pid);
@@ -1296,7 +1282,7 @@ static void mark_task_exited(struct task *task, long code) {
     struct ipc_msg note;
     memset(&note, 0, sizeof(note));
     note.type = IPC_PEER_EXITED;
-    note.a = task->pid;
+    note.a    = task->pid;
     ipc_send(wm_pid, &note, 0);
   }
 
@@ -1328,7 +1314,7 @@ static void mark_task_exited(struct task *task, long code) {
     }
   }
 
-  task->state = TASK_ZOMBIE;
+  task->state     = TASK_ZOMBIE;
   task->exit_code = code;
 
   /* Wake any task that was waiting on us via task_block(self.pid). O(MAX_TASKS)
@@ -1356,8 +1342,8 @@ static void mark_task_exited(struct task *task, long code) {
    * Kernel-spawned tasks have no parent to ask. */
   exit_records_drop_parent(task->pid);
   struct task *parent = task_find(task->parent_pid);
-  if (!claimed && task->parent_pid > 0 && parent &&
-      parent->state != TASK_ZOMBIE && parent->state != TASK_DEAD)
+  if (!claimed && task->parent_pid > 0 && parent && parent->state != TASK_ZOMBIE &&
+      parent->state != TASK_DEAD)
     exit_record_add(task->pid, task->parent_pid, code);
   wq_wake_all(&child_exit_wq);
   signal_child_exited(parent);
@@ -1422,13 +1408,14 @@ int task_kill(int pid, long code) {
   struct task *target = task_find(pid);
   /* A sleeping VFS owner/waiter still owns kernel-stack and FD references.
    * Refuse this kill; callers may retry after the bounded operation returns. */
-  if (target && target->vfs_active) return -1;
+  if (target && target->vfs_active)
+    return -1;
   if (target && target->state == TASK_LOADING) {
     return process_cancel_async(pid, code);
   }
   /* Kernel threads and already-dead tasks are not killable from userspace. */
-  if (!target || !target->vm || !target->vm->user_pml4 ||
-      target->state == TASK_ZOMBIE || target->state == TASK_DEAD)
+  if (!target || !target->vm || !target->vm->user_pml4 || target->state == TASK_ZOMBIE ||
+      target->state == TASK_DEAD)
     return -1;
 
   if (target == current)
@@ -1478,13 +1465,15 @@ void task_exit(long code) {
     panic("task_exit: no runnable task and no idle task");
 
   next->state = TASK_RUNNING;
-  current = next;
+  current     = next;
 
   log_write_hex("exit prev pid =", (u64)prev->pid, KERNEL, LOG_INFO);
   log_write_hex("exit prev state =", (u64)prev->state, KERNEL, LOG_INFO);
-  log_write_hex("exit next pid =", (u64)next->pid,
+  log_write_hex("exit next pid =",
+                (u64)next->pid,
 
-                KERNEL, LOG_INFO);
+                KERNEL,
+                LOG_INFO);
   log_write_hex("exit next state =", (u64)next->state, KERNEL, LOG_INFO);
 
   percpu_this()->current = next;
@@ -1501,7 +1490,7 @@ void task_exit_thread(void) {
     panic("task_exit_thread: active VFS operation");
   sched_reschedule_done();
   sb16_stream_release(current->pid);
-  current->state = TASK_ZOMBIE;
+  current->state     = TASK_ZOMBIE;
   current->unclaimed = 1; /* nobody joins a bare thread; idle reaps it */
 
   /* Wake anything blocked in thread_join on our pid. */
@@ -1522,7 +1511,7 @@ void task_exit_thread(void) {
   }
 
   next->state = TASK_RUNNING;
-  current = next;
+  current     = next;
   stage_for(next, NULL);
 
   context_enter(next->saved_rsp, next->cr3, next->context->fxstate);
@@ -1566,7 +1555,7 @@ static void task_release_address_space(struct task *t) {
     kfree(refs);
   }
 
-  t->vm->user_pml4 = 0;
+  t->vm->user_pml4      = 0;
   t->vm->pml4_ref_count = 0;
 }
 
@@ -1650,7 +1639,7 @@ int task_reap_unclaimed(void) {
 
 static void user_task_trampoline(void) {
   u64 entry = current->context->user_entry;
-  u64 rsp = current->context->user_rsp_initial;
-  u64 arg = current->context->user_arg;
+  u64 rsp   = current->context->user_rsp_initial;
+  u64 arg   = current->context->user_arg;
   arch_enter_user(entry, rsp, arg);
 }

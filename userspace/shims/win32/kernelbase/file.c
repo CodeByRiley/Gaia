@@ -41,8 +41,7 @@ BOOL WINAPI ReadFile(HANDLE h, void *p, DWORD n, DWORD *done, void *overlap) {
   *done = (DWORD)r;
   return TRUE;
 }
-BOOL WINAPI WriteFile(HANDLE h, const void *p, DWORD n, DWORD *done,
-                      void *overlap) {
+BOOL WINAPI WriteFile(HANDLE h, const void *p, DWORD n, DWORD *done, void *overlap) {
   if (done)
     *done = 0;
   if (overlap || (!p && n) || !done) {
@@ -60,16 +59,14 @@ BOOL WINAPI WriteFile(HANDLE h, const void *p, DWORD n, DWORD *done,
   *done = (DWORD)r;
   return TRUE;
 }
-BOOL WINAPI WriteConsoleA(HANDLE h, const void *p, DWORD n, DWORD *done,
-                          void *reserved) {
+BOOL WINAPI WriteConsoleA(HANDLE h, const void *p, DWORD n, DWORD *done, void *reserved) {
   if (reserved) {
     SetLastError(87);
     return FALSE;
   }
   return WriteFile(h, p, n, done, 0);
 }
-BOOL WINAPI WriteConsoleW(HANDLE h, const void *p, DWORD n, DWORD *done,
-                          void *reserved) {
+BOOL WINAPI WriteConsoleW(HANDLE h, const void *p, DWORD n, DWORD *done, void *reserved) {
   if (done)
     *done = 0;
   if (reserved || !p || !done) {
@@ -77,7 +74,7 @@ BOOL WINAPI WriteConsoleW(HANDLE h, const void *p, DWORD n, DWORD *done,
     return FALSE;
   }
   const WCHAR *w = p;
-  DWORD at = 0;
+  DWORD at       = 0;
   while (at < n) {
     WCHAR chunk[3] = {w[at], 0, 0};
     DWORD consumed = 1;
@@ -99,11 +96,9 @@ BOOL WINAPI WriteConsoleW(HANDLE h, const void *p, DWORD n, DWORD *done,
   }
   return TRUE;
 }
-HANDLE WINAPI CreateFileA(const char *name, DWORD access, DWORD sharing,
-                          void *security, DWORD creation, DWORD flags,
-                          HANDLE template) {
-  if (security || template || (sharing & ~7u) ||
-      (access & ~(GENERIC_READ | GENERIC_WRITE)) ||
+HANDLE WINAPI CreateFileA(const char *name, DWORD access, DWORD sharing, void *security,
+                          DWORD creation, DWORD flags, HANDLE template) {
+  if (security || template || (sharing & ~7u) || (access & ~(GENERIC_READ | GENERIC_WRITE)) ||
       (flags & ~FILE_ATTRIBUTE_NORMAL)) {
     SetLastError(120);
     return INVALID_HANDLE_VALUE;
@@ -113,8 +108,7 @@ HANDLE WINAPI CreateFileA(const char *name, DWORD access, DWORD sharing,
     SetLastError(87);
     return INVALID_HANDLE_VALUE;
   }
-  unsigned f = (access & GENERIC_READ ? GAIA_READ : 0) |
-               (access & GENERIC_WRITE ? GAIA_WRITE : 0);
+  unsigned f = (access & GENERIC_READ ? GAIA_READ : 0) | (access & GENERIC_WRITE ? GAIA_WRITE : 0);
   if (!f) {
     SetLastError(87);
     return INVALID_HANDLE_VALUE;
@@ -150,8 +144,7 @@ HANDLE WINAPI CreateFileA(const char *name, DWORD access, DWORD sharing,
     SetLastError(0);
   return h;
 }
-HANDLE WINAPI CreateFileW(const WCHAR *p, DWORD a, DWORD s, void *sec, DWORD c,
-                          DWORD f, HANDLE t) {
+HANDLE WINAPI CreateFileW(const WCHAR *p, DWORD a, DWORD s, void *sec, DWORD c, DWORD f, HANDLE t) {
   char name[1024];
   if (GaiaUtf8(p, name, sizeof(name)) < 0) {
     SetLastError(1113);
@@ -169,8 +162,7 @@ BOOL WINAPI CloseHandle(HANDLE h) {
   }
   return GaiaHandleClose(h);
 }
-BOOL WINAPI SetFilePointerEx(HANDLE h, LARGE_INTEGER off, LARGE_INTEGER *out,
-                             DWORD how) {
+BOOL WINAPI SetFilePointerEx(HANDLE h, LARGE_INTEGER off, LARGE_INTEGER *out, DWORD how) {
   if (how > 2) {
     SetLastError(87);
     return FALSE;

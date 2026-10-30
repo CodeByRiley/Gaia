@@ -1,8 +1,5 @@
 #define _BSD_SOURCE
-#include <unistd.h>
 #include "libc.h"
+#include <unistd.h>
 
-int issetugid(void)
-{
-	return libc.secure;
-}
+int issetugid(void) { return libc.secure; }

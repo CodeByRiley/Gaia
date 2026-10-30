@@ -15,65 +15,66 @@
  *               a wall clock to convert it against, and a plausible-looking
  *               wrong time is worse than an obvious zero.
  */
-#include <include/sys/stat.h>
 #include <include/errno.h>
+#include <include/sys/stat.h>
 #include <syscall.h>
 
 #define FAT_ATTR_READ_ONLY 0x01
 
 static void fill_stat(const struct stat_user *k, struct stat *buf) {
-    buf->st_dev   = 0;
-    buf->st_ino   = k->first_cluster;
-    buf->st_nlink = 1;
-    buf->st_rdev  = 0;
-    buf->st_size  = (off_t)k->size;
-    buf->st_atime = 0;
-    buf->st_mtime = 0;
-    buf->st_ctime = 0;
-    buf->st_uid   = 0;
-    buf->st_gid   = 0;
+  buf->st_dev   = 0;
+  buf->st_ino   = k->first_cluster;
+  buf->st_nlink = 1;
+  buf->st_rdev  = 0;
+  buf->st_size  = (off_t)k->size;
+  buf->st_atime = 0;
+  buf->st_mtime = 0;
+  buf->st_ctime = 0;
+  buf->st_uid   = 0;
+  buf->st_gid   = 0;
 
-    mode_t perm = (k->attr & FAT_ATTR_READ_ONLY)
-                      ? (S_IRUSR | S_IRGRP | S_IROTH)
-                      : (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH |
-                         S_IWOTH);
+  mode_t perm = (k->attr & FAT_ATTR_READ_ONLY)
+                    ? (S_IRUSR | S_IRGRP | S_IROTH)
+                    : (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 
-    if (k->type == STAT_TYPE_DIR) {
-        /* Directories need the execute bit or path traversal checks in
-         * ported code reject them out of hand. */
-        buf->st_mode = S_IFDIR | perm | S_IXUSR | S_IXGRP | S_IXOTH;
-    } else {
-        buf->st_mode = S_IFREG | perm;
-    }
+  if (k->type == STAT_TYPE_DIR) {
+    /* Directories need the execute bit or path traversal checks in
+     * ported code reject them out of hand. */
+    buf->st_mode = S_IFDIR | perm | S_IXUSR | S_IXGRP | S_IXOTH;
+  } else {
+    buf->st_mode = S_IFREG | perm;
+  }
 }
 
 int stat(const char *path, struct stat *buf) {
-    if (!path || !buf) {
-        errno = EINVAL;
-        return -1;
-    }
+  if (!path || !buf) {
+    errno = EINVAL;
+    return -1;
+  }
 
-    struct stat_user k;
-    if (syscall_result(stat_raw(path, &k)) != 0) return -1;
+  struct stat_user k;
+  if (syscall_result(stat_raw(path, &k)) != 0)
+    return -1;
 
-    fill_stat(&k, buf);
-    return 0;
+  fill_stat(&k, buf);
+  return 0;
 }
 
 int fstat(int fd, struct stat *buf) {
-    if (!buf) {
-        errno = EINVAL;
-        return -1;
-    }
+  if (!buf) {
+    errno = EINVAL;
+    return -1;
+  }
 
-    struct stat_user k;
-    if (syscall_result(fstat_raw(fd, &k)) != 0) return -1;
+  struct stat_user k;
+  if (syscall_result(fstat_raw(fd, &k)) != 0)
+    return -1;
 
-    fill_stat(&k, buf);
-    return 0;
+  fill_stat(&k, buf);
+  return 0;
 }
 
 int mkdir(const char *path, mode_t mode) {
-    (void)mode;   /* FAT has no permission bits to apply */
-    return (int)syscall_result(mkdir_path(path));
+  (void)mode; /* FAT has no permission bits to apply */
+  return (int)syscall_result(mkdir_path(path));
 }

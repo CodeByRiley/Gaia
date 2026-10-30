@@ -33,8 +33,7 @@ static int list_volumes(void) {
     return 0;
   }
 
-  printf("%-10s %-12s %-14s %-10s %s\n", "VOLUME", "SIZE", "START", "KIND",
-         "ACCESS");
+  printf("%-10s %-12s %-14s %-10s %s\n", "VOLUME", "SIZE", "START", "KIND", "ACCESS");
   for (long i = 0; i < count; i++) {
     struct blockdev_info *volume = &volumes[i];
 
@@ -54,8 +53,11 @@ static int list_volumes(void) {
                        : volume->flags & BLOCKDEV_ESP       ? "esp"
                        : volume->flags & BLOCKDEV_PARTITION ? "partition"
                                                             : "disk";
-    printf("%-10s %-8llu MiB %-14llu %-10s %s\n", volume->name, mib,
-           (unsigned long long)volume->start_lba, kind,
+    printf("%-10s %-8llu MiB %-14llu %-10s %s\n",
+           volume->name,
+           mib,
+           (unsigned long long)volume->start_lba,
+           kind,
            volume->flags & BLOCKDEV_WRITABLE ? "rw" : "ro");
   }
   return 0;
@@ -89,10 +91,9 @@ static int filesystem_name(const char *name) {
 
 /* A device name makes a useful default mountpoint.  /dev/ is accepted in the
  * source spelling but is not copied into the pathname. */
-static int default_target(const char *source,
-                          char out[sizeof("/mnt/") + BLOCKDEV_NAME_MAX]) {
+static int default_target(const char *source, char out[sizeof("/mnt/") + BLOCKDEV_NAME_MAX]) {
   const char *name = !strncmp(source, "/dev/", 5) ? source + 5 : source;
-  size_t length = strlen(name);
+  size_t length    = strlen(name);
   if (length == 0 || length >= BLOCKDEV_NAME_MAX)
     return -1;
   memcpy(out, "/mnt/", sizeof("/mnt/") - 1);
@@ -132,10 +133,10 @@ int main(int argc, char **argv) {
 
   char inferred_target[sizeof("/mnt/") + BLOCKDEV_NAME_MAX];
   const char *target = NULL;
-  const char *type = NULL;
+  const char *type   = NULL;
   if (argc == 4) {
     target = argv[2];
-    type = argv[3];
+    type   = argv[3];
   } else if (argc == 3 && !filesystem_name(argv[2])) {
     target = argv[2];
   } else {
@@ -158,8 +159,7 @@ int main(int argc, char **argv) {
              "(mount with no arguments lists them)\n",
              argv[1]);
     } else {
-      printf("mount: cannot mount %s at %s: %s\n", argv[1], target,
-             disk_err(errnum));
+      printf("mount: cannot mount %s at %s: %s\n", argv[1], target, disk_err(errnum));
     }
 
     return 1;

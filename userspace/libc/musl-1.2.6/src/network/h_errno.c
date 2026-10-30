@@ -1,11 +1,11 @@
-#include <netdb.h>
 #include "pthread_impl.h"
+#include <netdb.h>
 
 #undef h_errno
 int h_errno;
 
-int *__h_errno_location(void)
-{
-	if (!__pthread_self()->stack) return &h_errno;
-	return &__pthread_self()->h_errno_val;
+int *__h_errno_location(void) {
+  if (!__pthread_self()->stack)
+    return &h_errno;
+  return &__pthread_self()->h_errno_val;
 }

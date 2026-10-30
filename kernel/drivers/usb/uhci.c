@@ -1,10 +1,8 @@
-#include <drivers/usb/uhci.h>
-#include <drivers/usb/usb_device.h>
 #include <devices/io.h>
-#include <utilities/log.h>
-#include <utilities/types.h>
 #include <devices/pit.h>
 #include <devices/usb.h>
+#include <drivers/usb/uhci.h>
+#include <drivers/usb/usb_device.h>
 #include <input/mouse.h>
 #include <interrupts/idt.h>
 #include <interrupts/pic.h>
@@ -12,8 +10,10 @@
 #include <memory/pmm.h>
 #include <pci/pci.h>
 #include <sched/sched.h>
-#include <utilities/string.h>
 #include <stdint.h>
+#include <utilities/log.h>
+#include <utilities/string.h>
+#include <utilities/types.h>
 
 /* Link pointers are 32-bit, so every DMA structure has to live under 4 GiB. */
 #define UHCI_DMA_LIMIT 0x100000000ULL
@@ -31,16 +31,16 @@
  *   0xC10  interrupt TD          (16 B)
  *   0xC20  interrupt data buffer (64 B)
  */
-#define UHCI_ARENA_QH       0x000
-#define UHCI_ARENA_TD       0x010
-#define UHCI_ARENA_NTD      64
-#define UHCI_ARENA_SETUP    0x410
-#define UHCI_ARENA_DATA     0x800
+#define UHCI_ARENA_QH 0x000
+#define UHCI_ARENA_TD 0x010
+#define UHCI_ARENA_NTD 64
+#define UHCI_ARENA_SETUP 0x410
+#define UHCI_ARENA_DATA 0x800
 #define UHCI_ARENA_DATA_MAX 1024
-#define UHCI_ARENA_INT_QH   0xC00
-#define UHCI_ARENA_INT_TD   0xC10
-#define UHCI_ARENA_INT_BUF  0xC20
-#define UHCI_ARENA_INT_MAX  64
+#define UHCI_ARENA_INT_QH 0xC00
+#define UHCI_ARENA_INT_TD 0xC10
+#define UHCI_ARENA_INT_BUF 0xC20
+#define UHCI_ARENA_INT_MAX 64
 
 /* HID configurations run well under 64 bytes; truncating a larger one beats
  * overrunning the buffer. */
@@ -71,12 +71,12 @@ _Static_assert(sizeof(struct usb_descriptor) == 18, "USB device descriptor must 
 struct uhci_int_ep {
   int active;
 
-  u8  addr;
-  u8  ep;
+  u8 addr;
+  u8 ep;
   int low_speed;
   u16 maxlen;
-  u8  interval; /* bInterval, in frames */
-  u8  kind;
+  u8 interval; /* bInterval, in frames */
+  u8 kind;
 
   int toggle;
 
@@ -95,7 +95,7 @@ struct uhci_int_ep {
 
 struct uhci_hc {
   u16 io_base;
-  u8  irq;
+  u8 irq;
 
   u64 frame_list_phys;
   struct uhci_frame *frame_list;
@@ -108,20 +108,14 @@ struct uhci_hc {
   struct uhci_int_ep int_ep;
 };
 
-static void uhci_write16(u16 base, u16 offset, u16 val) {
-  outw(base + offset, val);
-}
+static void uhci_write16(u16 base, u16 offset, u16 val) { outw(base + offset, val); }
 
 static u16 uhci_read16(u16 base, u16 offset) { return inw(base + offset); }
 
 /* Single volatile u32 access , see UHCI_TD_STS_* in uhci.h. */
-SINLINE u32 td_status_read(const struct uhci_td *td) {
-  return *(const volatile u32 *)&td->status;
-}
+SINLINE u32 td_status_read(const struct uhci_td *td) { return *(const volatile u32 *)&td->status; }
 
-SINLINE void td_status_write(struct uhci_td *td, u32 val) {
-  *(volatile u32 *)&td->status = val;
-}
+SINLINE void td_status_write(struct uhci_td *td, u32 val) { *(volatile u32 *)&td->status = val; }
 
 /* element_ptr is the CPU/controller hand-off point: volatile, or the compiler
  * caches our write and never sees the controller's DMA update. */
@@ -130,7 +124,7 @@ SINLINE u32 qh_element_read(const struct uhci_qh *qh) {
 }
 
 SINLINE void qh_element_write(struct uhci_qh *qh, u32 val) {
-    *(volatile u32 *)(uptr)&qh->element_ptr = val;
+  *(volatile u32 *)(uptr)&qh->element_ptr = val;
 }
 
 /* Poll `reg` until `mask` clears. Returns 0, or -1 on timeout.
@@ -150,33 +144,28 @@ static int uhci_wait_clear(u16 io_base, u16 reg, u16 mask, u32 budget_ms) {
 // #region CONTROL TRANSFERS
 
 static struct uhci_td *uhci_td_at(struct uhci_hc *hc, int index) {
-  return (struct uhci_td *)(hc->arena + UHCI_ARENA_TD +
-                            (usize)index * sizeof(struct uhci_td));
+  return (struct uhci_td *)(hc->arena + UHCI_ARENA_TD + (usize)index * sizeof(struct uhci_td));
 }
 
 static u64 uhci_td_phys(struct uhci_hc *hc, int index) {
-  return hc->arena_phys + UHCI_ARENA_TD +
-         (u64)index * sizeof(struct uhci_td);
+  return hc->arena_phys + UHCI_ARENA_TD + (u64)index * sizeof(struct uhci_td);
 }
 
 /* Fill one TD. `len` is a real byte count; 0 is legal and UHCI_TD_MAXLEN
  * encodes it as the spec's 0x7FF null packet. */
-static void uhci_td_init(struct uhci_td *td, u64 next_phys, int last,
-                         int low_speed, u8 pid, u8 addr, u8 ep, int toggle,
-                         int len, u64 buf_phys) {
+static void uhci_td_init(struct uhci_td *td, u64 next_phys, int last, int low_speed, u8 pid,
+                         u8 addr, u8 ep, int toggle, int len, u64 buf_phys) {
   /* DEPTH runs the whole chain within one frame; without it the controller
    * takes one TD per frame and a control transfer costs milliseconds. */
-  td->link.link_ptr =
-      last ? UHCI_PTR_TERM : ((u32)next_phys | UHCI_PTR_DEPTH);
+  td->link.link_ptr = last ? UHCI_PTR_TERM : ((u32)next_phys | UHCI_PTR_DEPTH);
 
   u32 sts = UHCI_TD_STS_ACTIVE | (3u << UHCI_TD_STS_CERR_SHIFT);
   if (low_speed)
     sts |= UHCI_TD_STS_LS;
   td_status_write(td, sts);
 
-  td->token = UHCI_TD_PID(pid) | UHCI_TD_DEVADDR(addr) |
-              UHCI_TD_ENDPOINT(ep) | UHCI_TD_TOGGLE(toggle) |
-              UHCI_TD_MAXLEN(len);
+  td->token      = UHCI_TD_PID(pid) | UHCI_TD_DEVADDR(addr) | UHCI_TD_ENDPOINT(ep) |
+                   UHCI_TD_TOGGLE(toggle) | UHCI_TD_MAXLEN(len);
   td->buffer_ptr = (u32)buf_phys;
 }
 
@@ -185,10 +174,8 @@ static void uhci_td_init(struct uhci_td *td, u64 next_phys, int last,
  *
  * Polled, not interrupt-driven: this runs before the boot-time sti, so an
  * interrupt could not be delivered anyway. */
-static int uhci_control(struct uhci_hc *hc, u8 addr, int low_speed,
-                        u8 maxpacket,
-                        const struct usb_setup_packet *setup, void *data,
-                        u16 len, int dir_in) {
+static int uhci_control(struct uhci_hc *hc, u8 addr, int low_speed, u8 maxpacket,
+                        const struct usb_setup_packet *setup, void *data, u16 len, int dir_in) {
   if (len > UHCI_ARENA_DATA_MAX)
     return -1;
   if (maxpacket == 0)
@@ -196,14 +183,14 @@ static int uhci_control(struct uhci_hc *hc, u8 addr, int low_speed,
 
   /* setup TD + one TD per data packet + status TD */
   int data_tds = (len + maxpacket - 1) / maxpacket;
-  int n_tds = data_tds + 2;
+  int n_tds    = data_tds + 2;
   if (n_tds > UHCI_ARENA_NTD)
     return -1;
 
-  u8 *setup_buf = hc->arena + UHCI_ARENA_SETUP;
-  u8 *data_buf = hc->arena + UHCI_ARENA_DATA;
+  u8 *setup_buf  = hc->arena + UHCI_ARENA_SETUP;
+  u8 *data_buf   = hc->arena + UHCI_ARENA_DATA;
   u64 setup_phys = hc->arena_phys + UHCI_ARENA_SETUP;
-  u64 data_phys = hc->arena_phys + UHCI_ARENA_DATA;
+  u64 data_phys  = hc->arena_phys + UHCI_ARENA_DATA;
 
   memcpy(setup_buf, setup, sizeof(*setup));
   if (len && !dir_in)
@@ -214,18 +201,33 @@ static int uhci_control(struct uhci_hc *hc, u8 addr, int low_speed,
   int i = 0;
 
   /* SETUP , always DATA0. */
-  uhci_td_init(uhci_td_at(hc, i), uhci_td_phys(hc, i + 1), 0, low_speed,
-               USB_PID_SETUP, addr, 0, 0, sizeof(*setup), setup_phys);
+  uhci_td_init(uhci_td_at(hc, i),
+               uhci_td_phys(hc, i + 1),
+               0,
+               low_speed,
+               USB_PID_SETUP,
+               addr,
+               0,
+               0,
+               sizeof(*setup),
+               setup_phys);
   i++;
 
   /* DATA , starts DATA1, alternates per packet. */
-  int toggle = 1;
+  int toggle    = 1;
   u16 remaining = len;
-  u32 offset = 0;
+  u32 offset    = 0;
   while (remaining) {
     u16 chunk = remaining > maxpacket ? maxpacket : remaining;
-    uhci_td_init(uhci_td_at(hc, i), uhci_td_phys(hc, i + 1), 0, low_speed,
-                 dir_in ? USB_PID_IN : USB_PID_OUT, addr, 0, toggle, chunk,
+    uhci_td_init(uhci_td_at(hc, i),
+                 uhci_td_phys(hc, i + 1),
+                 0,
+                 low_speed,
+                 dir_in ? USB_PID_IN : USB_PID_OUT,
+                 addr,
+                 0,
+                 toggle,
+                 chunk,
                  data_phys + offset);
     i++;
     toggle ^= 1;
@@ -235,18 +237,18 @@ static int uhci_control(struct uhci_hc *hc, u8 addr, int low_speed,
 
   /* STATUS , opposite direction to the data stage, DATA1, zero length. With
    * no data stage the status is read IN. */
-  uhci_td_init(uhci_td_at(hc, i), 0, 1, low_speed,
-               dir_in ? USB_PID_OUT : USB_PID_IN, addr, 0, 1, 0, 0);
+  uhci_td_init(
+      uhci_td_at(hc, i), 0, 1, low_speed, dir_in ? USB_PID_OUT : USB_PID_IN, addr, 0, 1, 0, 0);
   int last_td = i;
 
   /* The QH already sits in every frame list entry, so writing element_ptr is
    * what starts the work. The controller walks it back to TERM as it drains. */
   struct uhci_qh *qh = (struct uhci_qh *)(hc->arena + UHCI_ARENA_QH);
-  qh->link_ptr = UHCI_PTR_TERM;
+  qh->link_ptr       = UHCI_PTR_TERM;
   qh_element_write(qh, (u32)uhci_td_phys(hc, 0));
 
   int failed = 0;
-  int done = 0;
+  int done   = 0;
   for (u32 elapsed = 0; elapsed < UHCI_XFER_TIMEOUT_MS * 10; elapsed++) {
     /* Scan the whole chain, not just the tail: an erroring TD halts the queue
      * and leaves everything behind it Active forever, which would otherwise
@@ -273,29 +275,24 @@ static int uhci_control(struct uhci_hc *hc, u8 addr, int low_speed,
   /* Snapshot before unhooking. Whether element_ptr moved off TD 0 separates
    * "device misbehaved" from "controller never looked at the queue". */
   u32 element_after = qh_element_read(qh);
-  u16 usbsts = uhci_read16(hc->io_base, UHCI_USBSTS);
-  u16 frnum = uhci_read16(hc->io_base, UHCI_FRNUM);
+  u16 usbsts        = uhci_read16(hc->io_base, UHCI_USBSTS);
+  u16 frnum         = uhci_read16(hc->io_base, UHCI_FRNUM);
 
   /* Unhook either way: on timeout the controller still owns these TDs and the
    * next transfer reuses the pool. */
   qh_element_write(qh, UHCI_PTR_TERM);
 
   if (!done || failed) {
-    log_write(failed ? "UHCI: transfer failed" : "UHCI: transfer timed out",
-              KERNEL, LOG_ERROR);
+    log_write(failed ? "UHCI: transfer failed" : "UHCI: transfer timed out", KERNEL, LOG_ERROR);
     log_write_hex("UHCI:   USBSTS", usbsts, KERNEL, LOG_ERROR);
-    log_write_hex("UHCI:   USBCMD", uhci_read16(hc->io_base, UHCI_USBCMD),
-                  KERNEL, LOG_ERROR);
+    log_write_hex("UHCI:   USBCMD", uhci_read16(hc->io_base, UHCI_USBCMD), KERNEL, LOG_ERROR);
     log_write_hex("UHCI:   FRNUM", frnum, KERNEL, LOG_ERROR);
     log_write_hex("UHCI:   QH element after", element_after, KERNEL, LOG_ERROR);
-    log_write_hex("UHCI:   QH element start", (u32)uhci_td_phys(hc, 0), KERNEL,
-                  LOG_ERROR);
+    log_write_hex("UHCI:   QH element start", (u32)uhci_td_phys(hc, 0), KERNEL, LOG_ERROR);
     for (int t = 0; t <= last_td; t++) {
       log_write_int("UHCI:   TD", t, KERNEL, LOG_ERROR);
-      log_write_hex("UHCI:     status", td_status_read(uhci_td_at(hc, t)),
-                    KERNEL, LOG_ERROR);
-      log_write_hex("UHCI:     token", uhci_td_at(hc, t)->token, KERNEL,
-                    LOG_ERROR);
+      log_write_hex("UHCI:     status", td_status_read(uhci_td_at(hc, t)), KERNEL, LOG_ERROR);
+      log_write_hex("UHCI:     token", uhci_td_at(hc, t)->token, KERNEL, LOG_ERROR);
     }
     return -1;
   }
@@ -308,16 +305,10 @@ static int uhci_control(struct uhci_hc *hc, u8 addr, int low_speed,
   }
 
   if (len && dir_in)
-    memcpy(data, data_buf, (usize)transferred < len ? (usize)transferred
-                                                     : len);
+    memcpy(data, data_buf, (usize)transferred < len ? (usize)transferred : len);
 
   return transferred;
 }
-
-
-
-
-
 
 // #endregion CONTROL TRANSFERS
 
@@ -333,15 +324,13 @@ static void uhci_int_arm(struct uhci_int_ep *ep) {
 
   td->link.link_ptr = UHCI_PTR_TERM;
 
-  u32 sts = UHCI_TD_STS_ACTIVE | UHCI_TD_STS_IOC |
-            (3u << UHCI_TD_STS_CERR_SHIFT);
+  u32 sts = UHCI_TD_STS_ACTIVE | UHCI_TD_STS_IOC | (3u << UHCI_TD_STS_CERR_SHIFT);
   if (ep->low_speed)
     sts |= UHCI_TD_STS_LS;
   td_status_write(td, sts);
 
-  td->token = UHCI_TD_PID(USB_PID_IN) | UHCI_TD_DEVADDR(ep->addr) |
-              UHCI_TD_ENDPOINT(ep->ep) | UHCI_TD_TOGGLE(ep->toggle) |
-              UHCI_TD_MAXLEN(ep->maxlen);
+  td->token      = UHCI_TD_PID(USB_PID_IN) | UHCI_TD_DEVADDR(ep->addr) | UHCI_TD_ENDPOINT(ep->ep) |
+                   UHCI_TD_TOGGLE(ep->toggle) | UHCI_TD_MAXLEN(ep->maxlen);
   td->buffer_ptr = (u32)ep->buf_phys;
 
   /* Last: this is what makes the queue live, so the TD must be complete. */
@@ -353,7 +342,7 @@ static void uhci_int_arm(struct uhci_int_ep *ep) {
  * stays reachable from every frame; the interval only sets the poll rate. */
 static void uhci_build_schedule(struct uhci_hc *hc) {
   u64 ctrl_qh_phys = hc->arena_phys + UHCI_ARENA_QH;
-  u32 ctrl_link = (u32)ctrl_qh_phys | UHCI_PTR_QH;
+  u32 ctrl_link    = (u32)ctrl_qh_phys | UHCI_PTR_QH;
 
   if (!hc->int_ep.active) {
     for (int i = 0; i < 1024; i++)
@@ -361,7 +350,7 @@ static void uhci_build_schedule(struct uhci_hc *hc) {
     return;
   }
 
-  u32 int_link = (u32)hc->int_ep.qh_phys | UHCI_PTR_QH;
+  u32 int_link            = (u32)hc->int_ep.qh_phys | UHCI_PTR_QH;
   hc->int_ep.qh->link_ptr = ctrl_link;
 
   u8 interval = hc->int_ep.interval ? hc->int_ep.interval : 1;
@@ -369,37 +358,35 @@ static void uhci_build_schedule(struct uhci_hc *hc) {
     hc->frame_list[i].link_ptr = (i % interval == 0) ? int_link : ctrl_link;
 }
 
-static int uhci_int_ep_start(struct uhci_hc *hc, u8 addr, int low_speed, u8 ep,
-                             u16 maxlen, u8 interval, u8 kind) {
+static int uhci_int_ep_start(struct uhci_hc *hc, u8 addr, int low_speed, u8 ep, u16 maxlen,
+                             u8 interval, u8 kind) {
   struct uhci_int_ep *iep = &hc->int_ep;
 
   if (iep->active) {
-    log_write("UHCI: periodic endpoint already in use, skipping", KERNEL,
-              LOG_WARN);
+    log_write("UHCI: periodic endpoint already in use, skipping", KERNEL, LOG_WARN);
     return -1;
   }
   if (maxlen == 0 || maxlen > UHCI_ARENA_INT_MAX) {
-    log_write_int("UHCI: periodic packet size unsupported", maxlen, KERNEL,
-                  LOG_WARN);
+    log_write_int("UHCI: periodic packet size unsupported", maxlen, KERNEL, LOG_WARN);
     return -1;
   }
 
-  iep->addr = addr;
-  iep->ep = ep;
+  iep->addr      = addr;
+  iep->ep        = ep;
   iep->low_speed = low_speed;
-  iep->maxlen = maxlen;
-  iep->interval = interval;
-  iep->kind = kind;
-  iep->toggle = 0;
-  iep->reports = 0;
-  iep->errors = 0;
-  iep->last_len = 0;
+  iep->maxlen    = maxlen;
+  iep->interval  = interval;
+  iep->kind      = kind;
+  iep->toggle    = 0;
+  iep->reports   = 0;
+  iep->errors    = 0;
+  iep->last_len  = 0;
 
-  iep->qh = (struct uhci_qh *)(hc->arena + UHCI_ARENA_INT_QH);
-  iep->qh_phys = hc->arena_phys + UHCI_ARENA_INT_QH;
-  iep->td = (struct uhci_td *)(hc->arena + UHCI_ARENA_INT_TD);
-  iep->td_phys = hc->arena_phys + UHCI_ARENA_INT_TD;
-  iep->buf = hc->arena + UHCI_ARENA_INT_BUF;
+  iep->qh       = (struct uhci_qh *)(hc->arena + UHCI_ARENA_INT_QH);
+  iep->qh_phys  = hc->arena_phys + UHCI_ARENA_INT_QH;
+  iep->td       = (struct uhci_td *)(hc->arena + UHCI_ARENA_INT_TD);
+  iep->td_phys  = hc->arena_phys + UHCI_ARENA_INT_TD;
+  iep->buf      = hc->arena + UHCI_ARENA_INT_BUF;
   iep->buf_phys = hc->arena_phys + UHCI_ARENA_INT_BUF;
 
   memset(iep->buf, 0, UHCI_ARENA_INT_MAX);
@@ -429,8 +416,7 @@ static void uhci_int_complete(struct uhci_int_ep *ep) {
      * failed transfer never advanced the device's sequence, and flipping it
      * would desync the endpoint for good. */
     if (ep->errors <= UHCI_INT_LOG_LIMIT)
-      log_write_hex("UHCI: periodic transfer error, status", sts, KERNEL,
-                    LOG_WARN);
+      log_write_hex("UHCI: periodic transfer error, status", sts, KERNEL, LOG_WARN);
   } else {
     ep->reports++;
     ep->last_len = (u16)UHCI_TD_ACTLEN(sts);
@@ -464,13 +450,13 @@ static void uhci_int_complete(struct uhci_int_ep *ep) {
  * nobody handled. Masking UHCI_PORTSC_WC_MASK moves only the requested bits. */
 static void uhci_portsc_set(struct uhci_hc *hc, u16 reg, u16 bits) {
   u16 val = uhci_read16(hc->io_base, reg);
-  val = (u16)((val | bits) & ~UHCI_PORTSC_WC_MASK);
+  val     = (u16)((val | bits) & ~UHCI_PORTSC_WC_MASK);
   uhci_write16(hc->io_base, reg, val);
 }
 
 static void uhci_portsc_clear(struct uhci_hc *hc, u16 reg, u16 bits) {
   u16 val = uhci_read16(hc->io_base, reg);
-  val = (u16)(val & ~bits & ~UHCI_PORTSC_WC_MASK);
+  val     = (u16)(val & ~bits & ~UHCI_PORTSC_WC_MASK);
   uhci_write16(hc->io_base, reg, val);
 }
 
@@ -512,7 +498,6 @@ static int uhci_port_reset(struct uhci_hc *hc, u16 reg) {
  * device may claim several hundred bytes. Boot path is single-threaded. */
 static u8 uhci_config_buf[UHCI_CONFIG_BUF_MAX];
 
-
 /* Find the first HID pointer interrupt IN endpoint, logging interfaces and
  * endpoints on the way past. Returns 1 and fills *out if one exists.
  *
@@ -524,15 +509,13 @@ static u8 uhci_config_buf[UHCI_CONFIG_BUF_MAX];
 /* UHCI's half of the shared device model: everything above a control
  * transfer is in drivers/usb/usb_device.c. Low speed rides in the pipe
  * because it belongs in every TD this controller builds. */
-static int uhci_pipe_control(const struct usb_pipe *pipe,
-                             const struct usb_setup_packet *setup, void *data,
-                             u16 length, int in) {
-  return uhci_control(pipe->hc, pipe->address, pipe->low_speed,
-                      (u8)pipe->maxpacket, setup, data, length, in);
+static int uhci_pipe_control(const struct usb_pipe *pipe, const struct usb_setup_packet *setup,
+                             void *data, u16 length, int in) {
+  return uhci_control(
+      pipe->hc, pipe->address, pipe->low_speed, (u8)pipe->maxpacket, setup, data, length, in);
 }
 
-static void uhci_enumerate_port(struct uhci_hc *hc, int port, u16 reg,
-                                int low_speed) {
+static void uhci_enumerate_port(struct uhci_hc *hc, int port, u16 reg, int low_speed) {
   struct usb_descriptor desc;
 
   if (uhci_port_reset(hc, reg) != 0) {
@@ -542,12 +525,12 @@ static void uhci_enumerate_port(struct uhci_hc *hc, int port, u16 reg,
   log_write_int("UHCI: port enabled, port", port, KERNEL, LOG_INFO);
 
   struct usb_pipe pipe = {
-      .hc = hc,
-      .control = uhci_pipe_control,
-      .address = 0,
+      .hc        = hc,
+      .control   = uhci_pipe_control,
+      .address   = 0,
       .maxpacket = UHCI_EP0_DEFAULT_MAXPACKET,
       .low_speed = low_speed,
-      .tag = "UHCI",
+      .tag       = "UHCI",
   };
 
   /* Chicken and egg: the descriptor names ep0's packet size, but reading it
@@ -555,8 +538,7 @@ static void uhci_enumerate_port(struct uhci_hc *hc, int port, u16 reg,
    * 8-byte read always reaches it. */
   memset(&desc, 0, sizeof(desc));
   if (usb_get_descriptor(&pipe, USB_DESC_DEVICE, 0, &desc, 8) < 8) {
-    log_write_int("UHCI: initial GET_DESCRIPTOR failed, port", port, KERNEL,
-                  LOG_ERROR);
+    log_write_int("UHCI: initial GET_DESCRIPTOR failed, port", port, KERNEL, LOG_ERROR);
     return;
   }
 
@@ -567,8 +549,7 @@ static void uhci_enumerate_port(struct uhci_hc *hc, int port, u16 reg,
   /* Devices may expect a reset between the probe read and SET_ADDRESS, and
    * many real ones require it. */
   if (uhci_port_reset(hc, reg) != 0) {
-    log_write_int("UHCI: port dropped after probe, port", port, KERNEL,
-                  LOG_ERROR);
+    log_write_int("UHCI: port dropped after probe, port", port, KERNEL, LOG_ERROR);
     return;
   }
 
@@ -584,10 +565,8 @@ static void uhci_enumerate_port(struct uhci_hc *hc, int port, u16 reg,
   log_write_int("UHCI: device addressed", addr, KERNEL, LOG_INFO);
 
   memset(&desc, 0, sizeof(desc));
-  if (usb_get_descriptor(&pipe, USB_DESC_DEVICE, 0, &desc, sizeof(desc)) <
-      (int)sizeof(desc)) {
-    log_write_int("UHCI: full GET_DESCRIPTOR failed, addr", addr, KERNEL,
-                  LOG_ERROR);
+  if (usb_get_descriptor(&pipe, USB_DESC_DEVICE, 0, &desc, sizeof(desc)) < (int)sizeof(desc)) {
+    log_write_int("UHCI: full GET_DESCRIPTOR failed, addr", addr, KERNEL, LOG_ERROR);
     return;
   }
 
@@ -595,8 +574,7 @@ static void uhci_enumerate_port(struct uhci_hc *hc, int port, u16 reg,
   log_write_hex("UHCI:   idProduct", desc.idProduct, KERNEL, LOG_INFO);
   log_write_hex("UHCI:   bcdUSB", desc.bcdUSB, KERNEL, LOG_INFO);
   log_write_hex("UHCI:   bDeviceClass", desc.bDeviceClass, KERNEL, LOG_INFO);
-  log_write_int("UHCI:   configurations", desc.bNumConfigurations, KERNEL,
-                LOG_INFO);
+  log_write_int("UHCI:   configurations", desc.bNumConfigurations, KERNEL, LOG_INFO);
 
   if (desc.bNumConfigurations == 0) {
     log_write("UHCI: device offers no configuration", KERNEL, LOG_WARN);
@@ -607,31 +585,25 @@ static void uhci_enumerate_port(struct uhci_hc *hc, int port, u16 reg,
   if (cfg_len < 0)
     return;
 
-  const struct usb_config_descriptor *cfg =
-      (const struct usb_config_descriptor *)uhci_config_buf;
-  log_write_int("UHCI:   config value", cfg->bConfigurationValue, KERNEL,
-                LOG_INFO);
+  const struct usb_config_descriptor *cfg = (const struct usb_config_descriptor *)uhci_config_buf;
+  log_write_int("UHCI:   config value", cfg->bConfigurationValue, KERNEL, LOG_INFO);
   log_write_int("UHCI:   interfaces", cfg->bNumInterfaces, KERNEL, LOG_INFO);
 
   struct usb_hid_pointer hid_pointer;
   memset(&hid_pointer, 0, sizeof(hid_pointer));
   /* No limit: UHCI sizes its interrupt buffer from the endpoint it finds. */
-  int have_hid_pointer = usb_find_hid_pointer(uhci_config_buf, cfg_len, 0,
-                                              "UHCI", &hid_pointer);
+  int have_hid_pointer = usb_find_hid_pointer(uhci_config_buf, cfg_len, 0, "UHCI", &hid_pointer);
 
   /* Until this lands the device answers only standard requests on ep0 , its
    * other endpoints do not exist, so configure before scheduling anything. */
   if (usb_set_configuration(&pipe, cfg->bConfigurationValue) < 0) {
-    log_write_int("UHCI: SET_CONFIGURATION failed, addr", addr, KERNEL,
-                  LOG_ERROR);
+    log_write_int("UHCI: SET_CONFIGURATION failed, addr", addr, KERNEL, LOG_ERROR);
     return;
   }
-  log_write_int("UHCI: device configured", cfg->bConfigurationValue, KERNEL,
-                LOG_INFO);
+  log_write_int("UHCI: device configured", cfg->bConfigurationValue, KERNEL, LOG_INFO);
 
   if (!have_hid_pointer) {
-    log_write("UHCI: no supported HID pointer endpoint, nothing to poll",
-              KERNEL, LOG_INFO);
+    log_write("UHCI: no supported HID pointer endpoint, nothing to poll", KERNEL, LOG_INFO);
     return;
   }
 
@@ -639,21 +611,24 @@ static void uhci_enumerate_port(struct uhci_hc *hc, int port, u16 reg,
     log_write("UHCI: HID SET_IDLE failed, continuing", KERNEL, LOG_WARN);
   if (hid_pointer.kind == USB_INT_KIND_HID_BOOT_MOUSE &&
       usb_hid_set_boot_protocol(&pipe, hid_pointer.interface_number) < 0)
-    log_write("UHCI: HID SET_PROTOCOL boot failed, continuing", KERNEL,
-              LOG_WARN);
+    log_write("UHCI: HID SET_PROTOCOL boot failed, continuing", KERNEL, LOG_WARN);
 
   struct usb_endpoint_descriptor *int_ep = &hid_pointer.endpoint;
-  u8 ep_num = int_ep->bEndpointAddress & USB_EP_ADDR_NUM_MASK;
-  if (uhci_int_ep_start(hc, addr, low_speed, ep_num, int_ep->wMaxPacketSize,
-                        int_ep->bInterval, hid_pointer.kind) == 0) {
-    log_write_int("UHCI: polling HID pointer endpoint", ep_num, KERNEL,
-                  LOG_INFO);
+  u8 ep_num                              = int_ep->bEndpointAddress & USB_EP_ADDR_NUM_MASK;
+  if (uhci_int_ep_start(hc,
+                        addr,
+                        low_speed,
+                        ep_num,
+                        int_ep->wMaxPacketSize,
+                        int_ep->bInterval,
+                        hid_pointer.kind) == 0) {
+    log_write_int("UHCI: polling HID pointer endpoint", ep_num, KERNEL, LOG_INFO);
   }
 }
 
 static void uhci_scan_ports(struct uhci_hc *hc) {
   for (int port = 0; port < UHCI_NUM_PORTS; port++) {
-    u16 reg = (port == 0) ? UHCI_PORTSC1 : UHCI_PORTSC2;
+    u16 reg    = (port == 0) ? UHCI_PORTSC1 : UHCI_PORTSC2;
     u16 status = uhci_read16(hc->io_base, reg);
 
     log_write_int("UHCI: scanning port", port, KERNEL, LOG_INFO);
@@ -667,7 +642,8 @@ static void uhci_scan_ports(struct uhci_hc *hc) {
     int low_speed = (status & UHCI_PORTSC_LSDA) != 0;
     log_write(low_speed ? "UHCI: device attached (low speed)"
                         : "UHCI: device attached (full speed)",
-              KERNEL, LOG_INFO);
+              KERNEL,
+              LOG_INFO);
 
     uhci_enumerate_port(hc, port, reg, low_speed);
   }
@@ -720,7 +696,7 @@ int uhci_init(struct pci_device *dev) {
     return -1;
   }
   hc->io_base = (u16)dev->bar[4].base;
-  hc->irq = dev->int_line;
+  hc->irq     = dev->int_line;
   log_write_hex("UHCI: I/O Base", hc->io_base, KERNEL, LOG_INFO);
   log_write_int("UHCI: IRQ line", hc->irq, KERNEL, LOG_INFO);
 
@@ -742,7 +718,7 @@ int uhci_init(struct pci_device *dev) {
    * frame -> QH -> nothing. link_ptr must terminate too , a QH pointing at
    * itself loops the controller for the rest of the frame. */
   struct uhci_qh *qh = (struct uhci_qh *)(hc->arena + UHCI_ARENA_QH);
-  qh->link_ptr = UHCI_PTR_TERM;
+  qh->link_ptr       = UHCI_PTR_TERM;
   qh_element_write(qh, UHCI_PTR_TERM);
 
   /* Rebuilt later if enumeration finds an endpoint to poll. */
@@ -769,16 +745,14 @@ int uhci_init(struct pci_device *dev) {
 
   /* Masked through bring-up and enumeration: those transfers are polled and
    * run before the boot-time sti, so arming IOC now would only strand an
-   * assert on a shared line. Enabled at the end of init, if anything needs it. */
+   * assert on a shared line. Enabled at the end of init, if anything needs it.
+   */
   uhci_write16(hc->io_base, UHCI_USBINTR, 0);
 
-  uhci_write16(hc->io_base, UHCI_USBCMD,
-               UHCI_USBCMD_CF | UHCI_USBCMD_RS | UHCI_USBCMD_MAXP);
+  uhci_write16(hc->io_base, UHCI_USBCMD, UHCI_USBCMD_CF | UHCI_USBCMD_RS | UHCI_USBCMD_MAXP);
 
-  if (uhci_wait_clear(hc->io_base, UHCI_USBSTS, UHCI_USBSTS_HCHALTED, 100) !=
-      0) {
-    log_write("UHCI: controller stayed halted after Run/Stop", KERNEL,
-              LOG_ERROR);
+  if (uhci_wait_clear(hc->io_base, UHCI_USBSTS, UHCI_USBSTS_HCHALTED, 100) != 0) {
+    log_write("UHCI: controller stayed halted after Run/Stop", KERNEL, LOG_ERROR);
     goto fail_stop;
   }
 
@@ -796,8 +770,7 @@ int uhci_init(struct pci_device *dev) {
   if (hc->int_ep.active) {
     irq_install(hc->irq, uhci_irq_handler);
     pic_clear_mask(hc->irq);
-    uhci_write16(hc->io_base, UHCI_USBINTR,
-                 UHCI_USBINTR_IOC_EN | UHCI_USBINTR_TIMEOUT_CRC_EN);
+    uhci_write16(hc->io_base, UHCI_USBINTR, UHCI_USBINTR_IOC_EN | UHCI_USBINTR_TIMEOUT_CRC_EN);
     log_write_int("UHCI: interrupts enabled on IRQ", hc->irq, KERNEL, LOG_INFO);
   }
 

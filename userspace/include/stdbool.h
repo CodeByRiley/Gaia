@@ -2,8 +2,8 @@
 #define GAIA_STDBOOL_H
 
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
-#define bool  _Bool
-#define true  1
+#define bool _Bool
+#define true 1
 #define false 0
 #endif
 

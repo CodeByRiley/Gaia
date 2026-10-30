@@ -27,20 +27,20 @@
 #ifndef TTY_H
 #define TTY_H
 
-#include <utilities/types.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
-#define TTY_CTRL_CLEAR  0x0C   /* form-feed: wipe surface, home cursor   */
-#define TTY_CTRL_PUSH   0x1C   /* save+clear (alt-screen enter)          */
-#define TTY_CTRL_POP    0x1D   /* restore (alt-screen exit)              */
-#define TTY_CTRL_ZOOM_IN  0x1E /* increase glyph scale by one step       */
+#define TTY_CTRL_CLEAR 0x0C    /* form-feed: wipe surface, home cursor   */
+#define TTY_CTRL_PUSH 0x1C     /* save+clear (alt-screen enter)          */
+#define TTY_CTRL_POP 0x1D      /* restore (alt-screen exit)              */
+#define TTY_CTRL_ZOOM_IN 0x1E  /* increase glyph scale by one step       */
 #define TTY_CTRL_ZOOM_OUT 0x1F /* decrease glyph scale by one step       */
 
 /* Channel count. Userspace heimdall mirrors one console window per channel,
  * so CON_MAX in userspace/bin/heimdall/heimdall.h must not exceed this. */
-#define TTY_MAX     4
-#define TTY_KERNEL  0
+#define TTY_MAX 4
+#define TTY_KERNEL 0
 
 extern struct ttf_font *g_sys_font;
 
@@ -49,7 +49,7 @@ void tty_init(void);
 /* Disable framebuffer drawing while heimdall owns the screen. Text still
  * buffers into the grid so the kernel log doesn't blackhole. */
 void tty_set_active(int on);
-int  tty_is_active(void);
+int tty_is_active(void);
 
 /* --- channel-addressed forms ------------------------------------------
  *
@@ -58,26 +58,26 @@ int  tty_is_active(void);
  *
  * Out-of-range or closed channels are ignored (writes) or return 0 / -1
  * (reads), so a stale index from userspace cannot corrupt another channel. */
-void   tty_write_ch(int idx, const char *buf, usize n);
-void   tty_clear_ch(int idx);
-int    tty_push_ch(int idx);
-int    tty_pop_ch(int idx);
-int    tty_zoom_ch(int idx, int delta);
-void   tty_inject_input_ch(int idx, char c);
+void tty_write_ch(int idx, const char *buf, usize n);
+void tty_clear_ch(int idx);
+int tty_push_ch(int idx);
+int tty_pop_ch(int idx);
+int tty_zoom_ch(int idx, int delta);
+void tty_inject_input_ch(int idx, char c);
 usize tty_read_input_ch(int idx, char *buf, usize max);
 usize tty_drain_ch(int idx, char *out, usize max);
 
 /* Claim a free channel in 1..TTY_MAX-1, empty its rings, and return its
  * index. Returns -1 when every channel is taken. TTY_KERNEL is never
  * handed out: it belongs to the kernel for the lifetime of the boot. */
-int  tty_alloc(void);
+int tty_alloc(void);
 
 /* Give a channel back. Discards anything still buffered on it. No-op for
  * TTY_KERNEL and for a channel that is already free. */
 void tty_release(int idx);
 
 /* True if `idx` names a channel that is currently open. */
-int  tty_is_open(int idx);
+int tty_is_open(int idx);
 
 void tty_thread_entry(void);
 

@@ -43,8 +43,7 @@ static int nvidia_match(const struct device *device) {
   // log_write_hex("nvidia_match: vendor=", pci->vendor, KERNEL, LOG_INFO);
   // log_write_hex("nvidia_match: class_code=", pci->class_code, KERNEL,
   // LOG_INFO);
-  return pci->vendor == NVIDIA_PCI_VENDOR_ID &&
-         pci->class_code == PCI_CLASS_DISPLAY;
+  return pci->vendor == NVIDIA_PCI_VENDOR_ID && pci->class_code == PCI_CLASS_DISPLAY;
 }
 
 static int bar_contains(u64 address, const struct pci_bar *bar) {
@@ -60,7 +59,7 @@ static u32 nvidia_reg_read32(const struct nvidia_device *device, u32 offset) {
 }
 
 static u32 nvidia_boot0_architecture(u32 boot0) {
-  u32 low = (boot0 >> 24) & 0x1Fu;
+  u32 low  = (boot0 >> 24) & 0x1Fu;
   u32 high = (boot0 >> 8) & 0x1u;
   return low | (high << 5);
 }
@@ -72,9 +71,7 @@ static u32 nvidia_boot42_chip_id(u32 boot42) {
   return (boot42 >> 20) & 0x1FFu;
 }
 
-static u32 nvidia_boot42_implementation(u32 boot42) {
-  return (boot42 >> 20) & 0xFu;
-}
+static u32 nvidia_boot42_implementation(u32 boot42) { return (boot42 >> 20) & 0xFu; }
 
 static const char *nvidia_architecture_name(u32 architecture) {
   switch (architecture) {
@@ -105,13 +102,10 @@ static const char *nvidia_architecture_name(u32 architecture) {
   }
 }
 
-static int nvidia_map_control_bar(struct nvidia_device *state,
-                                  u32 device_index) {
+static int nvidia_map_control_bar(struct nvidia_device *state, u32 device_index) {
   const struct pci_bar *bar = &state->pci.bar[0];
-  if (!bar->valid || bar->is_io || bar->base == 0 ||
-      bar->size < NV_PMC_BOOT_42 + 4) {
-    log_write("nvidia: BAR0 is not a usable register aperture", KERNEL,
-              LOG_ERROR);
+  if (!bar->valid || bar->is_io || bar->base == 0 || bar->size < NV_PMC_BOOT_42 + 4) {
+    log_write("nvidia: BAR0 is not a usable register aperture", KERNEL, LOG_ERROR);
     return -1;
   }
   if (bar->base & (PAGE_SIZE - 1)) {
@@ -121,13 +115,11 @@ static int nvidia_map_control_bar(struct nvidia_device *state,
 
   u16 original_command = pci_read16(state->pci.addr, PCI_CFG_COMMAND);
   if (pci_enable_memory(&state->pci) != 0) {
-    log_write("nvidia: could not enable PCI memory decoding", KERNEL,
-              LOG_ERROR);
+    log_write("nvidia: could not enable PCI memory decoding", KERNEL, LOG_ERROR);
     return -1;
   }
 
-  u64 virt =
-      NVIDIA_DEVICE_SLOT_BASE + (u64)device_index * NVIDIA_DEVICE_SLOT_SIZE;
+  u64 virt  = NVIDIA_DEVICE_SLOT_BASE + (u64)device_index * NVIDIA_DEVICE_SLOT_SIZE;
   u64 flags = VMM_PRESENT | VMM_PCD | VMM_PWT | VMM_NX;
   if (vmm_map(virt, bar->base, flags) != 0) {
     pci_write16(state->pci.addr, PCI_CFG_COMMAND, original_command);
@@ -135,35 +127,31 @@ static int nvidia_map_control_bar(struct nvidia_device *state,
     return -1;
   }
 
-  state->regs = (volatile u8 *)(uintptr_t)virt;
+  state->regs      = (volatile u8 *)(uintptr_t)virt;
   state->regs_phys = bar->base;
   state->regs_size = bar->size;
-  state->boot0 = nvidia_reg_read32(state, NV_PMC_BOOT_0);
-  state->boot42 = nvidia_reg_read32(state, NV_PMC_BOOT_42);
+  state->boot0     = nvidia_reg_read32(state, NV_PMC_BOOT_0);
+  state->boot42    = nvidia_reg_read32(state, NV_PMC_BOOT_42);
 
   if (state->boot0 == 0xFFFFFFFFu) {
     vmm_unmap(virt);
     pci_write16(state->pci.addr, PCI_CFG_COMMAND, original_command);
     state->regs = 0;
-    log_write("nvidia: BAR0 register read returned all ones", KERNEL,
-              LOG_ERROR);
+    log_write("nvidia: BAR0 register read returned all ones", KERNEL, LOG_ERROR);
     return -1;
   }
 
   state->state = NVIDIA_MMIO_READY;
   log_write_hex("nvidia: PMC_BOOT_0 =", state->boot0, KERNEL, LOG_INFO);
   log_write_hex("nvidia: PMC_BOOT_42 =", state->boot42, KERNEL, LOG_INFO);
-  state->architecture = nvidia_boot0_architecture(state->boot0);
+  state->architecture   = nvidia_boot0_architecture(state->boot0);
   state->implementation = nvidia_boot42_implementation(state->boot42);
-  state->chip_id = nvidia_boot42_chip_id(state->boot42);
-  log_write_hex("nvidia: architecture id =", state->architecture, KERNEL,
-                LOG_INFO);
+  state->chip_id        = nvidia_boot42_chip_id(state->boot42);
+  log_write_hex("nvidia: architecture id =", state->architecture, KERNEL, LOG_INFO);
   log_write_hex("nvidia: chip id =", state->chip_id, KERNEL, LOG_INFO);
-  log_write_hex("nvidia: implementation id =", state->implementation, KERNEL,
-                LOG_INFO);
-  log_write_string("nvidia: architecture",
-                   nvidia_architecture_name(state->architecture), KERNEL,
-                   LOG_INFO);
+  log_write_hex("nvidia: implementation id =", state->implementation, KERNEL, LOG_INFO);
+  log_write_string(
+      "nvidia: architecture", nvidia_architecture_name(state->architecture), KERNEL, LOG_INFO);
   return 0;
 }
 
@@ -175,13 +163,12 @@ static int nvidia_probe(struct device *device) {
   }
 
   const struct pci_device *pci = &device->bus_info.pci;
-  int has_mmio = 0;
+  int has_mmio                 = 0;
 
-  log_write_hex("nvidia: vendor:device =",
-                ((u32)pci->vendor << 16) | pci->device, KERNEL, LOG_INFO);
   log_write_hex(
-      "nvidia: subsystem =", ((u32)pci->subsys_vendor << 16) | pci->subsys_id,
-      KERNEL, LOG_INFO);
+      "nvidia: vendor:device =", ((u32)pci->vendor << 16) | pci->device, KERNEL, LOG_INFO);
+  log_write_hex(
+      "nvidia: subsystem =", ((u32)pci->subsys_vendor << 16) | pci->subsys_id, KERNEL, LOG_INFO);
 
   for (int i = 0; i < 6; i++) {
     const struct pci_bar *bar = &pci->bar[i];
@@ -200,48 +187,46 @@ static int nvidia_probe(struct device *device) {
   }
 
   struct nvidia_device *state = &nvidia_devices[_nvidia_device_count];
-  state->pci = *pci;
+  state->pci                  = *pci;
   state->boot_framebuffer_bar = -1;
-  state->state = NVIDIA_DETECTED;
-  state->regs = 0;
-  state->regs_phys = 0;
-  state->regs_size = 0;
-  state->boot0 = 0;
-  state->boot42 = 0;
-  state->architecture = 0;
-  state->implementation = 0;
-  state->chip_id = 0;
-  state->firmware_family = NVIDIA_FW_FAMILY_NONE;
-  state->gsp_firmware = 0;
-  state->gsp_firmware_size = 0;
-  state->gsp_image = 0;
-  state->gsp_image_size = 0;
-  state->gsp_signature = 0;
-  state->gsp_signature_size = 0;
-  state->ucode_firmware = 0;
-  state->ucode_firmware_size = 0;
-  state->gsp_radix3 = 0;
-  state->ucode_radix3 = 0;
-  state->firmware_version[0] = 0;
-  state->fwsec_desc_offset = 0;
-  state->fwsec_desc_version = 0;
-  state->fwsec_desc_size = 0;
-  state->fwsec_app_id = 0;
-  state->fwsec_present = 0;
+  state->state                = NVIDIA_DETECTED;
+  state->regs                 = 0;
+  state->regs_phys            = 0;
+  state->regs_size            = 0;
+  state->boot0                = 0;
+  state->boot42               = 0;
+  state->architecture         = 0;
+  state->implementation       = 0;
+  state->chip_id              = 0;
+  state->firmware_family      = NVIDIA_FW_FAMILY_NONE;
+  state->gsp_firmware         = 0;
+  state->gsp_firmware_size    = 0;
+  state->gsp_image            = 0;
+  state->gsp_image_size       = 0;
+  state->gsp_signature        = 0;
+  state->gsp_signature_size   = 0;
+  state->ucode_firmware       = 0;
+  state->ucode_firmware_size  = 0;
+  state->gsp_radix3           = 0;
+  state->ucode_radix3         = 0;
+  state->firmware_version[0]  = 0;
+  state->fwsec_desc_offset    = 0;
+  state->fwsec_desc_version   = 0;
+  state->fwsec_desc_size      = 0;
+  state->fwsec_app_id         = 0;
+  state->fwsec_present        = 0;
 
   u64 fb_phys = framebuffer_phys();
   for (int i = 0; i < 6; i++) {
     if (bar_contains(fb_phys, &pci->bar[i])) {
       state->boot_framebuffer_bar = i;
-      log_write_hex("nvidia: boot framebuffer is in BAR", (u64)i, KERNEL,
-                    LOG_INFO);
+      log_write_hex("nvidia: boot framebuffer is in BAR", (u64)i, KERNEL, LOG_INFO);
       break;
     }
   }
 
   if (state->boot_framebuffer_bar < 0) {
-    log_write("nvidia: boot framebuffer is outside decoded BARs", KERNEL,
-              LOG_WARN);
+    log_write("nvidia: boot framebuffer is outside decoded BARs", KERNEL, LOG_WARN);
   }
 
   if (nvidia_map_control_bar(state, _nvidia_device_count) != 0) {
@@ -250,26 +235,21 @@ static int nvidia_probe(struct device *device) {
   }
 
   if (nvidia_vbios_load(state, _nvidia_device_count) != 0) {
-    log_write("nvidia: VBIOS unavailable, native init deferred", KERNEL,
-              LOG_WARN);
+    log_write("nvidia: VBIOS unavailable, native init deferred", KERNEL, LOG_WARN);
   } else if (nvidia_fwsec_locate(state) != 0) {
     /* Not fatal here: the boot framebuffer stays up either way, and
      * WPR2 setup is the only thing that needs FWSEC. */
-    log_write("nvidia: FWSEC ucode not located, WPR2 setup deferred", KERNEL,
-              LOG_WARN);
+    log_write("nvidia: FWSEC ucode not located, WPR2 setup deferred", KERNEL, LOG_WARN);
   }
 
   if (state->architecture >= 0x16 && state->architecture <= 0x1C) {
     if (state->state == NVIDIA_VBIOS_READY) {
-      log_write("nvidia: ready for Turing+ firmware selection", KERNEL,
-                LOG_INFO);
+      log_write("nvidia: ready for Turing+ firmware selection", KERNEL, LOG_INFO);
     } else {
-      log_write("nvidia: Turing+ device blocked on VBIOS access", KERNEL,
-                LOG_WARN);
+      log_write("nvidia: Turing+ device blocked on VBIOS access", KERNEL, LOG_WARN);
     }
   } else {
-    log_write("nvidia: generation is outside the Turing+ path", KERNEL,
-              LOG_WARN);
+    log_write("nvidia: generation is outside the Turing+ path", KERNEL, LOG_WARN);
   }
 
   _nvidia_device_count++;
@@ -279,8 +259,8 @@ static int nvidia_probe(struct device *device) {
 }
 
 const struct driver nvidia_driver = {
-    .name = "nvidia-video",
-    .bus = DEVICE_BUS_PCI,
+    .name  = "nvidia-video",
+    .bus   = DEVICE_BUS_PCI,
     .match = nvidia_match,
     .probe = nvidia_probe,
 };
@@ -293,14 +273,12 @@ void nvidia_driver_late_init(void) {
 
     log_write_hex("nvidia: loading firmware for device", i, KERNEL, LOG_INFO);
     if (nvidia_firmware_load(device) != 0) {
-      log_write("nvidia: firmware unavailable; retaining boot framebuffer",
-                KERNEL, LOG_WARN);
+      log_write("nvidia: firmware unavailable; retaining boot framebuffer", KERNEL, LOG_WARN);
       continue;
     }
 
     if (nvidia_gsp_prepare(device) != 0) {
-      log_write("nvidia: could not stage GSP image; retaining boot framebuffer",
-                KERNEL, LOG_WARN);
+      log_write("nvidia: could not stage GSP image; retaining boot framebuffer", KERNEL, LOG_WARN);
     }
   }
 }

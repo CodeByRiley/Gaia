@@ -1,7 +1,7 @@
 /* kernel/sync/waitqueue.c , see waitqueue.h. */
-#include <sync/waitqueue.h>
 #include <arch/irq.h>
 #include <sched/sched.h>
+#include <sync/waitqueue.h>
 #include <utilities/errno.h>
 #include <utilities/panic.h>
 
@@ -11,14 +11,14 @@ void wq_add(struct wait_queue *wq, struct wq_entry *e) {
     panic("wq_add: no current task");
 
   e->task = t;
-  e->wq = wq;
+  e->wq   = wq;
   e->prev = 0;
   e->next = wq->head;
   if (wq->head)
     wq->head->prev = e;
   wq->head = e;
 
-  e->task_next = t->wait_entries;
+  e->task_next    = t->wait_entries;
   t->wait_entries = e;
 }
 
@@ -33,8 +33,8 @@ void wq_remove_all(struct task *t) {
     if (e->next)
       e->next->prev = e->prev;
     e->prev = e->next = 0;
-    e->task_next = 0;
-    e = next;
+    e->task_next      = 0;
+    e                 = next;
   }
   t->wait_entries = 0;
 }

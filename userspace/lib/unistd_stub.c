@@ -8,18 +8,23 @@
 #include <lib/syscall.h>
 
 /* TTY detection unsupported , treat every fd as a pipe/file. */
-int isatty(int fd)                       { (void)fd; return 0; }
+int isatty(int fd) {
+  (void)fd;
+  return 0;
+}
 
 /* Busy-wait `s` seconds. Returns 0 (no signal handling). */
 unsigned int sleep(unsigned int s) {
-    long target = get_ticks() + (long)s * 1000;
-    while (get_ticks() < target) { }
-    return 0;
+  long target = get_ticks() + (long)s * 1000;
+  while (get_ticks() < target) {
+  }
+  return 0;
 }
 
 /* Busy-wait `us` microseconds (resolution is actually ~1 ms , tick rate). */
 int usleep(unsigned int us) {
-    long target = get_ticks() + (long)(us / 1000);
-    while (get_ticks() < target) { }
-    return 0;
+  long target = get_ticks() + (long)(us / 1000);
+  while (get_ticks() < target) {
+  }
+  return 0;
 }

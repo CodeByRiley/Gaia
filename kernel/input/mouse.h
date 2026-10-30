@@ -12,16 +12,15 @@
 #include <stdint.h>
 #include <utilities/types.h>
 
-
-#define MOUSE_BTN_LEFT   0x01
-#define MOUSE_BTN_RIGHT  0x02
+#define MOUSE_BTN_LEFT 0x01
+#define MOUSE_BTN_RIGHT 0x02
 #define MOUSE_BTN_MIDDLE 0x04
 
 struct mouse_event {
-    int16_t dx;            /* relative since last event; +x = right    */
-    int16_t dy;            /* relative since last event; +y = down     */
-    u8 buttons;       /* MOUSE_BTN_* mask of currently-held btns  */
-    u8 _pad;
+  int16_t dx; /* relative since last event; +x = right    */
+  int16_t dy; /* relative since last event; +y = down     */
+  u8 buttons; /* MOUSE_BTN_* mask of currently-held btns  */
+  u8 _pad;
 };
 
 void mouse_init(void);
@@ -34,7 +33,7 @@ void mouse_hid_report(const u8 *report, u16 len);
 void mouse_hid_tablet_report(const u8 *report, u16 len);
 
 /* Pop one event into *out. Returns 1 on success, 0 if ring empty. */
-int  mouse_poll(struct mouse_event *out);
+int mouse_poll(struct mouse_event *out);
 
 /* Absolute cursor coordinates, clamped to [0, w-1] / [0, h-1] where w/h
  * come from mouse_set_bounds (default: unbounded). */

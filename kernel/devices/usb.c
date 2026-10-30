@@ -54,8 +54,7 @@ void usb_init(void) {
     struct pci_device dev;
     if (!pci_device_at(i, &dev))
       continue;
-    if (dev.class_code != PCI_CLASS_SERIAL_BUS ||
-        dev.subclass != PCI_SUBCLASS_USB)
+    if (dev.class_code != PCI_CLASS_SERIAL_BUS || dev.subclass != PCI_SUBCLASS_USB)
       continue;
 
     found++;
@@ -77,6 +76,5 @@ void usb_init(void) {
     return;
   }
 
-  log_write_int("USB: controllers initialised", (int64_t)found, KERNEL,
-                LOG_INFO);
+  log_write_int("USB: controllers initialised", (int64_t)found, KERNEL, LOG_INFO);
 }

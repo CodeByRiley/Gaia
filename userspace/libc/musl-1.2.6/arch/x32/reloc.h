@@ -12,20 +12,25 @@
  * they do not seem to be used/usable for anything. If needed, new
  * mappings will have to be added. */
 
-#define REL_SYMBOLIC    R_X86_64_32
-#define REL_OFFSET      R_X86_64_PC32
-#define REL_GOT         R_X86_64_GLOB_DAT
-#define REL_PLT         R_X86_64_JUMP_SLOT
-#define REL_RELATIVE    R_X86_64_RELATIVE
-#define REL_COPY        R_X86_64_COPY
-#define REL_DTPMOD      R_X86_64_DTPMOD64
-#define REL_DTPOFF      R_X86_64_DTPOFF64
-#define REL_TPOFF       R_X86_64_TPOFF64
+#define REL_SYMBOLIC R_X86_64_32
+#define REL_OFFSET R_X86_64_PC32
+#define REL_GOT R_X86_64_GLOB_DAT
+#define REL_PLT R_X86_64_JUMP_SLOT
+#define REL_RELATIVE R_X86_64_RELATIVE
+#define REL_COPY R_X86_64_COPY
+#define REL_DTPMOD R_X86_64_DTPMOD64
+#define REL_DTPOFF R_X86_64_DTPOFF64
+#define REL_TPOFF R_X86_64_TPOFF64
 
-#define CRTJMP(pc,sp) __asm__ __volatile__( \
-	"mov %1,%%esp ; jmp *%0" : : "r"((uint64_t)(uintptr_t)pc), "r"(sp) : "memory" )
+#define CRTJMP(pc, sp)                                                                             \
+  __asm__ __volatile__("mov %1,%%esp ; jmp *%0"                                                    \
+                       :                                                                           \
+                       : "r"((uint64_t)(uintptr_t)pc), "r"(sp)                                     \
+                       : "memory")
 
-#define GETFUNCSYM(fp, sym, got) __asm__ ( \
-	".hidden " #sym "\n" \
-	"	lea " #sym "(%%rip),%0\n" \
-	: "=r"(*fp) : : "memory" )
+#define GETFUNCSYM(fp, sym, got)                                                                   \
+  __asm__(".hidden " #sym "\n"                                                                     \
+          "	lea " #sym "(%%rip),%0\n"                                                          \
+          : "=r"(*fp)                                                                              \
+          :                                                                                        \
+          : "memory")

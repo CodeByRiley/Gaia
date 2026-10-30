@@ -13,9 +13,9 @@
 #include <stdint.h>
 
 struct bmp_image {
-    int       width;
-    int       height;
-    uint32_t *pixels;   /* width*height, top-down, 0xAARRGGBB */
+  int width;
+  int height;
+  uint32_t *pixels; /* width*height, top-down, 0xAARRGGBB */
 };
 
 /* Load and decode `path`. Returns 0 on success, -1 on anything else:
@@ -26,7 +26,7 @@ struct bmp_image {
  * is entirely zero are also treated as opaque , plenty of tools write
  * that for images with no transparency, and honouring it literally would
  * make every such image invisible. */
-int  bmp_load(const char *path, struct bmp_image *out);
+int bmp_load(const char *path, struct bmp_image *out);
 
 /* Release the pixel buffer and zero the struct. Safe on a zeroed struct. */
 void bmp_free(struct bmp_image *img);

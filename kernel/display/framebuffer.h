@@ -14,10 +14,10 @@
 #ifndef FRAMEBUFFER_H
 #define FRAMEBUFFER_H
 
+#include <arch/syscall_abi.h>
 #include <stdint.h>
 #include <utilities/math.h>
 #include <utilities/types.h>
-#include <arch/syscall_abi.h>
 
 #define FB_TARGET_HZ 120
 
@@ -84,18 +84,16 @@ void framebuffer_panic_takeover(void);
  * are split into scanline lanes and dispatched to the AP work queue; CPU 0
  * processes one lane and supplies the single-core fallback. This call is
  * synchronous, so the caller may modify or release the source after return. */
-int framebuffer_present_user(u64 *user_pml4, int owner_pid, u64 source,
-                             u32 source_pitch, const struct fb_rect *rects,
-                             u32 rect_count);
+int framebuffer_present_user(u64 *user_pml4, int owner_pid, u64 source, u32 source_pitch,
+                             const struct fb_rect *rects, u32 rect_count);
 
 /* Pin a compositor backbuffer logically by snapshotting its physical pages.
  * The VM layer rejects munmap over this range until unregister or owner exit.
  */
-int framebuffer_register_user(u64 *user_pml4, int owner_pid, u64 source,
-                              u32 source_pitch, u64 source_bytes);
+int framebuffer_register_user(u64 *user_pml4, int owner_pid, u64 source, u32 source_pitch,
+                              u64 source_bytes);
 int framebuffer_unregister_user(u64 *user_pml4, int owner_pid);
-int framebuffer_user_buffer_registered(u64 *user_pml4, int owner_pid,
-                                       u64 source, u32 source_pitch,
+int framebuffer_user_buffer_registered(u64 *user_pml4, int owner_pid, u64 source, u32 source_pitch,
                                        u64 source_bytes);
 int framebuffer_registered_range_overlaps(u64 *user_pml4, u64 base, u64 bytes);
 

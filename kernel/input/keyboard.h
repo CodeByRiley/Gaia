@@ -13,18 +13,18 @@
 #include <utilities/types.h>
 
 struct kbd_key {
-    u16 keycode;     /* Linux KEY_* (see input/key_codes.h) */
-    u8  pressed;     /* 1 = press, 0 = release              */
+  u16 keycode; /* Linux KEY_* (see input/key_codes.h) */
+  u8 pressed;  /* 1 = press, 0 = release              */
 };
 
 struct kbd_event {
-    struct kbd_key key;
+  struct kbd_key key;
 };
 
 void keyboard_init(void);
 
 /* Pop one event into *pressed / *key. Returns 1 on success, 0 if ring
  * empty. Lossy on overflow , sticky modifier holds may desync. */
-int  keyboard_poll(int *pressed, u16 *key);
+int keyboard_poll(int *pressed, u16 *key);
 
 #endif

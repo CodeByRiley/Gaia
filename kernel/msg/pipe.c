@@ -1,7 +1,7 @@
 /* kernel/msg/pipe.c , see pipe.h. */
-#include <msg/pipe.h>
 #include <arch/irq.h>
 #include <memory/heap.h>
+#include <msg/pipe.h>
 #include <utilities/errno.h>
 #include <utilities/string.h>
 
@@ -45,13 +45,9 @@ void pipe_unref(struct pipe *p, int write_end) {
     kfree(p);
 }
 
-int pipe_readable(const struct pipe *p) {
-  return p->count > 0 || p->writers == 0;
-}
+int pipe_readable(const struct pipe *p) { return p->count > 0 || p->writers == 0; }
 
-int pipe_writable(const struct pipe *p) {
-  return p->count < PIPE_CAPACITY || p->readers == 0;
-}
+int pipe_writable(const struct pipe *p) { return p->count < PIPE_CAPACITY || p->readers == 0; }
 
 long pipe_read(struct pipe *p, void *buf, usize n, int nonblock) {
   if (n == 0)
@@ -91,9 +87,9 @@ long pipe_write(struct pipe *p, const void *buf, usize n, int nonblock) {
   if (n == 0)
     return 0;
 
-  u64 flags = irq_save();
+  u64 flags     = irq_save();
   usize written = 0;
-  long rc = 0;
+  long rc       = 0;
   while (written < n) {
     if (p->readers == 0) {
       rc = -EPIPE;
@@ -103,7 +99,7 @@ long pipe_write(struct pipe *p, const void *buf, usize n, int nonblock) {
     /* A write of at most PIPE_BUF bytes waits until it fits whole, so it is
      * never interleaved with another writer's. Longer writes go in pieces. */
     usize space = PIPE_CAPACITY - p->count;
-    usize need = (n <= PIPE_BUF) ? n - written : 1;
+    usize need  = (n <= PIPE_BUF) ? n - written : 1;
     if (space < need) {
       if (nonblock) {
         rc = -EAGAIN;
@@ -117,7 +113,7 @@ long pipe_write(struct pipe *p, const void *buf, usize n, int nonblock) {
     }
 
     usize chunk = n - written < space ? n - written : space;
-    u32 tail = (p->head + p->count) % PIPE_CAPACITY;
+    u32 tail    = (p->head + p->count) % PIPE_CAPACITY;
     usize first = PIPE_CAPACITY - tail;
     if (first > chunk)
       first = chunk;

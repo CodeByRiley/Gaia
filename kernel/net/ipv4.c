@@ -16,8 +16,7 @@ static u16 ipv4_next_id;
 /* Where to send a packet for `dst`: the host itself when it is on-link,
  * otherwise the gateway. Returns -1 when neither applies, which is the
  * honest answer for an off-link destination with no gateway configured. */
-static int ipv4_next_hop(const struct netif *nif, const u8 *dst,
-                         u8 hop[IPV4_ALEN]) {
+static int ipv4_next_hop(const struct netif *nif, const u8 *dst, u8 hop[IPV4_ALEN]) {
   if (ipv4_same_subnet(dst, nif->ipv4, nif->netmask)) {
     memcpy(hop, dst, IPV4_ALEN);
     return 0;
@@ -30,12 +29,10 @@ static int ipv4_next_hop(const struct netif *nif, const u8 *dst,
 
 static int ipv4_dst_is_broadcast(const struct netif *nif, const u8 *dst) {
   static const u8 all_ones[IPV4_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF};
-  return ipv4_addr_equal(dst, all_ones) ||
-         ipv4_is_broadcast(dst, nif->ipv4, nif->netmask);
+  return ipv4_addr_equal(dst, all_ones) || ipv4_is_broadcast(dst, nif->ipv4, nif->netmask);
 }
 
-int ipv4_output_framed(u8 *frame, const u8 dst[IPV4_ALEN],
-                       u8 protocol, u16 payload_len) {
+int ipv4_output_framed(u8 *frame, const u8 dst[IPV4_ALEN], u8 protocol, u16 payload_len) {
   struct netif *nif = netif_get();
   if (!nif || !frame || !dst || payload_len > IPV4_PAYLOAD_MAX)
     return -1;
@@ -43,13 +40,13 @@ int ipv4_output_framed(u8 *frame, const u8 dst[IPV4_ALEN],
   u16 total_len = (u16)(IPV4_HDR_LEN + payload_len);
 
   struct ipv4_hdr *ip = (struct ipv4_hdr *)(frame + ETH_HDR_LEN);
-  ip->version_ihl = 0x45; /* IPv4, 20-byte header, no options */
-  ip->gaia = 0;
-  ip->total_length = to_be16(total_len);
-  ip->id = to_be16(ipv4_next_id++);
-  ip->flags_fragment = 0;
-  ip->ttl = IPV4_DEFAULT_TTL;
-  ip->protocol = protocol;
+  ip->version_ihl     = 0x45; /* IPv4, 20-byte header, no options */
+  ip->gaia            = 0;
+  ip->total_length    = to_be16(total_len);
+  ip->id              = to_be16(ipv4_next_id++);
+  ip->flags_fragment  = 0;
+  ip->ttl             = IPV4_DEFAULT_TTL;
+  ip->protocol        = protocol;
   memcpy(ip->src, nif->ipv4, IPV4_ALEN);
   memcpy(ip->dst, dst, IPV4_ALEN);
   ip->checksum = 0;
@@ -70,8 +67,7 @@ int ipv4_output_framed(u8 *frame, const u8 dst[IPV4_ALEN],
   return arp_send_or_queue(hop, frame, total_len, ETH_TYPE_IPV4);
 }
 
-int ipv4_output(const u8 dst[IPV4_ALEN], u8 protocol,
-                const void *payload, u16 payload_len) {
+int ipv4_output(const u8 dst[IPV4_ALEN], u8 protocol, const void *payload, u16 payload_len) {
   if (payload_len > IPV4_PAYLOAD_MAX)
     return -1;
 
@@ -82,8 +78,7 @@ int ipv4_output(const u8 dst[IPV4_ALEN], u8 protocol,
   return ipv4_output_framed(frame, dst, protocol, payload_len);
 }
 
-void ipv4_input(const struct eth_hdr *eth, const u8 *packet,
-                u16 len) {
+void ipv4_input(const struct eth_hdr *eth, const u8 *packet, u16 len) {
   struct netif *nif = netif_get();
   if (!nif || !packet || len < IPV4_HDR_LEN)
     return;
@@ -93,7 +88,7 @@ void ipv4_input(const struct eth_hdr *eth, const u8 *packet,
   if ((ip->version_ihl >> 4) != 4)
     return;
 
-  u16 ihl = (u16)((ip->version_ihl & 0x0F) * 4);
+  u16 ihl       = (u16)((ip->version_ihl & 0x0F) * 4);
   u16 total_len = from_be16(ip->total_length);
 
   /* total_len may be shorter than len , Ethernet pads to 60 bytes, so a
@@ -110,17 +105,23 @@ void ipv4_input(const struct eth_hdr *eth, const u8 *packet,
   if (from_be16(ip->flags_fragment) & 0x3FFF)
     return;
 
-  log_write_fmt(KERNEL, LOG_DEBUG,
+  log_write_fmt(KERNEL,
+                LOG_DEBUG,
                 "RX IP packet for %d.%d.%d.%d. My IP is %d.%d.%d.%d\n",
-                ip->dst[0], ip->dst[1], ip->dst[2], ip->dst[3], nif->ipv4[0],
-                nif->ipv4[1], nif->ipv4[2], nif->ipv4[3]);
+                ip->dst[0],
+                ip->dst[1],
+                ip->dst[2],
+                ip->dst[3],
+                nif->ipv4[0],
+                nif->ipv4[1],
+                nif->ipv4[2],
+                nif->ipv4[3]);
 
-  if (!ipv4_addr_equal(ip->dst, nif->ipv4) &&
-      !ipv4_dst_is_broadcast(nif, ip->dst))
+  if (!ipv4_addr_equal(ip->dst, nif->ipv4) && !ipv4_dst_is_broadcast(nif, ip->dst))
     return;
 
   const u8 *payload = packet + ihl;
-  u16 payload_len = (u16)(total_len - ihl);
+  u16 payload_len   = (u16)(total_len - ihl);
 
   switch (ip->protocol) {
   case IPPROTO_ICMP:
@@ -129,26 +130,26 @@ void ipv4_input(const struct eth_hdr *eth, const u8 *packet,
   case IPPROTO_UDP:
     udp_input(ip, payload, payload_len);
     break;
-//   case IPPROTO_UDP: {
-//     log_write("net: UDP packet received", KERNEL, LOG_INFO);
-//
-//     const struct udp_header *udp = (const struct udp_header *)payload;
-//     const u8 *udp_payload = payload + UDP_HEADER_SIZE;
-//     u16 udp_payload_len = payload_len - UDP_HEADER_SIZE;
-//
-//     struct ipv4_addr src = *(struct ipv4_addr *)ip->src;
-//     struct ipv4_addr dst = *(struct ipv4_addr *)ip->dst;
-//
-//     socket_handle_incoming(src,                 // src_ip
-//                            udp->src_port,       // src_port
-//                            dst,                 // dest_ip
-//                            udp->dst_port,       // dest_port
-//                            IPPROTO_UDP,         // protocol
-//                            (void *)udp_payload, // payload
-//                            udp_payload_len      // length
-//     );
-//     break;
-//   }
+    //   case IPPROTO_UDP: {
+    //     log_write("net: UDP packet received", KERNEL, LOG_INFO);
+    //
+    //     const struct udp_header *udp = (const struct udp_header *)payload;
+    //     const u8 *udp_payload = payload + UDP_HEADER_SIZE;
+    //     u16 udp_payload_len = payload_len - UDP_HEADER_SIZE;
+    //
+    //     struct ipv4_addr src = *(struct ipv4_addr *)ip->src;
+    //     struct ipv4_addr dst = *(struct ipv4_addr *)ip->dst;
+    //
+    //     socket_handle_incoming(src,                 // src_ip
+    //                            udp->src_port,       // src_port
+    //                            dst,                 // dest_ip
+    //                            udp->dst_port,       // dest_port
+    //                            IPPROTO_UDP,         // protocol
+    //                            (void *)udp_payload, // payload
+    //                            udp_payload_len      // length
+    //     );
+    //     break;
+    //   }
   case IPPROTO_TCP: {
     log_write("net: TCP packet received", KERNEL, LOG_INFO);
     tcp_input(ip, payload, payload_len);

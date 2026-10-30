@@ -8,9 +8,9 @@
 #ifndef PRINTF_H
 #define PRINTF_H
 
-#include <utilities/types.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <utilities/types.h>
 
 int vsnprintf(char *buf, usize size, const char *fmt, va_list ap);
 int snprintf(char *buf, usize size, const char *fmt, ...);

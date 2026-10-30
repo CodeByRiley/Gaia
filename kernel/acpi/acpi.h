@@ -88,8 +88,7 @@ int acpi_init(u64 mb2_addr);
 
 /* Return the `index`th checksum-valid SDT with this four-byte signature.
  * The pointer remains valid for the lifetime of the kernel. */
-const struct acpi_sdt_header *acpi_find_table(const char signature[4],
-                                              u32 index);
+const struct acpi_sdt_header *acpi_find_table(const char signature[4], u32 index);
 
 /* Default LAPIC MMIO physical base reported by MADT. */
 u64 acpi_lapic_phys(void);

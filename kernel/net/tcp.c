@@ -6,14 +6,20 @@
 #include "utilities/string.h"
 
 const char *g_tcpStateStrs[] = {
-    "CLOSED",      "LISTEN",     "SYN_SENT",   "SYN_RECEIVED",
-    "ESTABLISHED", "FIN_WAIT_1", "FIN_WAIT_2", "CLOSE_WAIT",
-    "CLOSING",     "LAST_ACK",   "TIME_WAIT",
+    "CLOSED",
+    "LISTEN",
+    "SYN_SENT",
+    "SYN_RECEIVED",
+    "ESTABLISHED",
+    "FIN_WAIT_1",
+    "FIN_WAIT_2",
+    "CLOSE_WAIT",
+    "CLOSING",
+    "LAST_ACK",
+    "TIME_WAIT",
 };
 
-void tcp_init(void) {
-  /* Retransmit timers and TCB tables go here. */
-}
+void tcp_init(void) { /* Retransmit timers and TCB tables go here. */ }
 
 /* RFC 1071 one's-complement sum over big-endian 16-bit words, done
  * byte-pair by byte-pair so it does not depend on host endianness.
@@ -27,17 +33,17 @@ static u32 tcp_sum(const u8 *p, u16 len, u32 sum) {
   return sum;
 }
 
-u16 tcp_checksum(const u8 src_ip[4], const u8 dst_ip[4],
-                 const struct tcp_header *hdr, u16 seg_len) {
+u16 tcp_checksum(const u8 src_ip[4], const u8 dst_ip[4], const struct tcp_header *hdr,
+                 u16 seg_len) {
   struct tcp_pseudo_header pseudo;
   memcpy(pseudo.src, src_ip, IPV4_ALEN);
   memcpy(pseudo.dst, dst_ip, IPV4_ALEN);
-  pseudo.zero = 0;
+  pseudo.zero     = 0;
   pseudo.protocol = IPPROTO_TCP;
-  pseudo.tcp_len = to_be16(seg_len);
+  pseudo.tcp_len  = to_be16(seg_len);
 
   u32 sum = tcp_sum((const u8 *)&pseudo, (u16)sizeof pseudo, 0);
-  sum = tcp_sum((const u8 *)hdr, seg_len, sum);
+  sum     = tcp_sum((const u8 *)hdr, seg_len, sum);
 
   while (sum >> 16)
     sum = (sum & 0xFFFFu) + (sum >> 16);
@@ -71,7 +77,7 @@ void tcp_parse_options(const u8 *opts, u8 opts_len, struct tcp_options *out) {
       if (len == 4) {
         u16 raw;
         memcpy(&raw, opts + i + 2, sizeof raw); /* options can be unaligned */
-        out->mss = from_be16(raw);
+        out->mss     = from_be16(raw);
         out->has_mss = true;
       }
       break;
@@ -83,8 +89,8 @@ void tcp_parse_options(const u8 *opts, u8 opts_len, struct tcp_options *out) {
       if (len == 10) {
         u32 raw[2];
         memcpy(raw, opts + i + 2, sizeof raw);
-        out->timestamp_value = from_be32(raw[0]);
-        out->timestamp_echo = from_be32(raw[1]);
+        out->timestamp_value   = from_be32(raw[0]);
+        out->timestamp_echo    = from_be32(raw[1]);
         out->timestamp_present = true;
       }
       break;
@@ -116,25 +122,33 @@ void tcp_input(const struct ipv4_hdr *ip, const u8 *segment, u16 seg_len) {
   }
 
   struct tcp_options opts;
-  tcp_parse_options(segment + TCP_MIN_HEADER_LEN,
-                    (u8)(hdr_len - TCP_MIN_HEADER_LEN), &opts);
+  tcp_parse_options(segment + TCP_MIN_HEADER_LEN, (u8)(hdr_len - TCP_MIN_HEADER_LEN), &opts);
 
   const u8 *payload = segment + hdr_len;
-  u16 payload_len = (u16)(seg_len - hdr_len);
+  u16 payload_len   = (u16)(seg_len - hdr_len);
 
-  log_write_fmt(KERNEL, LOG_DEBUG,
+  log_write_fmt(KERNEL,
+                LOG_DEBUG,
                 "tcp: %u.%u.%u.%u:%u -> local:%u flags=0x%02x seq=%u ack=%u "
                 "win=%u len=%u mss=%u\n",
-                ip->src[0], ip->src[1], ip->src[2], ip->src[3],
-                tcp_hdr_src_port(hdr), tcp_hdr_dst_port(hdr), hdr->flags,
-                tcp_hdr_seq(hdr), tcp_hdr_ack(hdr), tcp_hdr_window(hdr),
-                payload_len, opts.has_mss ? opts.mss : 0u);
+                ip->src[0],
+                ip->src[1],
+                ip->src[2],
+                ip->src[3],
+                tcp_hdr_src_port(hdr),
+                tcp_hdr_dst_port(hdr),
+                hdr->flags,
+                tcp_hdr_seq(hdr),
+                tcp_hdr_ack(hdr),
+                tcp_hdr_window(hdr),
+                payload_len,
+                opts.has_mss ? opts.mss : 0u);
 
   /* Interim demux, same shape as the UDP path. A real TCP layer wants a
    * 4-tuple lookup with a fallback to listening sockets, and an RST when
    * nothing matches (RFC 793 §3.4). */
   struct ipv4_addr src = *(struct ipv4_addr *)ip->src;
   struct ipv4_addr dst = *(struct ipv4_addr *)ip->dst;
-  socket_handle_incoming(src, hdr->src_port, dst, hdr->dst_port, IPPROTO_TCP,
-                         (void *)payload, payload_len);
+  socket_handle_incoming(
+      src, hdr->src_port, dst, hdr->dst_port, IPPROTO_TCP, (void *)payload, payload_len);
 }

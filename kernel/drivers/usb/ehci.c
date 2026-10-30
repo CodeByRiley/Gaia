@@ -20,29 +20,29 @@
 #include <utilities/log.h>
 #include <utilities/string.h>
 
-#define EHCI_DMA_LIMIT          0x100000000ULL
-#define EHCI_MMIO_VIRT_BASE     0xFFFFE00500000000ULL
-#define EHCI_MMIO_SLOT_SIZE     0x10000ULL
-#define EHCI_MAX_CONTROLLERS    4
-#define EHCI_CONFIG_BUF_MAX     256
-#define EHCI_XFER_TIMEOUT_MS    500
-#define EHCI_EP0_DEFAULT_MAXP   8
-#define EHCI_INT_BUF_MAX        64
-#define EHCI_INT_LOG_LIMIT      4
+#define EHCI_DMA_LIMIT 0x100000000ULL
+#define EHCI_MMIO_VIRT_BASE 0xFFFFE00500000000ULL
+#define EHCI_MMIO_SLOT_SIZE 0x10000ULL
+#define EHCI_MAX_CONTROLLERS 4
+#define EHCI_CONFIG_BUF_MAX 256
+#define EHCI_XFER_TIMEOUT_MS 500
+#define EHCI_EP0_DEFAULT_MAXP 8
+#define EHCI_INT_BUF_MAX 64
+#define EHCI_INT_LOG_LIMIT 4
 
 /* One physically contiguous 4 KiB DMA arena. All hardware link pointers are
  * 32-bit, and every QH/qTD address below meets its 32-byte alignment rule. */
-#define EHCI_ARENA_ASYNC_HEAD   0x000
-#define EHCI_ARENA_CONTROL_QH   0x040
-#define EHCI_ARENA_QTD_POOL     0x080
-#define EHCI_ARENA_SETUP        0x180
-#define EHCI_ARENA_DATA         0x200
-#define EHCI_ARENA_DATA_MAX     1024
-#define EHCI_ARENA_PERIODIC_QH  0x600
+#define EHCI_ARENA_ASYNC_HEAD 0x000
+#define EHCI_ARENA_CONTROL_QH 0x040
+#define EHCI_ARENA_QTD_POOL 0x080
+#define EHCI_ARENA_SETUP 0x180
+#define EHCI_ARENA_DATA 0x200
+#define EHCI_ARENA_DATA_MAX 1024
+#define EHCI_ARENA_PERIODIC_QH 0x600
 #define EHCI_ARENA_PERIODIC_QTD 0x640
-#define EHCI_ARENA_INT_BUF      0x680
-#define EHCI_ARENA_BULK_BUF     0x800
-#define EHCI_ARENA_BULK_MAX     2048
+#define EHCI_ARENA_INT_BUF 0x680
+#define EHCI_ARENA_BULK_BUF 0x800
+#define EHCI_ARENA_BULK_MAX 2048
 
 struct ehci_int_ep {
   int active;
@@ -99,12 +99,8 @@ static u8 ehci_config_buf[EHCI_CONFIG_BUF_MAX];
 SINLINE u8 ehci_read8(uintptr_t addr) { return read8(addr); }
 SINLINE u16 ehci_read16(uintptr_t addr) { return read16(addr); }
 SINLINE u32 ehci_read32(uintptr_t addr) { return read32(addr); }
-SINLINE void ehci_write32(uintptr_t addr, u32 value) {
-  write32(addr, value);
-}
-SINLINE u32 ehci_op_read(const struct ehci_hcd *hc, u32 reg) {
-  return ehci_read32(hc->op + reg);
-}
+SINLINE void ehci_write32(uintptr_t addr, u32 value) { write32(addr, value); }
+SINLINE u32 ehci_op_read(const struct ehci_hcd *hc, u32 reg) { return ehci_read32(hc->op + reg); }
 SINLINE void ehci_op_write(const struct ehci_hcd *hc, u32 reg, u32 value) {
   ehci_write32(hc->op + reg, value);
 }
@@ -120,12 +116,9 @@ SINLINE u32 qh_next_read(const struct ehci_qh *qh) {
 SINLINE void qh_next_write(struct ehci_qh *qh, u32 value) {
   *(volatile u32 *)(void *)&qh->overlay.next = value;
 }
-static void ehci_dma_barrier(void) {
-  __asm__ volatile("mfence" ::: "memory");
-}
+static void ehci_dma_barrier(void) { __asm__ volatile("mfence" ::: "memory"); }
 
-static int ehci_wait_mask(uintptr_t base, u32 reg, u32 mask, u32 expected,
-                          u32 budget_ms) {
+static int ehci_wait_mask(uintptr_t base, u32 reg, u32 mask, u32 expected, u32 budget_ms) {
   for (u64 i = 0; i < (u64)budget_ms * 10; i++) {
     if ((ehci_read32(base + reg) & mask) == expected)
       return 0;
@@ -140,19 +133,16 @@ static int ehci_wait_set(uintptr_t base, u32 reg, u32 mask, u32 budget_ms) {
   return ehci_wait_mask(base, reg, mask, mask, budget_ms);
 }
 
-static uintptr_t ehci_map_mmio(const struct pci_bar *bar, u64 *mapped_page,
-                               u64 *mapped_pages) {
-  if (!bar || !bar->valid || bar->is_io || bar->size == 0 ||
-      ehci_mmio_slot >= EHCI_MAX_CONTROLLERS)
+static uintptr_t ehci_map_mmio(const struct pci_bar *bar, u64 *mapped_page, u64 *mapped_pages) {
+  if (!bar || !bar->valid || bar->is_io || bar->size == 0 || ehci_mmio_slot >= EHCI_MAX_CONTROLLERS)
     return 0;
-  u64 offset = bar->base & 0xFFFULL;
+  u64 offset    = bar->base & 0xFFFULL;
   u64 page_phys = bar->base & ~0xFFFULL;
-  u64 pages = (bar->size + offset + 0xFFFULL) / 4096;
+  u64 pages     = (bar->size + offset + 0xFFFULL) / 4096;
   if (pages == 0 || pages * 4096 > EHCI_MMIO_SLOT_SIZE)
     return 0;
 
-  u64 va = EHCI_MMIO_VIRT_BASE +
-           (u64)ehci_mmio_slot * EHCI_MMIO_SLOT_SIZE;
+  u64 va    = EHCI_MMIO_VIRT_BASE + (u64)ehci_mmio_slot * EHCI_MMIO_SLOT_SIZE;
   u64 flags = VMM_PRESENT | VMM_WRITE | VMM_PCD | VMM_PWT | VMM_NX;
   for (u64 i = 0; i < pages; i++) {
     if (vmm_map(va + i * 4096, page_phys + i * 4096, flags) != 0) {
@@ -164,7 +154,7 @@ static uintptr_t ehci_map_mmio(const struct pci_bar *bar, u64 *mapped_page,
     }
   }
   ehci_mmio_slot++;
-  *mapped_page = va;
+  *mapped_page  = va;
   *mapped_pages = pages;
   return (uintptr_t)(va + offset);
 }
@@ -173,7 +163,7 @@ static void ehci_unmap_mmio(struct ehci_hcd *hc) {
   for (u64 i = 0; i < hc->mmio_pages; i++)
     vmm_unmap(hc->mmio_page + i * 4096);
   hc->mmio = 0;
-  hc->op = 0;
+  hc->op   = 0;
 }
 
 /* EHCI extended capability ownership handoff (EHCI 1.0 section 2.1.7). */
@@ -181,7 +171,7 @@ static int ehci_take_ownership(struct ehci_hcd *hc, u32 hccparams) {
   u8 eecp = (u8)FIELD_GET(HCCPARAMS_REG_EECP, hccparams);
   for (int hops = 0; eecp >= 0x40 && hops < 48; hops++) {
     u32 legsup = pci_read32(hc->pci_addr, eecp);
-    u8 next = (u8)FIELD_GET(USBLEGSUP_NEXT_MASK, legsup);
+    u8 next    = (u8)FIELD_GET(USBLEGSUP_NEXT_MASK, legsup);
     if ((u8)legsup == USBLEGSUP_CAP_ID) {
       if (legsup & USBLEGSUP_BIOS_OWNED) {
         pci_write32(hc->pci_addr, eecp, legsup | USBLEGSUP_OS_OWNED);
@@ -192,8 +182,7 @@ static int ehci_take_ownership(struct ehci_hcd *hc, u32 hccparams) {
           pit_delay_ms(1);
         }
         if (legsup & USBLEGSUP_BIOS_OWNED) {
-          log_write("EHCI: BIOS ownership handoff timed out", KERNEL,
-                    LOG_ERROR);
+          log_write("EHCI: BIOS ownership handoff timed out", KERNEL, LOG_ERROR);
           return -1;
         }
       } else if (!(legsup & USBLEGSUP_OS_OWNED)) {
@@ -217,17 +206,15 @@ static struct ehci_qtd *ehci_qtd_at(struct ehci_hcd *hc, int index) {
                                      (usize)index * sizeof(struct ehci_qtd));
 }
 static u64 ehci_qtd_phys(struct ehci_hcd *hc, int index) {
-  return hc->arena_phys + EHCI_ARENA_QTD_POOL +
-         (u64)index * sizeof(struct ehci_qtd);
+  return hc->arena_phys + EHCI_ARENA_QTD_POOL + (u64)index * sizeof(struct ehci_qtd);
 }
 
-static void ehci_qtd_init(struct ehci_qtd *qtd, u64 next_phys,
-                          u64 alt_phys, u32 pid, int toggle, u16 length,
-                          u64 buffer_phys, int ioc) {
+static void ehci_qtd_init(struct ehci_qtd *qtd, u64 next_phys, u64 alt_phys, u32 pid, int toggle,
+                          u16 length, u64 buffer_phys, int ioc) {
   memset(qtd, 0, sizeof(*qtd));
-  qtd->next = next_phys ? (u32)next_phys : LINK_TERMINATE;
+  qtd->next     = next_phys ? (u32)next_phys : LINK_TERMINATE;
   qtd->alt_next = alt_phys ? (u32)alt_phys : LINK_TERMINATE;
-  qtd->buf[0] = (u32)buffer_phys;
+  qtd->buf[0]   = (u32)buffer_phys;
   if (length) {
     u64 page = (buffer_phys & ~0xFFFULL) + 0x1000;
     for (int i = 1; i < 5; i++, page += 0x1000)
@@ -243,10 +230,10 @@ static void ehci_qtd_init(struct ehci_qtd *qtd, u64 next_phys,
 }
 
 /* Stop fetching before rewriting the shared QH/qTDs. If the controller cannot
- * quiesce, keep its permanent arena pinned and refuse further async requests. */
+ * quiesce, keep its permanent arena pinned and refuse further async requests.
+ */
 static int ehci_async_stop(struct ehci_hcd *hc) {
-  ehci_op_write(hc, EHCI_USBCMD, ehci_op_read(hc, EHCI_USBCMD) &
-                ~CMD_REG_ASYNC_SCHEDULE_ENABLE);
+  ehci_op_write(hc, EHCI_USBCMD, ehci_op_read(hc, EHCI_USBCMD) & ~CMD_REG_ASYNC_SCHEDULE_ENABLE);
   if (ehci_wait_clear(hc->op, EHCI_USBSTS, STS_REG_ASYNC_SCHEDULE_STATUS, 100)) {
     hc->async_failed = 1;
     return -1;
@@ -256,8 +243,7 @@ static int ehci_async_stop(struct ehci_hcd *hc) {
 }
 static void ehci_async_start(struct ehci_hcd *hc) {
   ehci_dma_barrier();
-  ehci_op_write(hc, EHCI_USBCMD, ehci_op_read(hc, EHCI_USBCMD) |
-                CMD_REG_ASYNC_SCHEDULE_ENABLE);
+  ehci_op_write(hc, EHCI_USBCMD, ehci_op_read(hc, EHCI_USBCMD) | CMD_REG_ASYNC_SCHEDULE_ENABLE);
 }
 static int ehci_transfer_error(u32 token) {
   return (token & QTD_ERROR_MASK) == QTD_STATUS_HALTED ? USB_STORAGE_STALL : -1;
@@ -265,16 +251,15 @@ static int ehci_transfer_error(u32 token) {
 
 /* Caller holds async_lock and has stopped the asynchronous schedule. */
 static int ehci_ctrl_locked(struct ehci_hcd *hc, u8 addr, u16 maxpacket,
-                          const struct usb_setup_packet *setup, void *data,
-                          u16 length, u32 timeout_ms) {
-  if (!hc || !setup || maxpacket == 0 || length > EHCI_ARENA_DATA_MAX ||
-      setup->wLength != length)
+                            const struct usb_setup_packet *setup, void *data, u16 length,
+                            u32 timeout_ms) {
+  if (!hc || !setup || maxpacket == 0 || length > EHCI_ARENA_DATA_MAX || setup->wLength != length)
     return -1;
-  u8 *setup_buf = hc->arena + EHCI_ARENA_SETUP;
-  u8 *data_buf = hc->arena + EHCI_ARENA_DATA;
+  u8 *setup_buf  = hc->arena + EHCI_ARENA_SETUP;
+  u8 *data_buf   = hc->arena + EHCI_ARENA_DATA;
   u64 setup_phys = hc->arena_phys + EHCI_ARENA_SETUP;
-  u64 data_phys = hc->arena_phys + EHCI_ARENA_DATA;
-  int dir_in = (setup->bmRequestType & 0x80) != 0;
+  u64 data_phys  = hc->arena_phys + EHCI_ARENA_DATA;
+  int dir_in     = (setup->bmRequestType & 0x80) != 0;
 
   memcpy(setup_buf, setup, sizeof(*setup));
   if (length && !dir_in)
@@ -283,29 +268,33 @@ static int ehci_ctrl_locked(struct ehci_hcd *hc, u8 addr, u16 maxpacket,
     memset(data_buf, 0, length);
 
   int status_index = length ? 2 : 1;
-  u64 status_phys = ehci_qtd_phys(hc, status_index);
-  ehci_qtd_init(ehci_qtd_at(hc, 0), ehci_qtd_phys(hc, 1), 0,
-                QTD_PID_SETUP, 0, sizeof(*setup), setup_phys, 0);
+  u64 status_phys  = ehci_qtd_phys(hc, status_index);
+  ehci_qtd_init(
+      ehci_qtd_at(hc, 0), ehci_qtd_phys(hc, 1), 0, QTD_PID_SETUP, 0, sizeof(*setup), setup_phys, 0);
   if (length)
-    ehci_qtd_init(ehci_qtd_at(hc, 1), status_phys, status_phys,
-                  dir_in ? QTD_PID_IN : QTD_PID_OUT, 1, length, data_phys, 0);
-  ehci_qtd_init(ehci_qtd_at(hc, status_index), 0, 0,
-                dir_in ? QTD_PID_OUT : QTD_PID_IN, 1, 0, 0, 0);
+    ehci_qtd_init(ehci_qtd_at(hc, 1),
+                  status_phys,
+                  status_phys,
+                  dir_in ? QTD_PID_IN : QTD_PID_OUT,
+                  1,
+                  length,
+                  data_phys,
+                  0);
+  ehci_qtd_init(ehci_qtd_at(hc, status_index), 0, 0, dir_in ? QTD_PID_OUT : QTD_PID_IN, 1, 0, 0, 0);
 
   struct ehci_qh *qh = ehci_qh_at(hc, EHCI_ARENA_CONTROL_QH);
-  qh->ep_char = FIELD_PREP(QH_EPCHAR_ADDR_MASK, addr) |
-                QH_EPCHAR_SPEED_HIGH | QH_EPCHAR_DTC |
-                FIELD_PREP(QH_EPCHAR_MAXP_MASK, maxpacket);
-  qh->ep_cap = QH_EPCAP_MULT_1;
+  qh->ep_char  = FIELD_PREP(QH_EPCHAR_ADDR_MASK, addr) | QH_EPCHAR_SPEED_HIGH | QH_EPCHAR_DTC |
+                 FIELD_PREP(QH_EPCHAR_MAXP_MASK, maxpacket);
+  qh->ep_cap   = QH_EPCAP_MULT_1;
   qh->curr_qtd = 0;
   qh->overlay.alt_next = LINK_TERMINATE;
-  qh->overlay.token = 0;
+  qh->overlay.token    = 0;
   memset(qh->overlay.buf, 0, sizeof(qh->overlay.buf));
   ehci_dma_barrier();
   qh_next_write(qh, (u32)ehci_qtd_phys(hc, 0));
   ehci_async_start(hc);
 
-  int done = 0;
+  int done   = 0;
   int failed = 0;
   for (u64 elapsed = 0; elapsed < (u64)timeout_ms * 10; elapsed++) {
     for (int i = 0; i <= status_index; i++) {
@@ -326,22 +315,20 @@ static int ehci_ctrl_locked(struct ehci_hcd *hc, u8 addr, u16 maxpacket,
   qh_next_write(qh, LINK_TERMINATE);
   ehci_dma_barrier();
   if (!done) {
-    log_write(failed ? "EHCI: control transfer failed"
-                     : "EHCI: control transfer timed out",
-              KERNEL, LOG_ERROR);
-    log_write_hex("EHCI:   USBSTS", ehci_op_read(hc, EHCI_USBSTS), KERNEL,
-                  LOG_ERROR);
+    log_write(failed ? "EHCI: control transfer failed" : "EHCI: control transfer timed out",
+              KERNEL,
+              LOG_ERROR);
+    log_write_hex("EHCI:   USBSTS", ehci_op_read(hc, EHCI_USBSTS), KERNEL, LOG_ERROR);
     log_write_hex("EHCI:   QH next", qh_after, KERNEL, LOG_ERROR);
     for (int i = 0; i <= status_index; i++)
-      log_write_hex("EHCI:   qTD token", qtd_token_read(ehci_qtd_at(hc, i)),
-                    KERNEL, LOG_ERROR);
+      log_write_hex("EHCI:   qTD token", qtd_token_read(ehci_qtd_at(hc, i)), KERNEL, LOG_ERROR);
     return failed ? failed : -1;
   }
 
   if (!length)
     return 0;
-  u32 data_token = qtd_token_read(ehci_qtd_at(hc, 1));
-  u16 remaining = (u16)FIELD_GET(QTD_TOTAL_LEN_MASK, data_token);
+  u32 data_token  = qtd_token_read(ehci_qtd_at(hc, 1));
+  u16 remaining   = (u16)FIELD_GET(QTD_TOTAL_LEN_MASK, data_token);
   int transferred = length - remaining;
   if (dir_in)
     memcpy(data, data_buf, (usize)transferred);
@@ -349,14 +336,16 @@ static int ehci_ctrl_locked(struct ehci_hcd *hc, u8 addr, u16 maxpacket,
 }
 
 static int ehci_ctrl_xfer(struct ehci_hcd *hc, u8 addr, u16 maxpacket,
-                          const struct usb_setup_packet *setup, void *data,
-                          u16 length, u32 timeout_ms) {
-  if (!hc || (length && !data)) return -1;
+                          const struct usb_setup_packet *setup, void *data, u16 length,
+                          u32 timeout_ms) {
+  if (!hc || (length && !data))
+    return -1;
   spin_lock(&hc->async_lock);
   int rc = -1;
   if (!hc->async_failed && !ehci_async_stop(hc)) {
     rc = ehci_ctrl_locked(hc, addr, maxpacket, setup, data, length, timeout_ms);
-    if (ehci_async_stop(hc)) rc = -1;
+    if (ehci_async_stop(hc))
+      rc = -1;
   }
   spin_unlock(&hc->async_lock);
   return rc;
@@ -369,68 +358,83 @@ static int ehci_storage_connected(struct ehci_storage_device *dev) {
     dev->disconnected = 1; /* never direct a stale mount at a replacement disk */
   return !dev->disconnected;
 }
-static int ehci_storage_control(void *context,
-                                const struct usb_setup_packet *setup, void *data) {
+static int ehci_storage_control(void *context, const struct usb_setup_packet *setup, void *data) {
   struct ehci_storage_device *dev = context;
-  if (!ehci_storage_connected(dev)) return -1;
-  return ehci_ctrl_xfer(dev->hc, dev->address, dev->maxpacket, setup, data,
-                        setup->wLength, EHCI_XFER_TIMEOUT_MS);
+  if (!ehci_storage_connected(dev))
+    return -1;
+  return ehci_ctrl_xfer(
+      dev->hc, dev->address, dev->maxpacket, setup, data, setup->wLength, EHCI_XFER_TIMEOUT_MS);
 }
 
-static int ehci_storage_bulk(void *context, u8 endpoint, u16 packet, u8 *toggle,
-                             void *buffer, u32 length, u32 *actual) {
+static int ehci_storage_bulk(void *context, u8 endpoint, u16 packet, u8 *toggle, void *buffer,
+                             u32 length, u32 *actual) {
   struct ehci_storage_device *dev = context;
-  struct ehci_hcd *hc = dev->hc;
-  *actual = 0;
-  if (!buffer || !length || packet != 512) return -1;
+  struct ehci_hcd *hc             = dev->hc;
+  *actual                         = 0;
+  if (!buffer || !length || packet != 512)
+    return -1;
   spin_lock(&hc->async_lock);
   int rc = -1;
   if (hc->async_failed || !ehci_storage_connected(dev) || ehci_async_stop(hc))
     goto out;
-  u8 *bounce = hc->arena + EHCI_ARENA_BULK_BUF;
-  struct ehci_qh *qh = ehci_qh_at(hc, EHCI_ARENA_CONTROL_QH);
+  u8 *bounce           = hc->arena + EHCI_ARENA_BULK_BUF;
+  struct ehci_qh *qh   = ehci_qh_at(hc, EHCI_ARENA_CONTROL_QH);
   struct ehci_qtd *qtd = ehci_qtd_at(hc, 0);
-  int input = (endpoint & 0x80) != 0;
+  int input            = (endpoint & 0x80) != 0;
   while (*actual < length) {
     u32 chunk = length - *actual;
-    if (chunk > EHCI_ARENA_BULK_MAX) chunk = EHCI_ARENA_BULK_MAX;
-    if (!input) memcpy(bounce, (u8 *)buffer + *actual, chunk);
-    ehci_qtd_init(qtd, 0, 0, input ? QTD_PID_IN : QTD_PID_OUT, *toggle,
-                  chunk, hc->arena_phys + EHCI_ARENA_BULK_BUF, 0);
-    qh->ep_char = FIELD_PREP(QH_EPCHAR_ADDR_MASK, dev->address) |
-                  FIELD_PREP(QH_EPCHAR_EP_MASK, endpoint & 0x0f) |
-                  QH_EPCHAR_SPEED_HIGH | QH_EPCHAR_DTC |
-                  FIELD_PREP(QH_EPCHAR_MAXP_MASK, packet);
-    qh->ep_cap = QH_EPCAP_MULT_1;
+    if (chunk > EHCI_ARENA_BULK_MAX)
+      chunk = EHCI_ARENA_BULK_MAX;
+    if (!input)
+      memcpy(bounce, (u8 *)buffer + *actual, chunk);
+    ehci_qtd_init(qtd,
+                  0,
+                  0,
+                  input ? QTD_PID_IN : QTD_PID_OUT,
+                  *toggle,
+                  chunk,
+                  hc->arena_phys + EHCI_ARENA_BULK_BUF,
+                  0);
+    qh->ep_char  = FIELD_PREP(QH_EPCHAR_ADDR_MASK, dev->address) |
+                   FIELD_PREP(QH_EPCHAR_EP_MASK, endpoint & 0x0f) | QH_EPCHAR_SPEED_HIGH |
+                   QH_EPCHAR_DTC | FIELD_PREP(QH_EPCHAR_MAXP_MASK, packet);
+    qh->ep_cap   = QH_EPCAP_MULT_1;
     qh->curr_qtd = 0;
     memset(&qh->overlay, 0, sizeof(qh->overlay));
     qh->overlay.alt_next = LINK_TERMINATE;
-    qh->overlay.next = (u32)ehci_qtd_phys(hc, 0);
+    qh->overlay.next     = (u32)ehci_qtd_phys(hc, 0);
     ehci_async_start(hc);
     u32 token = QTD_STATUS_ACTIVE;
     for (u32 elapsed = 0; elapsed < EHCI_XFER_TIMEOUT_MS * 10; elapsed++) {
       token = qtd_token_read(qtd);
-      if (!(token & QTD_STATUS_ACTIVE) || (token & QTD_ERROR_MASK)) break;
+      if (!(token & QTD_STATUS_ACTIVE) || (token & QTD_ERROR_MASK))
+        break;
       pit_delay_us(100);
     }
-    if (ehci_async_stop(hc)) goto out;
+    if (ehci_async_stop(hc))
+      goto out;
     token = qtd_token_read(qtd);
     qh_next_write(qh, LINK_TERMINATE);
     u32 remaining = FIELD_GET(QTD_TOTAL_LEN_MASK, token);
-    if (remaining > chunk) goto out;
+    if (remaining > chunk)
+      goto out;
     u32 done = chunk - remaining;
-    if (input) memcpy((u8 *)buffer + *actual, bounce, done);
+    if (input)
+      memcpy((u8 *)buffer + *actual, bounce, done);
     *actual += done;
     if (token & QTD_ERROR_MASK) {
       rc = ehci_transfer_error(token);
       goto out;
     }
-    if (token & QTD_STATUS_ACTIVE) goto out;
+    if (token & QTD_STATUS_ACTIVE)
+      goto out;
     /* A short transfer ending on a packet boundary includes a zero packet. */
     u32 packets = (done + packet - 1) / packet;
-    if (done < chunk && done % packet == 0) packets++;
+    if (done < chunk && done % packet == 0)
+      packets++;
     *toggle ^= packets & 1;
-    if (done < chunk) break;
+    if (done < chunk)
+      break;
   }
   rc = 0;
 out:
@@ -438,22 +442,19 @@ out:
   return rc;
 }
 
-
-
-
 /* PORTSC has write-one-to-clear change bits. Strip them from ordinary RMWs. */
 static void ehci_port_set(struct ehci_hcd *hc, int port, u32 bits) {
-  u32 reg = EHCI_PORTSC(port);
+  u32 reg   = EHCI_PORTSC(port);
   u32 value = ehci_op_read(hc, reg);
   ehci_op_write(hc, reg, (value & ~PORTSC_REG_WC_MASK) | bits);
 }
 static void ehci_port_clear(struct ehci_hcd *hc, int port, u32 bits) {
-  u32 reg = EHCI_PORTSC(port);
+  u32 reg   = EHCI_PORTSC(port);
   u32 value = ehci_op_read(hc, reg);
   ehci_op_write(hc, reg, (value & ~PORTSC_REG_WC_MASK) & ~bits);
 }
 static void ehci_port_ack_changes(struct ehci_hcd *hc, int port) {
-  u32 reg = EHCI_PORTSC(port);
+  u32 reg   = EHCI_PORTSC(port);
   u32 value = ehci_op_read(hc, reg);
   if (value & PORTSC_REG_WC_MASK)
     ehci_op_write(hc, reg, value);
@@ -461,7 +462,7 @@ static void ehci_port_ack_changes(struct ehci_hcd *hc, int port) {
 
 /* Returns 0 only for a connected high-speed device. */
 static int ehci_port_reset(struct ehci_hcd *hc, int port) {
-  u32 reg = EHCI_PORTSC(port);
+  u32 reg    = EHCI_PORTSC(port);
   u32 status = ehci_op_read(hc, reg);
   if (!(status & PORTSC_REG_CONNECT_STATUS))
     return -1;
@@ -489,43 +490,39 @@ static int ehci_port_reset(struct ehci_hcd *hc, int port) {
 
 static void ehci_periodic_arm(struct ehci_int_ep *ep) {
   memset(ep->buf, 0, ep->maxlen);
-  ehci_qtd_init(ep->qtd, 0, 0, QTD_PID_IN, ep->toggle, ep->maxlen,
-                ep->buf_phys, 1);
-  ep->qh->curr_qtd = 0;
+  ehci_qtd_init(ep->qtd, 0, 0, QTD_PID_IN, ep->toggle, ep->maxlen, ep->buf_phys, 1);
+  ep->qh->curr_qtd         = 0;
   ep->qh->overlay.alt_next = LINK_TERMINATE;
-  ep->qh->overlay.token = 0;
+  ep->qh->overlay.token    = 0;
   memset(ep->qh->overlay.buf, 0, sizeof(ep->qh->overlay.buf));
   ehci_dma_barrier();
   qh_next_write(ep->qh, (u32)ep->qtd_phys);
   ehci_dma_barrier();
 }
 
-static int ehci_periodic_start(struct ehci_hcd *hc, u8 addr, u8 ep,
-                               u16 maxlen, u8 interval, u8 kind) {
+static int ehci_periodic_start(struct ehci_hcd *hc, u8 addr, u8 ep, u16 maxlen, u8 interval,
+                               u8 kind) {
   struct ehci_int_ep *iep = &hc->int_ep;
   if (iep->active || maxlen == 0 || maxlen > EHCI_INT_BUF_MAX)
     return -1;
-  iep->addr = addr;
-  iep->ep = ep;
-  iep->maxlen = maxlen;
+  iep->addr     = addr;
+  iep->ep       = ep;
+  iep->maxlen   = maxlen;
   iep->interval = interval;
-  iep->kind = kind;
-  iep->qh = ehci_qh_at(hc, EHCI_ARENA_PERIODIC_QH);
-  iep->qh_phys = hc->arena_phys + EHCI_ARENA_PERIODIC_QH;
-  iep->qtd = (struct ehci_qtd *)(void *)(hc->arena +
-                                         EHCI_ARENA_PERIODIC_QTD);
+  iep->kind     = kind;
+  iep->qh       = ehci_qh_at(hc, EHCI_ARENA_PERIODIC_QH);
+  iep->qh_phys  = hc->arena_phys + EHCI_ARENA_PERIODIC_QH;
+  iep->qtd      = (struct ehci_qtd *)(void *)(hc->arena + EHCI_ARENA_PERIODIC_QTD);
   iep->qtd_phys = hc->arena_phys + EHCI_ARENA_PERIODIC_QTD;
-  iep->buf = hc->arena + EHCI_ARENA_INT_BUF;
+  iep->buf      = hc->arena + EHCI_ARENA_INT_BUF;
   iep->buf_phys = hc->arena_phys + EHCI_ARENA_INT_BUF;
   memset(iep->qh, 0, sizeof(*iep->qh));
   iep->qh->horiz_link = LINK_TERMINATE;
-  iep->qh->ep_char = FIELD_PREP(QH_EPCHAR_ADDR_MASK, addr) |
-                     FIELD_PREP(QH_EPCHAR_EP_MASK, ep) |
-                     QH_EPCHAR_SPEED_HIGH | QH_EPCHAR_DTC |
-                     FIELD_PREP(QH_EPCHAR_MAXP_MASK, maxlen);
+  iep->qh->ep_char = FIELD_PREP(QH_EPCHAR_ADDR_MASK, addr) | FIELD_PREP(QH_EPCHAR_EP_MASK, ep) |
+                     QH_EPCHAR_SPEED_HIGH | QH_EPCHAR_DTC | FIELD_PREP(QH_EPCHAR_MAXP_MASK, maxlen);
   /* High-speed bInterval is an exponent in 125 us microframes. Express
    * sub-millisecond periods with S-mask and longer ones with frame spacing. */
-  u8 smask = 1;
+  u8 smask         = 1;
   u16 frame_stride = 1;
   if (interval <= 1)
     smask = 0xFF;
@@ -536,7 +533,7 @@ static int ehci_periodic_start(struct ehci_hcd *hc, u8 addr, u8 ep,
   else if (interval > 4)
     frame_stride = interval >= 14 ? 1024 : (u16)(1U << (interval - 4));
   iep->qh->ep_cap = FIELD_PREP(QH_EPCAP_SMASK_MASK, smask) | QH_EPCAP_MULT_1;
-  iep->active = 1;
+  iep->active     = 1;
   ehci_periodic_arm(iep);
   u32 qh_link = (u32)iep->qh_phys | LINK_TYPE_QH;
   for (int i = 0; i < 1024; i++)
@@ -545,8 +542,7 @@ static int ehci_periodic_start(struct ehci_hcd *hc, u8 addr, u8 ep,
 
   u32 cmd = ehci_op_read(hc, EHCI_USBCMD);
   ehci_op_write(hc, EHCI_USBCMD, cmd | CMD_REG_PERIODIC_SCHEDULE_ENABLE);
-  if (ehci_wait_set(hc->op, EHCI_USBSTS,
-                    STS_REG_PERIODIC_SCHEDULE_STATUS, 100) != 0) {
+  if (ehci_wait_set(hc->op, EHCI_USBSTS, STS_REG_PERIODIC_SCHEDULE_STATUS, 100) != 0) {
     iep->active = 0;
     ehci_op_write(hc, EHCI_USBCMD, cmd);
     return -1;
@@ -566,7 +562,7 @@ static void ehci_periodic_complete(struct ehci_int_ep *ep) {
       log_write_hex("EHCI: periodic transfer error", token, KERNEL, LOG_WARN);
   } else {
     u16 remaining = (u16)FIELD_GET(QTD_TOTAL_LEN_MASK, token);
-    ep->last_len = ep->maxlen - remaining;
+    ep->last_len  = ep->maxlen - remaining;
     ep->reports++;
     ep->toggle ^= 1;
     if (ep->kind == USB_INT_KIND_HID_BOOT_MOUSE)
@@ -597,12 +593,11 @@ static void ehci_irq_handler(void) {
 
 /* EHCI's half of the shared device model: everything above a control
  * transfer is in drivers/usb/usb_device.c. */
-static int ehci_pipe_control(const struct usb_pipe *pipe,
-                             const struct usb_setup_packet *setup, void *data,
-                             u16 length, int in) {
+static int ehci_pipe_control(const struct usb_pipe *pipe, const struct usb_setup_packet *setup,
+                             void *data, u16 length, int in) {
   (void)in; /* ehci_ctrl_xfer reads the direction out of bmRequestType */
-  return ehci_ctrl_xfer(pipe->hc, pipe->address, pipe->maxpacket, setup, data,
-                        length, EHCI_XFER_TIMEOUT_MS);
+  return ehci_ctrl_xfer(
+      pipe->hc, pipe->address, pipe->maxpacket, setup, data, length, EHCI_XFER_TIMEOUT_MS);
 }
 
 static void ehci_enumerate_port(struct ehci_hcd *hc, int port) {
@@ -612,17 +607,16 @@ static void ehci_enumerate_port(struct ehci_hcd *hc, int port) {
   log_write_int("EHCI: high-speed port enabled", port, KERNEL, LOG_INFO);
 
   struct usb_pipe pipe = {
-      .hc = hc,
-      .control = ehci_pipe_control,
-      .address = 0,
+      .hc        = hc,
+      .control   = ehci_pipe_control,
+      .address   = 0,
       .maxpacket = EHCI_EP0_DEFAULT_MAXP,
-      .tag = "EHCI",
+      .tag       = "EHCI",
   };
 
   memset(&descriptor, 0, sizeof(descriptor));
   if (usb_get_descriptor(&pipe, USB_DESC_DEVICE, 0, &descriptor, 8) < 8) {
-    log_write_int("EHCI: initial descriptor failed on port", port, KERNEL,
-                  LOG_ERROR);
+    log_write_int("EHCI: initial descriptor failed on port", port, KERNEL, LOG_ERROR);
     return;
   }
   if (descriptor.bMaxPacketSize0)
@@ -640,10 +634,9 @@ static void ehci_enumerate_port(struct ehci_hcd *hc, int port) {
   pit_delay_ms(2);
 
   memset(&descriptor, 0, sizeof(descriptor));
-  if (usb_get_descriptor(&pipe, USB_DESC_DEVICE, 0, &descriptor,
-                         sizeof(descriptor)) < (int)sizeof(descriptor)) {
-    log_write_int("EHCI: full descriptor failed for address", address,
-                  KERNEL, LOG_ERROR);
+  if (usb_get_descriptor(&pipe, USB_DESC_DEVICE, 0, &descriptor, sizeof(descriptor)) <
+      (int)sizeof(descriptor)) {
+    log_write_int("EHCI: full descriptor failed for address", address, KERNEL, LOG_ERROR);
     return;
   }
   log_write_int("EHCI: device addressed", address, KERNEL, LOG_INFO);
@@ -653,8 +646,7 @@ static void ehci_enumerate_port(struct ehci_hcd *hc, int port) {
   if (descriptor.bNumConfigurations == 0)
     return;
 
-  int config_length =
-      usb_read_config(&pipe, 0, ehci_config_buf, EHCI_CONFIG_BUF_MAX);
+  int config_length = usb_read_config(&pipe, 0, ehci_config_buf, EHCI_CONFIG_BUF_MAX);
   if (config_length < 0)
     return;
   const struct usb_config_descriptor *config =
@@ -662,21 +654,24 @@ static void ehci_enumerate_port(struct ehci_hcd *hc, int port) {
   struct usb_hid_pointer pointer;
   memset(&pointer, 0, sizeof(pointer));
   /* An interrupt endpoint has to fit the periodic arena's buffer. */
-  int have_pointer = usb_find_hid_pointer(ehci_config_buf, config_length,
-                                          EHCI_INT_BUF_MAX, "EHCI", &pointer);
+  int have_pointer =
+      usb_find_hid_pointer(ehci_config_buf, config_length, EHCI_INT_BUF_MAX, "EHCI", &pointer);
   if (usb_set_configuration(&pipe, config->bConfigurationValue) < 0) {
-    log_write_int("EHCI: SET_CONFIGURATION failed for address", address,
-                  KERNEL, LOG_ERROR);
+    log_write_int("EHCI: SET_CONFIGURATION failed for address", address, KERNEL, LOG_ERROR);
     return;
   }
-  log_write_int("EHCI: device configured", config->bConfigurationValue,
-                KERNEL, LOG_INFO);
+  log_write_int("EHCI: device configured", config->bConfigurationValue, KERNEL, LOG_INFO);
   struct ehci_storage_device *disk = &hc->storage[port];
-  *disk = (struct ehci_storage_device){
-      .hc = hc, .address = address, .port = port, .maxpacket = pipe.maxpacket,
+  *disk                            = (struct ehci_storage_device){
+      .hc        = hc,
+      .address   = address,
+      .port      = port,
+      .maxpacket = pipe.maxpacket,
   };
   struct usb_storage_transport transport = {
-      .context = disk, .control = ehci_storage_control, .bulk = ehci_storage_bulk,
+      .context = disk,
+      .control = ehci_storage_control,
+      .bulk    = ehci_storage_bulk,
   };
   if (usb_storage_probe(&transport, ehci_config_buf, config_length) == 0)
     log_write("USB storage: SCSI/BOT disk ready", KERNEL, LOG_INFO);
@@ -688,11 +683,13 @@ static void ehci_enumerate_port(struct ehci_hcd *hc, int port) {
       usb_hid_set_boot_protocol(&pipe, pointer.interface_number) < 0)
     log_write("EHCI: HID boot protocol failed, continuing", KERNEL, LOG_WARN);
   u8 endpoint = pointer.endpoint.bEndpointAddress & USB_EP_ADDR_NUM_MASK;
-  if (ehci_periodic_start(hc, address, endpoint,
+  if (ehci_periodic_start(hc,
+                          address,
+                          endpoint,
                           pointer.endpoint.wMaxPacketSize,
-                          pointer.endpoint.bInterval, pointer.kind) == 0)
-    log_write_int("EHCI: polling HID pointer endpoint", endpoint, KERNEL,
-                  LOG_INFO);
+                          pointer.endpoint.bInterval,
+                          pointer.kind) == 0)
+    log_write_int("EHCI: polling HID pointer endpoint", endpoint, KERNEL, LOG_INFO);
 }
 
 static void ehci_scan_ports(struct ehci_hcd *hc) {
@@ -706,22 +703,22 @@ static void ehci_scan_ports(struct ehci_hcd *hc) {
 }
 
 static void ehci_async_schedule_init(struct ehci_hcd *hc) {
-  struct ehci_qh *head = ehci_qh_at(hc, EHCI_ARENA_ASYNC_HEAD);
+  struct ehci_qh *head    = ehci_qh_at(hc, EHCI_ARENA_ASYNC_HEAD);
   struct ehci_qh *control = ehci_qh_at(hc, EHCI_ARENA_CONTROL_QH);
-  u64 head_phys = hc->arena_phys + EHCI_ARENA_ASYNC_HEAD;
-  u64 control_phys = hc->arena_phys + EHCI_ARENA_CONTROL_QH;
+  u64 head_phys           = hc->arena_phys + EHCI_ARENA_ASYNC_HEAD;
+  u64 control_phys        = hc->arena_phys + EHCI_ARENA_CONTROL_QH;
   memset(head, 0, sizeof(*head));
   memset(control, 0, sizeof(*control));
-  head->horiz_link = (u32)control_phys | LINK_TYPE_QH;
-  head->ep_char = QH_EPCHAR_H;
-  head->ep_cap = QH_EPCAP_MULT_1;
-  head->overlay.next = LINK_TERMINATE;
+  head->horiz_link       = (u32)control_phys | LINK_TYPE_QH;
+  head->ep_char          = QH_EPCHAR_H;
+  head->ep_cap           = QH_EPCAP_MULT_1;
+  head->overlay.next     = LINK_TERMINATE;
   head->overlay.alt_next = LINK_TERMINATE;
-  control->horiz_link = (u32)head_phys | LINK_TYPE_QH;
-  control->ep_char = QH_EPCHAR_SPEED_HIGH | QH_EPCHAR_DTC |
-                     FIELD_PREP(QH_EPCHAR_MAXP_MASK, EHCI_EP0_DEFAULT_MAXP);
-  control->ep_cap = QH_EPCAP_MULT_1;
-  control->overlay.next = LINK_TERMINATE;
+  control->horiz_link    = (u32)head_phys | LINK_TYPE_QH;
+  control->ep_char =
+      QH_EPCHAR_SPEED_HIGH | QH_EPCHAR_DTC | FIELD_PREP(QH_EPCHAR_MAXP_MASK, EHCI_EP0_DEFAULT_MAXP);
+  control->ep_cap           = QH_EPCAP_MULT_1;
+  control->overlay.next     = LINK_TERMINATE;
   control->overlay.alt_next = LINK_TERMINATE;
 }
 
@@ -745,25 +742,25 @@ int ehci_init(struct pci_device *dev) {
   }
   struct ehci_hcd *hc = &ehci_controllers[ehci_controller_count];
   memset(hc, 0, sizeof(*hc));
-  hc->pci_addr = dev->addr;
-  hc->irq = dev->int_line;
+  hc->pci_addr  = dev->addr;
+  hc->irq       = dev->int_line;
   hc->next_addr = 1;
-  hc->mmio = ehci_map_mmio(&dev->bar[0], &hc->mmio_page, &hc->mmio_pages);
+  hc->mmio      = ehci_map_mmio(&dev->bar[0], &hc->mmio_page, &hc->mmio_pages);
   if (!hc->mmio) {
     log_write("EHCI: could not map BAR0", KERNEL, LOG_ERROR);
     return -1;
   }
 
-  u8 caplength = ehci_read8(hc->mmio + EHCI_CAPLENGTH);
-  u16 version = ehci_read16(hc->mmio + EHCI_HCIVERSION);
+  u8 caplength  = ehci_read8(hc->mmio + EHCI_CAPLENGTH);
+  u16 version   = ehci_read16(hc->mmio + EHCI_HCIVERSION);
   u32 hcsparams = ehci_read32(hc->mmio + EHCI_HCSPARAMS);
   u32 hccparams = ehci_read32(hc->mmio + EHCI_HCCPARAMS);
   if (caplength < 0x10 || caplength >= dev->bar[0].size) {
     log_write("EHCI: invalid CAPLENGTH", KERNEL, LOG_ERROR);
     goto fail_unmap;
   }
-  hc->op = hc->mmio + caplength;
-  hc->ports = (u8)FIELD_GET(HCSPARAMS_REG_N_PORTS, hcsparams);
+  hc->op                 = hc->mmio + caplength;
+  hc->ports              = (u8)FIELD_GET(HCSPARAMS_REG_N_PORTS, hcsparams);
   hc->port_power_control = (hcsparams & HCSPARAMS_REG_PPC) != 0;
   if (hc->ports == 0 || hc->ports > 15) {
     log_write("EHCI: invalid root-port count", KERNEL, LOG_ERROR);
@@ -778,11 +775,11 @@ int ehci_init(struct pci_device *dev) {
     goto fail_unmap;
 
   hc->periodic_phys = pmm_alloc_frame_below(EHCI_DMA_LIMIT);
-  hc->arena_phys = pmm_alloc_frame_below(EHCI_DMA_LIMIT);
+  hc->arena_phys    = pmm_alloc_frame_below(EHCI_DMA_LIMIT);
   if (!hc->periodic_phys || !hc->arena_phys)
     goto fail_dma;
   hc->periodic = (u32 *)phys_to_virt(hc->periodic_phys);
-  hc->arena = (u8 *)phys_to_virt(hc->arena_phys);
+  hc->arena    = (u8 *)phys_to_virt(hc->arena_phys);
   memset(hc->arena, 0, FRAME_SIZE);
   for (int i = 0; i < 1024; i++)
     hc->periodic[i] = LINK_TERMINATE;
@@ -790,34 +787,28 @@ int ehci_init(struct pci_device *dev) {
   ehci_dma_barrier();
 
   u32 cmd = ehci_op_read(hc, EHCI_USBCMD) &
-            ~(CMD_REG_RUN_STOP | CMD_REG_ASYNC_SCHEDULE_ENABLE |
-              CMD_REG_PERIODIC_SCHEDULE_ENABLE);
+            ~(CMD_REG_RUN_STOP | CMD_REG_ASYNC_SCHEDULE_ENABLE | CMD_REG_PERIODIC_SCHEDULE_ENABLE);
   ehci_op_write(hc, EHCI_USBCMD, cmd);
-  if (ehci_wait_set(hc->op, EHCI_USBSTS, STS_REG_HOST_CONTROLLER_HALTED,
-                    100) != 0) {
+  if (ehci_wait_set(hc->op, EHCI_USBSTS, STS_REG_HOST_CONTROLLER_HALTED, 100) != 0) {
     log_write("EHCI: controller did not halt", KERNEL, LOG_ERROR);
     goto fail_dma;
   }
   ehci_op_write(hc, EHCI_USBCMD, CMD_REG_HOST_CONTROLLER_RESET);
-  if (ehci_wait_clear(hc->op, EHCI_USBCMD,
-                      CMD_REG_HOST_CONTROLLER_RESET, 100) != 0) {
+  if (ehci_wait_clear(hc->op, EHCI_USBCMD, CMD_REG_HOST_CONTROLLER_RESET, 100) != 0) {
     log_write("EHCI: reset did not complete", KERNEL, LOG_ERROR);
     goto fail_dma;
   }
   ehci_op_write(hc, EHCI_CTRLDSSEGMENT, 0);
   ehci_op_write(hc, EHCI_PERIODICLISTBASE, (u32)hc->periodic_phys);
-  ehci_op_write(hc, EHCI_ASYNCLISTADDR,
-                (u32)(hc->arena_phys + EHCI_ARENA_ASYNC_HEAD));
+  ehci_op_write(hc, EHCI_ASYNCLISTADDR, (u32)(hc->arena_phys + EHCI_ARENA_ASYNC_HEAD));
   ehci_op_write(hc, EHCI_USBINTR, 0);
   ehci_op_write(hc, EHCI_USBSTS, 0x3F);
   ehci_op_write(hc, EHCI_CONFIGFLAG, CONFIGFLAG_REG_CONFIGURED);
-  cmd = CMD_REG_RUN_STOP | CMD_REG_ASYNC_SCHEDULE_ENABLE |
-        FIELD_PREP(CMD_REG_INTERRUPT_THRESHOLD, 8);
+  cmd =
+      CMD_REG_RUN_STOP | CMD_REG_ASYNC_SCHEDULE_ENABLE | FIELD_PREP(CMD_REG_INTERRUPT_THRESHOLD, 8);
   ehci_op_write(hc, EHCI_USBCMD, cmd);
-  if (ehci_wait_clear(hc->op, EHCI_USBSTS,
-                      STS_REG_HOST_CONTROLLER_HALTED, 100) != 0 ||
-      ehci_wait_set(hc->op, EHCI_USBSTS,
-                    STS_REG_ASYNC_SCHEDULE_STATUS, 100) != 0) {
+  if (ehci_wait_clear(hc->op, EHCI_USBSTS, STS_REG_HOST_CONTROLLER_HALTED, 100) != 0 ||
+      ehci_wait_set(hc->op, EHCI_USBSTS, STS_REG_ASYNC_SCHEDULE_STATUS, 100) != 0) {
     log_write("EHCI: schedules did not start", KERNEL, LOG_ERROR);
     goto fail_stop;
   }
@@ -829,12 +820,11 @@ int ehci_init(struct pci_device *dev) {
   if (hc->int_ep.active) {
     irq_install(hc->irq, ehci_irq_handler);
     pic_clear_mask(hc->irq);
-    ehci_op_write(hc, EHCI_USBINTR,
-                  INTR_REG_INTERRUPT_ENABLE |
-                      INTR_REG_ERROR_INTERRUPT_ENABLE |
+    ehci_op_write(hc,
+                  EHCI_USBINTR,
+                  INTR_REG_INTERRUPT_ENABLE | INTR_REG_ERROR_INTERRUPT_ENABLE |
                       INTR_REG_HOST_SYSTEM_ERROR_ENABLE);
-    log_write_int("EHCI: interrupts enabled on IRQ", hc->irq, KERNEL,
-                  LOG_INFO);
+    log_write_int("EHCI: interrupts enabled on IRQ", hc->irq, KERNEL, LOG_INFO);
   }
   return 0;
 

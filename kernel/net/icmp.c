@@ -36,10 +36,9 @@ static u32 icmp_ticks_to_ms(u64 ticks) {
 
 /* ---------------- receive ---------------------------------------------- */
 
-static void icmp_echo_reply_input(const struct ipv4_hdr *ip,
-                                  const struct icmp_hdr *icmp) {
+static void icmp_echo_reply_input(const struct ipv4_hdr *ip, const struct icmp_hdr *icmp) {
   u16 ident = from_be16(icmp->ident);
-  u16 seq = from_be16(icmp->sequence);
+  u16 seq   = from_be16(icmp->sequence);
 
   u64 flags = spin_lock_irqsave(&pings.lock);
   for (int i = 0; i < ICMP_PING_SESSIONS; i++) {
@@ -49,19 +48,17 @@ static void icmp_echo_reply_input(const struct ipv4_hdr *ip,
     /* Source address as well as ident/seq: a reply from the wrong host
      * carrying a guessed identifier would otherwise stop the wait early
      * and report a round trip that never happened. */
-    if (s->ident != ident || s->seq != seq ||
-        !ipv4_addr_equal(s->dst, ip->src))
+    if (s->ident != ident || s->seq != seq || !ipv4_addr_equal(s->dst, ip->src))
       continue;
 
     s->reply_ticks = pit_ticks();
-    s->replied = 1;
+    s->replied     = 1;
     break;
   }
   spin_unlock_irqrestore(&pings.lock, flags);
 }
 
-static void icmp_echo_request_input(const struct ipv4_hdr *ip,
-                                    const u8 *payload, u16 len) {
+static void icmp_echo_request_input(const struct ipv4_hdr *ip, const u8 *payload, u16 len) {
   u8 frame[ETH_FRAME_MAX];
   u8 *reply_payload = frame + IPV4_HEADROOM;
   memcpy(reply_payload, payload, len);
@@ -69,9 +66,9 @@ static void icmp_echo_request_input(const struct ipv4_hdr *ip,
   /* Identifier, sequence, and body are echoed back unchanged - that is
    * what makes the reply match the request the sender is waiting on. */
   struct icmp_hdr *reply = (struct icmp_hdr *)reply_payload;
-  reply->type = ICMP_ECHO_REPLY;
-  reply->checksum = 0;
-  reply->checksum = inet_checksum(reply_payload, len);
+  reply->type            = ICMP_ECHO_REPLY;
+  reply->checksum        = 0;
+  reply->checksum        = inet_checksum(reply_payload, len);
 
   /* Replies go back through ipv4_output like anything else, rather than
    * turning the received frame around in place. That costs an ARP lookup
@@ -80,8 +77,7 @@ static void icmp_echo_request_input(const struct ipv4_hdr *ip,
   ipv4_output_framed(frame, ip->src, IPPROTO_ICMP, len);
 }
 
-void icmp_input(const struct ipv4_hdr *ip, const u8 *payload,
-                u16 len) {
+void icmp_input(const struct ipv4_hdr *ip, const u8 *payload, u16 len) {
   if (!ip || !payload || len < ICMP_HDR_LEN || len > IPV4_PAYLOAD_MAX)
     return;
 
@@ -111,31 +107,30 @@ void icmp_input(const struct ipv4_hdr *ip, const u8 *payload,
 /* ---------------- ping ------------------------------------------------- */
 
 static void icmp_session_release(int slot) {
-  u64 flags = spin_lock_irqsave(&pings.lock);
+  u64 flags               = spin_lock_irqsave(&pings.lock);
   pings.slot[slot].in_use = 0;
   spin_unlock_irqrestore(&pings.lock, flags);
 }
 
-long icmp_ping(const u8 dst[IPV4_ALEN], u16 ident, u16 seq,
-               u32 timeout_ms, u32 *rtt_ms_out) {
+long icmp_ping(const u8 dst[IPV4_ALEN], u16 ident, u16 seq, u32 timeout_ms, u32 *rtt_ms_out) {
   if (!dst || !netif_get())
     return -2;
 
   /* Claim a slot before transmitting. The reply can arrive while this
    * task is still inside ipv4_output_framed on another CPU, so the slot
    * has to be findable by then or the reply is dropped as unmatched. */
-  int slot = -1;
+  int slot  = -1;
   u64 flags = spin_lock_irqsave(&pings.lock);
   for (int i = 0; i < ICMP_PING_SESSIONS; i++) {
     if (pings.slot[i].in_use)
       continue;
-    slot = i;
-    pings.slot[i].in_use = 1;
-    pings.slot[i].replied = 0;
-    pings.slot[i].ident = ident;
-    pings.slot[i].seq = seq;
+    slot                      = i;
+    pings.slot[i].in_use      = 1;
+    pings.slot[i].replied     = 0;
+    pings.slot[i].ident       = ident;
+    pings.slot[i].seq         = seq;
     pings.slot[i].reply_ticks = 0;
-    pings.slot[i].sent_ticks = pit_ticks();
+    pings.slot[i].sent_ticks  = pit_ticks();
     memcpy(pings.slot[i].dst, dst, IPV4_ALEN);
     break;
   }
@@ -149,10 +144,10 @@ long icmp_ping(const u8 dst[IPV4_ALEN], u16 ident, u16 seq,
   u8 *payload = frame + IPV4_HEADROOM;
 
   struct icmp_hdr *req = (struct icmp_hdr *)payload;
-  req->type = ICMP_ECHO_REQUEST;
-  req->code = 0;
-  req->ident = to_be16(ident);
-  req->sequence = to_be16(seq);
+  req->type            = ICMP_ECHO_REQUEST;
+  req->code            = 0;
+  req->ident           = to_be16(ident);
+  req->sequence        = to_be16(seq);
 
   /* The classic incrementing byte pattern. Any filler would do, but a
    * pattern makes a corrupted reply obvious in a hex dump instead of
@@ -182,9 +177,9 @@ long icmp_ping(const u8 dst[IPV4_ALEN], u16 ident, u16 seq,
     int replied;
     u64 rtt;
 
-    flags = spin_lock_irqsave(&pings.lock);
+    flags   = spin_lock_irqsave(&pings.lock);
     replied = pings.slot[slot].replied;
-    rtt = pings.slot[slot].reply_ticks - pings.slot[slot].sent_ticks;
+    rtt     = pings.slot[slot].reply_ticks - pings.slot[slot].sent_ticks;
     spin_unlock_irqrestore(&pings.lock, flags);
 
     if (replied) {

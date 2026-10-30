@@ -11,8 +11,8 @@
  * involved.
  */
 #include <devices/io.h>
-#include <drivers/video/virtualbox/vbox_video.h>
 #include <drivers/base/vendors/pci_ids.h>
+#include <drivers/video/virtualbox/vbox_video.h>
 #include <memory/hhdm.h>
 #include <memory/pmm.h>
 #include <memory/vmm.h>
@@ -90,14 +90,10 @@ struct PACKED vmmdev_display_change2 {
   u32 display;
 };
 
-_Static_assert(sizeof(struct vmmdev_request_header) == 24,
-               "VMMDev request header ABI");
-_Static_assert(sizeof(struct vmmdev_guest_info) == 32,
-               "VMMDev guest info ABI");
-_Static_assert(sizeof(struct vmmdev_guest_caps) == 28,
-               "VMMDev guest caps ABI");
-_Static_assert(sizeof(struct vmmdev_display_change2) == 44,
-               "VMMDev display change v2 ABI");
+_Static_assert(sizeof(struct vmmdev_request_header) == 24, "VMMDev request header ABI");
+_Static_assert(sizeof(struct vmmdev_guest_info) == 32, "VMMDev guest info ABI");
+_Static_assert(sizeof(struct vmmdev_guest_caps) == 28, "VMMDev guest caps ABI");
+_Static_assert(sizeof(struct vmmdev_display_change2) == 44, "VMMDev display change v2 ABI");
 
 static struct pci_device svga_device;
 static u16 svga_io_base;
@@ -119,14 +115,13 @@ static void svga_write(u32 index, u32 value) {
   outl((u16)(svga_io_base + 1), value);
 }
 
-static void request_init(struct vmmdev_request_header *header, u32 size,
-                         u32 type) {
+static void request_init(struct vmmdev_request_header *header, u32 size, u32 type) {
   memset(vmmdev_request, 0, 4096);
-  header->size = size;
-  header->version = VMMDEV_REQUEST_HEADER_VERSION;
+  header->size         = size;
+  header->version      = VMMDEV_REQUEST_HEADER_VERSION;
   header->request_type = type;
-  header->rc = -1;
-  header->requestor = VMMDEV_REQUESTOR_DRIVER;
+  header->rc           = -1;
+  header->requestor    = VMMDEV_REQUESTOR_DRIVER;
 }
 
 static int vmmdev_perform(struct vmmdev_request_header *header) {
@@ -153,7 +148,7 @@ static int map_fifo(u64 physical, u32 bytes) {
       return -1;
     }
   }
-  svga_fifo = (volatile u32 *)VBOX_FIFO_VIRT_BASE;
+  svga_fifo              = (volatile u32 *)VBOX_FIFO_VIRT_BASE;
   svga_fifo_mapped_pages = pages;
   return 0;
 }
@@ -161,17 +156,16 @@ static int map_fifo(u64 physical, u32 bytes) {
 static void unmap_fifo(void) {
   for (u32 i = 0; i < svga_fifo_mapped_pages; i++)
     vmm_unmap(VBOX_FIFO_VIRT_BASE + (u64)i * 4096ULL);
-  svga_fifo = 0;
+  svga_fifo              = 0;
   svga_fifo_mapped_pages = 0;
 }
 
 static int fifo_submit(const u32 *words, u32 count) {
   u32 minimum = svga_fifo[SVGA_FIFO_MIN];
   u32 maximum = svga_fifo[SVGA_FIFO_MAX];
-  u32 next = svga_fifo[SVGA_FIFO_NEXT_CMD];
-  if (minimum < 16U || maximum > svga_fifo_bytes || next < minimum ||
-      next >= maximum || count == 0 ||
-      (u64)count * 4ULL >= maximum - minimum)
+  u32 next    = svga_fifo[SVGA_FIFO_NEXT_CMD];
+  if (minimum < 16U || maximum > svga_fifo_bytes || next < minimum || next >= maximum ||
+      count == 0 || (u64)count * 4ULL >= maximum - minimum)
     return -1;
 
   /* Commit the whole packet with one NEXT_CMD update. Publishing one word at
@@ -198,7 +192,7 @@ static int fifo_submit(const u32 *words, u32 count) {
 }
 
 static int set_mode(u32 width, u32 height, struct vbox_video_mode *mode) {
-  u32 max_width = svga_read(SVGA_REG_MAX_WIDTH);
+  u32 max_width  = svga_read(SVGA_REG_MAX_WIDTH);
   u32 max_height = svga_read(SVGA_REG_MAX_HEIGHT);
   if (width == 0 || height == 0 || width > max_width || height > max_height)
     return -1;
@@ -208,29 +202,28 @@ static int set_mode(u32 width, u32 height, struct vbox_video_mode *mode) {
   svga_write(SVGA_REG_BITS_PER_PIXEL, 32);
   svga_write(SVGA_REG_ENABLE, 1);
 
-  u32 actual_width = svga_read(SVGA_REG_WIDTH);
+  u32 actual_width  = svga_read(SVGA_REG_WIDTH);
   u32 actual_height = svga_read(SVGA_REG_HEIGHT);
-  u32 pitch = svga_read(SVGA_REG_BYTES_PER_LINE);
-  u32 bpp = svga_read(SVGA_REG_BITS_PER_PIXEL);
-  u32 depth = svga_read(SVGA_REG_DEPTH);
-  u32 pseudocolor = svga_read(SVGA_REG_PSEUDOCOLOR);
-  u32 offset = svga_read(SVGA_REG_FB_OFFSET);
-  if (actual_width != width || actual_height != height || bpp != 32 ||
-      depth < 24 || pseudocolor || pitch < width * 4U ||
-      offset >= svga_device.bar[1].size ||
+  u32 pitch         = svga_read(SVGA_REG_BYTES_PER_LINE);
+  u32 bpp           = svga_read(SVGA_REG_BITS_PER_PIXEL);
+  u32 depth         = svga_read(SVGA_REG_DEPTH);
+  u32 pseudocolor   = svga_read(SVGA_REG_PSEUDOCOLOR);
+  u32 offset        = svga_read(SVGA_REG_FB_OFFSET);
+  if (actual_width != width || actual_height != height || bpp != 32 || depth < 24 || pseudocolor ||
+      pitch < width * 4U || offset >= svga_device.bar[1].size ||
       (u64)pitch * height > svga_device.bar[1].size - offset)
     return -1;
 
   if (mode) {
     *mode = (struct vbox_video_mode){
-        .physical = svga_device.bar[1].base + offset,
-        .width = actual_width,
-        .height = actual_height,
-        .pitch = pitch,
-        .bpp = bpp,
-        .red_mask = svga_read(SVGA_REG_RED_MASK),
+        .physical   = svga_device.bar[1].base + offset,
+        .width      = actual_width,
+        .height     = actual_height,
+        .pitch      = pitch,
+        .bpp        = bpp,
+        .red_mask   = svga_read(SVGA_REG_RED_MASK),
         .green_mask = svga_read(SVGA_REG_GREEN_MASK),
-        .blue_mask = svga_read(SVGA_REG_BLUE_MASK),
+        .blue_mask  = svga_read(SVGA_REG_BLUE_MASK),
     };
   }
   return 0;
@@ -239,29 +232,26 @@ static int set_mode(u32 width, u32 height, struct vbox_video_mode *mode) {
 int vbox_video_get_mode(struct vbox_video_mode *mode) {
   if (!driver_active || !mode)
     return -1;
-  u32 width = svga_read(SVGA_REG_WIDTH);
+  u32 width  = svga_read(SVGA_REG_WIDTH);
   u32 height = svga_read(SVGA_REG_HEIGHT);
   return set_mode(width, height, mode);
 }
 
 int vbox_video_init(u32 width, u32 height) {
-  if (!pci_find_by_id(PCI_VENDOR_VMWARE, PCI_DEVICE_VMWARE_SVGA2,
-                      &svga_device))
+  if (!pci_find_by_id(PCI_VENDOR_VMWARE, PCI_DEVICE_VMWARE_SVGA2, &svga_device))
     return -1;
 
   struct pci_device vmmdev;
-  if (!pci_find_by_id(PCI_VENDOR_VBOX, PCI_DEVICE_VBOX_VMMDEV, &vmmdev) ||
-      !vmmdev.bar[0].valid || !vmmdev.bar[0].is_io ||
-      vmmdev.bar[0].base > UINT16_MAX ||
-      !svga_device.bar[0].valid || !svga_device.bar[0].is_io ||
-      svga_device.bar[0].base > UINT16_MAX ||
-      !svga_device.bar[1].valid || svga_device.bar[1].is_io ||
-      !svga_device.bar[2].valid || svga_device.bar[2].is_io)
+  if (!pci_find_by_id(PCI_VENDOR_VBOX, PCI_DEVICE_VBOX_VMMDEV, &vmmdev) || !vmmdev.bar[0].valid ||
+      !vmmdev.bar[0].is_io || vmmdev.bar[0].base > UINT16_MAX || !svga_device.bar[0].valid ||
+      !svga_device.bar[0].is_io || svga_device.bar[0].base > UINT16_MAX ||
+      !svga_device.bar[1].valid || svga_device.bar[1].is_io || !svga_device.bar[2].valid ||
+      svga_device.bar[2].is_io)
     return -1;
 
   pci_enable(&vmmdev);
   pci_enable(&svga_device);
-  vmmdev_port = (u16)vmmdev.bar[0].base;
+  vmmdev_port  = (u16)vmmdev.bar[0].base;
   svga_io_base = (u16)svga_device.bar[0].base;
 
   vmmdev_request_phys = pmm_alloc_frame_below(UINT32_MAX);
@@ -274,7 +264,7 @@ int vbox_video_init(u32 width, u32 height) {
     goto fail;
 
   u32 reported_fifo_bytes = svga_read(SVGA_REG_MEM_SIZE);
-  u64 fifo_limit = svga_device.bar[2].size;
+  u64 fifo_limit          = svga_device.bar[2].size;
   if (reported_fifo_bytes < fifo_limit)
     fifo_limit = reported_fifo_bytes;
   if (fifo_limit > UINT32_MAX)
@@ -284,21 +274,19 @@ int vbox_video_init(u32 width, u32 height) {
     goto fail;
 
   svga_write(SVGA_REG_CONFIG_DONE, 0);
-  svga_fifo[SVGA_FIFO_MIN] = SVGA_FIFO_REGISTER_BYTES;
-  svga_fifo[SVGA_FIFO_MAX] = svga_fifo_bytes;
+  svga_fifo[SVGA_FIFO_MIN]      = SVGA_FIFO_REGISTER_BYTES;
+  svga_fifo[SVGA_FIFO_MAX]      = svga_fifo_bytes;
   svga_fifo[SVGA_FIFO_NEXT_CMD] = SVGA_FIFO_REGISTER_BYTES;
-  svga_fifo[SVGA_FIFO_STOP] = SVGA_FIFO_REGISTER_BYTES;
+  svga_fifo[SVGA_FIFO_STOP]     = SVGA_FIFO_REGISTER_BYTES;
   __asm__ volatile("" ::: "memory");
   svga_write(SVGA_REG_CONFIG_DONE, 1);
 
   struct vmmdev_guest_info *info = vmmdev_request;
-  request_init(&info->header, sizeof(*info),
-               VMMDEV_REQUEST_REPORT_GUEST_INFO);
+  request_init(&info->header, sizeof(*info), VMMDEV_REQUEST_REPORT_GUEST_INFO);
   info->interface_version = VMMDEV_INTERFACE_VERSION;
-  info->os_type = VMMDEV_OSTYPE_LINUX26_X64;
+  info->os_type           = VMMDEV_OSTYPE_LINUX26_X64;
   if (vmmdev_perform(&info->header) != 0)
-    log_write("VBOX: guest-info report rejected; trying resize capability",
-              KERNEL, LOG_WARN);
+    log_write("VBOX: guest-info report rejected; trying resize capability", KERNEL, LOG_WARN);
 
   struct vmmdev_guest_caps *caps = vmmdev_request;
   request_init(&caps->header, sizeof(*caps), VMMDEV_REQUEST_REPORT_GUEST_CAPS);
@@ -322,7 +310,7 @@ fail_fifo:
 fail:
   pmm_free_frame(vmmdev_request_phys);
   vmmdev_request_phys = 0;
-  vmmdev_request = 0;
+  vmmdev_request      = 0;
   return -1;
 }
 
@@ -331,15 +319,14 @@ int vbox_video_poll_resize(struct vbox_video_mode *mode) {
     return -1;
 
   struct vmmdev_display_change2 *request = vmmdev_request;
-  request_init(&request->header, sizeof(*request),
-               VMMDEV_REQUEST_GET_DISPLAY_CHANGE2);
+  request_init(&request->header, sizeof(*request), VMMDEV_REQUEST_GET_DISPLAY_CHANGE2);
   request->event_ack = VMMDEV_EVENT_DISPLAY_CHANGE;
   if (vmmdev_perform(&request->header) != 0)
     return -1;
   if (request->display != 0 || request->xres == 0 || request->yres == 0)
     return 0;
 
-  u32 current_width = svga_read(SVGA_REG_WIDTH);
+  u32 current_width  = svga_read(SVGA_REG_WIDTH);
   u32 current_height = svga_read(SVGA_REG_HEIGHT);
   if (request->xres == current_width && request->yres == current_height)
     return 0;

@@ -86,8 +86,8 @@ HMODULE WINAPI LoadLibraryW(const WCHAR *name) {
 }
 FARPROC WINAPI GetProcAddress(HMODULE module, const char *name) {
   uintptr_t n = (uintptr_t)name;
-  int64_t r = gaia_call(1151, (int64_t)(uintptr_t)module, n <= 65535 ? 0 : n,
-                        n <= 65535 ? n : 0, 0, 0, 0);
+  int64_t r =
+      gaia_call(1151, (int64_t)(uintptr_t)module, n <= 65535 ? 0 : n, n <= 65535 ? n : 0, 0, 0, 0);
   if (r <= 0) {
     SetLastError(127);
     return 0;

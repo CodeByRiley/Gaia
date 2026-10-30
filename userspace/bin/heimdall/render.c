@@ -8,51 +8,49 @@
 #include <time.h>
 
 int outer_w(const struct window *w) { return w->client_w + 2 * BORDER_PX; }
-int outer_h(const struct window *w) {
-  return w->client_h + TITLEBAR_PX + BORDER_PX + w->status_h;
-}
+int outer_h(const struct window *w) { return w->client_h + TITLEBAR_PX + BORDER_PX + w->status_h; }
 
 /* Keep Heimdall call sites terse while the reusable library owns clipping and
  * union semantics. */
 void mark_dirty(int x, int y, int w, int h) {
-  gfx_damage_add(&desktop_damage, gfx_rect_make(x, y, w, h),
-                 gfx_rect_make(0, 0, fb_w, fb_h));
+  gfx_damage_add(&desktop_damage, gfx_rect_make(x, y, w, h), gfx_rect_make(0, 0, fb_w, fb_h));
 }
 
 /* Missing artwork falls back to the built-in mask. */
 static struct bmp_image tb_start_icon;
 static struct bmp_image tb_network_connected_icon;
 static struct bmp_image tb_network_disconnected_icon;
-static int tb_start_icon_loaded = 0;
-static int tb_network_connected_icon_loaded = 0;
+static int tb_start_icon_loaded                = 0;
+static int tb_network_connected_icon_loaded    = 0;
 static int tb_network_disconnected_icon_loaded = 0;
-static int tb_network_connected = 0;
+static int tb_network_connected                = 0;
 
-static int tb_load_icon(const char *path, const char *name, int max_dim,
-                        struct bmp_image *icon) {
+static int tb_load_icon(const char *path, const char *name, int max_dim, struct bmp_image *icon) {
   if (bmp_load(path, icon) != 0) {
     printf("heimdall: %s unavailable, using built-in %s icon\n", path, name);
     return 0;
   }
 
-  if (icon->width <= 0 || icon->height <= 0 || icon->width > max_dim ||
-      icon->height > max_dim) {
+  if (icon->width <= 0 || icon->height <= 0 || icon->width > max_dim || icon->height > max_dim) {
     printf("heimdall: %s has invalid %s icon dimensions %dx%d, using "
            "built-in %s icon\n",
-           path, name, icon->width, icon->height, name);
+           path,
+           name,
+           icon->width,
+           icon->height,
+           name);
     bmp_free(icon);
     return 0;
   }
 
-  printf("heimdall: %s icon %dx%d from %s\n", name, icon->width, icon->height,
-         path);
+  printf("heimdall: %s icon %dx%d from %s\n", name, icon->width, icon->height, path);
   return 1;
 }
 
 /* Monochrome network artwork uses alpha for its shape. Tint once at load
  * time so ordinary blits preserve transparent and antialiased edges. */
-static int tb_load_network_icon(const char *path, const char *name,
-                                uint32_t tint, struct bmp_image *icon) {
+static int tb_load_network_icon(const char *path, const char *name, uint32_t tint,
+                                struct bmp_image *icon) {
   if (!tb_load_icon(path, name, TB_INTERNET_ICON_MAX_DIM, icon))
     return 0;
   for (int i = 0; i < icon->width * icon->height; i++) {
@@ -67,16 +65,18 @@ static int tb_load_network_icon(const char *path, const char *name,
 
 void tb_load_icons(void) {
   if (!tb_start_icon_loaded)
-    tb_start_icon_loaded = tb_load_icon(TB_START_ICON_PATH, "start",
-                                        TB_START_ICON_MAX_DIM, &tb_start_icon);
+    tb_start_icon_loaded =
+        tb_load_icon(TB_START_ICON_PATH, "start", TB_START_ICON_MAX_DIM, &tb_start_icon);
   if (!tb_network_connected_icon_loaded)
-    tb_network_connected_icon_loaded = tb_load_network_icon(
-        TB_NETWORK_CONNECTED_ICON_PATH, "connected network",
-        TB_NETWORK_CONNECTED_FG, &tb_network_connected_icon);
+    tb_network_connected_icon_loaded = tb_load_network_icon(TB_NETWORK_CONNECTED_ICON_PATH,
+                                                            "connected network",
+                                                            TB_NETWORK_CONNECTED_FG,
+                                                            &tb_network_connected_icon);
   if (!tb_network_disconnected_icon_loaded)
-    tb_network_disconnected_icon_loaded = tb_load_network_icon(
-        TB_NETWORK_DISCONNECTED_ICON_PATH, "disconnected network",
-        TB_NETWORK_DISCONNECTED_FG, &tb_network_disconnected_icon);
+    tb_network_disconnected_icon_loaded = tb_load_network_icon(TB_NETWORK_DISCONNECTED_ICON_PATH,
+                                                               "disconnected network",
+                                                               TB_NETWORK_DISCONNECTED_FG,
+                                                               &tb_network_disconnected_icon);
 }
 
 /* Grow geometrically and retain the allocation across host resizes. Width-only
@@ -93,8 +93,8 @@ int backbuffer_reserve(size_t required) {
     pages *= 2;
 
   size_t capacity = pages * 4096;
-  uint32_t *new_fb = (uint32_t *)mmap(0, capacity, PROT_READ | PROT_WRITE,
-                                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  uint32_t *new_fb =
+      (uint32_t *)mmap(0, capacity, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (new_fb == MAP_FAILED)
     return -1;
 
@@ -104,7 +104,7 @@ int backbuffer_reserve(size_t required) {
   }
   if (fb && fb_capacity)
     munmap(fb, fb_capacity);
-  fb = new_fb;
+  fb          = new_fb;
   fb_capacity = capacity;
   return 0;
 }
@@ -125,9 +125,7 @@ int backbuffer_register(void) {
   return 0;
 }
 
-uint32_t *fb_pix(int x, int y) {
-  return fb + (size_t)y * (size_t)fb_stride + (size_t)x;
-}
+uint32_t *fb_pix(int x, int y) { return fb + (size_t)y * (size_t)fb_stride + (size_t)x; }
 
 /* Compose clip: the region present_dirty() is about to copy out to the
  * hardware framebuffer. Every compositor primitive must honour this clip:
@@ -158,13 +156,12 @@ void clip_set(int x, int y, int w, int h) {
 int clip_hits(int x, int y, int w, int h) {
   if (w <= 0 || h <= 0 || clip_w <= 0 || clip_h <= 0)
     return 0;
-  return x < clip_x + clip_w && x + w > clip_x && y < clip_y + clip_h &&
-         y + h > clip_y;
+  return x < clip_x + clip_w && x + w > clip_x && y < clip_y + clip_h && y + h > clip_y;
 }
 
 int clip_contains_point(int x, int y) {
-  return clip_w > 0 && clip_h > 0 && x >= clip_x && y >= clip_y &&
-         x < clip_x + clip_w && y < clip_y + clip_h;
+  return clip_w > 0 && clip_h > 0 && x >= clip_x && y >= clip_y && x < clip_x + clip_w &&
+         y < clip_y + clip_h;
 }
 
 void fb_fill_rect(int x, int y, int w, int h, uint32_t color) {
@@ -224,10 +221,10 @@ void draw_glyph_fb(int x, int y, char c, uint32_t fg, uint32_t bg) {
     y1 = clip_y + clip_h;
   if (x0 >= x1 || y0 >= y1)
     return;
-  int col_first = x0 - x;
-  int col_last = x1 - x;
-  int row_first = y0 - y;
-  int row_last = y1 - y;
+  int col_first        = x0 - x;
+  int col_last         = x1 - x;
+  int row_first        = y0 - y;
+  int row_last         = y1 - y;
   const uint8_t *glyph = font8x8[(int)c - FONT_FIRST];
   for (int r = row_first; r < row_last; r++) {
     uint8_t bits = glyph[r];
@@ -240,8 +237,7 @@ void draw_glyph_fb(int x, int y, char c, uint32_t fg, uint32_t bg) {
   }
 }
 
-void draw_text_fb(int x, int y, const char *s, int max_w, uint32_t fg,
-                  uint32_t bg) {
+void draw_text_fb(int x, int y, const char *s, int max_w, uint32_t fg, uint32_t bg) {
   int drawn = 0;
   while (*s && drawn + FONT_GLYPH_W <= max_w) {
     draw_glyph_fb(x + drawn, y, *s, fg, bg);
@@ -253,19 +249,18 @@ void draw_text_fb(int x, int y, const char *s, int max_w, uint32_t fg,
 /* Compute screen-space rect of titlebar button `idx_from_right` (0 = closest
  * to the corner). Used by both draw_chrome and the input pump's hit_test
  * so click rects exactly match what was rendered. */
-void titlebar_btn_rect(int win_x, int win_y, int outer_w, int idx_from_right,
-                       int *bx, int *by, int *bw, int *bh) {
+void titlebar_btn_rect(int win_x, int win_y, int outer_w, int idx_from_right, int *bx, int *by,
+                       int *bw, int *bh) {
   *bw = TB_BTN_SIZE;
   *bh = TB_BTN_SIZE;
-  *bx = win_x + outer_w - BORDER_PX - TB_BTN_PAD_R -
-        (idx_from_right + 1) * TB_BTN_SIZE - idx_from_right * TB_BTN_GAP;
+  *bx = win_x + outer_w - BORDER_PX - TB_BTN_PAD_R - (idx_from_right + 1) * TB_BTN_SIZE -
+        idx_from_right * TB_BTN_GAP;
   *by = win_y + (TITLEBAR_PX - TB_BTN_SIZE) / 2;
 }
 
 /* Stamp a TB_BTN_SIZE square button at (x,y). bg fills the rect; fg appears
  * only where the mask is 1. Mirrors the cursor's mask-overlay rendering. */
-void draw_button_mask(int x, int y,
-                      const uint8_t mask[TB_BTN_SIZE][TB_BTN_SIZE], uint32_t fg,
+void draw_button_mask(int x, int y, const uint8_t mask[TB_BTN_SIZE][TB_BTN_SIZE], uint32_t fg,
                       uint32_t bg) {
   fb_fill_rect(x, y, TB_BTN_SIZE, TB_BTN_SIZE, bg);
   for (int r = 0; r < TB_BTN_SIZE; r++) {
@@ -274,8 +269,7 @@ void draw_button_mask(int x, int y,
         continue;
       int px = x + c;
       int py = y + r;
-      if (px < 0 || px >= fb_w || py < 0 || py >= fb_h ||
-          !clip_contains_point(px, py))
+      if (px < 0 || px >= fb_w || py < 0 || py >= fb_h || !clip_contains_point(px, py))
         continue;
       *fb_pix(px, py) = fg;
     }
@@ -283,8 +277,7 @@ void draw_button_mask(int x, int y,
 }
 
 /* Taskbar masks carry their own size, independently of the Start button. */
-static void draw_taskbar_mask(int x, int y, int size,
-                              const uint8_t mask[size][size], uint32_t fg,
+static void draw_taskbar_mask(int x, int y, int size, const uint8_t mask[size][size], uint32_t fg,
                               uint32_t bg) {
   fb_fill_rect(x, y, size, size, bg);
   for (int r = 0; r < size; r++) {
@@ -293,8 +286,7 @@ static void draw_taskbar_mask(int x, int y, int size,
         continue;
       int px = x + c;
       int py = y + r;
-      if (px < 0 || px >= fb_w || py < 0 || py >= fb_h ||
-          !clip_contains_point(px, py))
+      if (px < 0 || px >= fb_w || py < 0 || py >= fb_h || !clip_contains_point(px, py))
         continue;
       *fb_pix(px, py) = fg;
     }
@@ -305,10 +297,10 @@ void draw_chrome(const struct window *w, int focused) {
   int ow = outer_w(w);
   int oh = outer_h(w);
   fb_fill_rect(w->x, w->y, ow, oh, CHROME_BG);
-  int tb_x = w->x + BORDER_PX;
-  int tb_y = w->y;
-  int tb_w = ow - 2 * BORDER_PX;
-  int tb_h = TITLEBAR_PX - BORDER_PX;
+  int tb_x    = w->x + BORDER_PX;
+  int tb_y    = w->y;
+  int tb_w    = ow - 2 * BORDER_PX;
+  int tb_h    = TITLEBAR_PX - BORDER_PX;
   uint32_t bg = focused ? TITLEBAR_FG : TITLEBAR_BG;
   fb_fill_rect(tb_x, tb_y, tb_w, tb_h, bg);
 
@@ -316,12 +308,11 @@ void draw_chrome(const struct window *w, int focused) {
    * gets clamped so it never overlaps the buttons. Order from right to
    * left: close (idx 0), max (1), min (2). */
   const int n_btns = 3;
-  int btn_strip_w =
-      n_btns * TB_BTN_SIZE + (n_btns - 1) * TB_BTN_GAP + TB_BTN_PAD_R;
+  int btn_strip_w  = n_btns * TB_BTN_SIZE + (n_btns - 1) * TB_BTN_GAP + TB_BTN_PAD_R;
 
   int text_x = tb_x + 4;
   int text_y = tb_y + (tb_h - FONT_GLYPH_H) / 2;
-  int avail = tb_w - 8 - btn_strip_w;
+  int avail  = tb_w - 8 - btn_strip_w;
   if (avail > 0) {
     draw_text_fb(text_x, text_y, w->title, avail, CHROME_TEXT, bg);
   }
@@ -344,19 +335,18 @@ void draw_chrome(const struct window *w, int focused) {
      * area, which matters most when the client is also light-coloured. */
     fb_fill_rect(sx, sy, sw, 1, TITLEBAR_BG);
 
-    int ty = sy + (w->status_h - FONT_GLYPH_H) / 2;
+    int ty    = sy + (w->status_h - FONT_GLYPH_H) / 2;
     int avail = sw - 2 * STATUSBAR_PAD_X;
     if (avail > 0 && w->status[0])
-      draw_text_fb(sx + STATUSBAR_PAD_X, ty, w->status, avail, STATUSBAR_FG,
-                   STATUSBAR_BG);
+      draw_text_fb(sx + STATUSBAR_PAD_X, ty, w->status, avail, STATUSBAR_FG, STATUSBAR_BG);
   }
 }
 
 void blit_surface(const struct window *w) {
   int dst_x = w->x + BORDER_PX;
   int dst_y = w->y + TITLEBAR_PX;
-  int cw = w->client_w;
-  int ch = w->client_h;
+  int cw    = w->client_w;
+  int ch    = w->client_h;
 
   /* Clamp to the clip box, not just the screen: rows and columns outside
    * the region about to be presented would be copied for nothing. */
@@ -367,26 +357,24 @@ void blit_surface(const struct window *w) {
   if (x0 >= x1 || y0 >= y1)
     return;
 
-  int src_x = x0 - dst_x;
-  int src_y = y0 - dst_y;
+  int src_x  = x0 - dst_x;
+  int src_y  = y0 - dst_y;
   int span_w = x1 - x0;
 
   for (int yy = 0; yy < y1 - y0; yy++) {
-    uint32_t *src =
-        w->surface + (size_t)(src_y + yy) * (size_t)cw + (size_t)src_x;
+    uint32_t *src = w->surface + (size_t)(src_y + yy) * (size_t)cw + (size_t)src_x;
     uint32_t *dst = fb_pix(x0, y0 + yy);
     memcpy(dst, src, (size_t)span_w * 4);
   }
 }
 
-void blit_icon(int dst_x, int dst_y, int dst_w, int dst_h, int src_w, int src_h,
-               uint32_t *pixels);
+void blit_icon(int dst_x, int dst_y, int dst_w, int dst_h, int src_w, int src_h, uint32_t *pixels);
 
 /* Scale available artwork inside the padded button. */
 void draw_start_button(int y) {
   if (!tb_start_icon_loaded) {
-    draw_taskbar_mask(0, y, TASKBAR_START_W, fallback_taskbar_start_mask,
-                      PRINT_COLOR_GREEN, TASKBAR_BG);
+    draw_taskbar_mask(
+        0, y, TASKBAR_START_W, fallback_taskbar_start_mask, PRINT_COLOR_GREEN, TASKBAR_BG);
     return;
   }
 
@@ -397,8 +385,13 @@ void draw_start_button(int y) {
   if (2 * pad >= TASKBAR_START_W || 2 * pad >= TASKBAR_PX)
     pad = 0;
 
-  blit_icon(pad, y + pad, TASKBAR_START_W - 2 * pad, TASKBAR_PX - 2 * pad,
-            tb_start_icon.width, tb_start_icon.height, tb_start_icon.pixels);
+  blit_icon(pad,
+            y + pad,
+            TASKBAR_START_W - 2 * pad,
+            TASKBAR_PX - 2 * pad,
+            tb_start_icon.width,
+            tb_start_icon.height,
+            tb_start_icon.pixels);
 }
 
 /* Rendered clock text, refreshed by clock_tick(). Kept as formatted strings
@@ -417,10 +410,14 @@ void clock_format(void) {
   if (hour12 == 0)
     hour12 = 12;
 
-  snprintf(clock_time_text, sizeof(clock_time_text), "%d:%02d %s", hour12,
-           now.minute, now.hour < 12 ? "AM" : "PM");
-  snprintf(clock_date_text, sizeof(clock_date_text), "%02d/%02d/%04d", now.day,
-           now.month, now.year);
+  snprintf(clock_time_text,
+           sizeof(clock_time_text),
+           "%d:%02d %s",
+           hour12,
+           now.minute,
+           now.hour < 12 ? "AM" : "PM");
+  snprintf(
+      clock_date_text, sizeof(clock_date_text), "%02d/%02d/%04d", now.day, now.month, now.year);
 }
 
 int clock_rect(int *cx, int *cy, int *cw, int *ch) {
@@ -441,8 +438,7 @@ int clock_tick(void) {
 
   clock_format();
 
-  if (strcmp(prev_time, clock_time_text) == 0 &&
-      strcmp(prev_date, clock_date_text) == 0)
+  if (strcmp(prev_time, clock_time_text) == 0 && strcmp(prev_date, clock_date_text) == 0)
     return 0;
 
   int cx, cy, cw, ch;
@@ -461,15 +457,18 @@ void draw_clock(void) {
 
   /* Two rows centred as a block in the strip. */
   int block_h = FONT_GLYPH_H * 2 + CLOCK_LINE_GAP;
-  int top = cy + (ch - block_h) / 2;
+  int top     = cy + (ch - block_h) / 2;
 
   int time_w = (int)strlen(clock_time_text) * FONT_GLYPH_W;
   int date_w = (int)strlen(clock_date_text) * FONT_GLYPH_W;
 
-  draw_text_fb(cx + (cw - time_w) / 2, top, clock_time_text, cw, CLOCK_FG,
+  draw_text_fb(cx + (cw - time_w) / 2, top, clock_time_text, cw, CLOCK_FG, TASKBAR_BG);
+  draw_text_fb(cx + (cw - date_w) / 2,
+               top + FONT_GLYPH_H + CLOCK_LINE_GAP,
+               clock_date_text,
+               cw,
+               CLOCK_FG,
                TASKBAR_BG);
-  draw_text_fb(cx + (cw - date_w) / 2, top + FONT_GLYPH_H + CLOCK_LINE_GAP,
-               clock_date_text, cw, CLOCK_FG, TASKBAR_BG);
 }
 
 /* Reserve an icon slot immediately to the left of the clock. */
@@ -486,7 +485,7 @@ int network_rect(int *cx, int *cy, int *cw, int *ch) {
  * Missing hardware or a failed query uses the disconnected globe. */
 int network_tick(void) {
   struct net_stats stats = {0};
-  int connected = net_stats(&stats) == 0 && stats.present && stats.link_up;
+  int connected          = net_stats(&stats) == 0 && stats.present && stats.link_up;
   if (connected == tb_network_connected)
     return 0;
   tb_network_connected = connected;
@@ -502,11 +501,10 @@ static void draw_network_status(void) {
   int x, y, w, h;
   if (!network_rect(&x, &y, &w, &h))
     return;
-  const struct bmp_image *icon = tb_network_connected
-                                     ? &tb_network_connected_icon
-                                     : &tb_network_disconnected_icon;
-  int loaded = tb_network_connected ? tb_network_connected_icon_loaded
-                                    : tb_network_disconnected_icon_loaded;
+  const struct bmp_image *icon =
+      tb_network_connected ? &tb_network_connected_icon : &tb_network_disconnected_icon;
+  int loaded =
+      tb_network_connected ? tb_network_connected_icon_loaded : tb_network_disconnected_icon_loaded;
   if (!loaded) {
     if (tb_network_connected) {
       /* Monitor silhouette; keep the globe exclusive to disconnection. */
@@ -516,8 +514,8 @@ static void draw_network_status(void) {
       fb_fill_rect(x + w / 2 - 1, y + h - 7, 2, 3, TB_NETWORK_CONNECTED_FG);
       fb_fill_rect(x + 7, y + h - 4, w - 14, 2, TB_NETWORK_CONNECTED_FG);
     } else {
-      draw_taskbar_mask(x, y, TB_INTERNET_SIZE, fallback_internet_mask,
-                        TB_NETWORK_DISCONNECTED_FG, TASKBAR_BG);
+      draw_taskbar_mask(
+          x, y, TB_INTERNET_SIZE, fallback_internet_mask, TB_NETWORK_DISCONNECTED_FG, TASKBAR_BG);
     }
     return;
   }
@@ -529,8 +527,7 @@ static void draw_network_status(void) {
   if (2 * pad >= w || 2 * pad >= h)
     pad = 0;
 
-  blit_icon(x + pad, y + pad, w - 2 * pad, h - 2 * pad, icon->width,
-            icon->height, icon->pixels);
+  blit_icon(x + pad, y + pad, w - 2 * pad, h - 2 * pad, icon->width, icon->height, icon->pixels);
 }
 
 void draw_taskbar(void) {
@@ -544,8 +541,7 @@ void draw_taskbar(void) {
   draw_start_button(y);
 
   // draw divider right after the start button
-  fb_fill_rect(TASKBAR_START_W + TASKBAR_BTN_GAP, y, 2, TASKBAR_PX,
-               PRINT_COLOR_BLACK);
+  fb_fill_rect(TASKBAR_START_W + TASKBAR_BTN_GAP, y, 2, TASKBAR_PX, PRINT_COLOR_BLACK);
 
   struct tb_entry ents[MAX_Z];
   int n = build_taskbar_entries(ents, (int)(sizeof(ents) / sizeof(ents[0])));
@@ -578,8 +574,8 @@ void draw_start_menu(void) {
     return;
 
   int menu_h = start_menu_count * START_MENU_ITEM_H + START_MENU_PAD * 2;
-  int mx = 0;
-  int my = taskbar_y() - menu_h;
+  int mx     = 0;
+  int my     = taskbar_y() - menu_h;
 
   fb_fill_rect(mx, my, START_MENU_W, menu_h, MENU_BG);
 
@@ -597,8 +593,12 @@ void draw_start_menu(void) {
     uint32_t fg = (i == start_menu_hover) ? MENU_HOVER_FG : MENU_TEXT;
 
     fb_fill_rect(item_x, item_y, item_w, START_MENU_ITEM_H - 2, bg);
-    draw_text_fb(item_x + 4, item_y + (START_MENU_ITEM_H - FONT_GLYPH_H) / 2,
-                 start_menu_programs[i].name, item_w - 8, fg, bg);
+    draw_text_fb(item_x + 4,
+                 item_y + (START_MENU_ITEM_H - FONT_GLYPH_H) / 2,
+                 start_menu_programs[i].name,
+                 item_w - 8,
+                 fg,
+                 bg);
   }
 }
 
@@ -620,8 +620,7 @@ void drain_tty_into_console(void) {
 
 /* Blit and scale an icon to dst_w x dst_h, supporting alpha and magenta chroma
  * key. */
-void blit_icon(int dst_x, int dst_y, int dst_w, int dst_h, int src_w, int src_h,
-               uint32_t *pixels) {
+void blit_icon(int dst_x, int dst_y, int dst_w, int dst_h, int src_w, int src_h, uint32_t *pixels) {
   if (!pixels || src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0)
     return;
 
@@ -645,16 +644,16 @@ void blit_icon(int dst_x, int dst_y, int dst_w, int dst_h, int src_w, int src_h,
     return;
 
   int start_y = screen_y0 - dst_y;
-  int end_y = screen_y1 - dst_y;
+  int end_y   = screen_y1 - dst_y;
   int start_x = screen_x0 - dst_x;
-  int end_x = screen_x1 - dst_x;
+  int end_x   = screen_x1 - dst_x;
 
   for (int y = start_y; y < end_y; y++) {
     for (int x = start_x; x < end_x; x++) {
       int sx = (x * src_w) / dst_w;
       int sy = (y * src_h) / dst_h;
 
-      uint32_t src = pixels[sy * src_w + sx];
+      uint32_t src   = pixels[sy * src_w + sx];
       uint32_t alpha = src >> 24;
       uint32_t color = src & 0x00FFFFFF;
 
@@ -683,15 +682,17 @@ void compose_handle(int handle) {
     struct console *con = con_for_handle(handle);
     if (!con)
       return;
-    if (!clip_hits(con->win.x, con->win.y, outer_w_dims(con->win.client_w),
+    if (!clip_hits(con->win.x,
+                   con->win.y,
+                   outer_w_dims(con->win.client_w),
                    outer_h_dims(con->win.client_h, con->win.status_h)))
       return;
     struct window cw = {0};
-    cw.x = con->win.x;
-    cw.y = con->win.y;
-    cw.client_w = con->win.client_w;
-    cw.client_h = con->win.client_h;
-    cw.surface = con->win.surface;
+    cw.x             = con->win.x;
+    cw.y             = con->win.y;
+    cw.client_w      = con->win.client_w;
+    cw.client_h      = con->win.client_h;
+    cw.surface       = con->win.surface;
     memcpy(cw.title, con->win.title, sizeof(cw.title) - 1);
     draw_chrome(&cw, focused_handle == handle);
     blit_surface(&cw);
@@ -725,7 +726,7 @@ void compose(void) {
 
       int x = cx0;
       while (x < cx1) {
-        int col = x % w;
+        int col   = x % w;
         int chunk = w - col;
         if (x + chunk > cx1)
           chunk = cx1 - x;
@@ -739,21 +740,34 @@ void compose(void) {
 
   for (int i = 0; i < desktop_icon_count; i++) {
     /* Label sits under the icon, so extend the cull box downward. */
-    if (!clip_hits(desktop_icons[i].x, desktop_icons[i].y, desktop_icons[i].w,
+    if (!clip_hits(desktop_icons[i].x,
+                   desktop_icons[i].y,
+                   desktop_icons[i].w,
                    desktop_icons[i].h + 2 + FONT_GLYPH_H))
       continue;
     if (desktop_icons[i].loaded) {
-      blit_icon(desktop_icons[i].x, desktop_icons[i].y, desktop_icons[i].w,
-                desktop_icons[i].h, desktop_icons[i].icon.width,
-                desktop_icons[i].icon.height, desktop_icons[i].icon.pixels);
+      blit_icon(desktop_icons[i].x,
+                desktop_icons[i].y,
+                desktop_icons[i].w,
+                desktop_icons[i].h,
+                desktop_icons[i].icon.width,
+                desktop_icons[i].icon.height,
+                desktop_icons[i].icon.pixels);
     } else {
-      fb_fill_rect(desktop_icons[i].x, desktop_icons[i].y, desktop_icons[i].w,
-                   desktop_icons[i].h, 0x00808080);
+      fb_fill_rect(desktop_icons[i].x,
+                   desktop_icons[i].y,
+                   desktop_icons[i].w,
+                   desktop_icons[i].h,
+                   0x00808080);
     }
 
     int text_y = desktop_icons[i].y + desktop_icons[i].h + 2;
-    draw_text_fb(desktop_icons[i].x, text_y, desktop_icons[i].program.name,
-                 desktop_icons[i].w, 0x00FFFFFF, DESKTOP_BG);
+    draw_text_fb(desktop_icons[i].x,
+                 text_y,
+                 desktop_icons[i].program.name,
+                 desktop_icons[i].w,
+                 0x00FFFFFF,
+                 DESKTOP_BG);
   }
   for (int i = z_count - 1; i >= 0; i--) {
     compose_handle(z_order[i]);
@@ -770,9 +784,8 @@ void compose(void) {
 /* Hand normal backbuffer copies to the kernel so large regions can use its AP
  * work queue. Keep the direct path as a fallback for an older kernel or a
  * rejected request. */
-//struct fb_rect strips[4] = { top, left, right, bottom }
-void present_backbuffer_rects(const struct fb_rect *rects,
-                              uint32_t rect_count) {
+// struct fb_rect strips[4] = { top, left, right, bottom }
+void present_backbuffer_rects(const struct fb_rect *rects, uint32_t rect_count) {
   if (rect_count == 0)
     return;
   if (fb_present(fb, (uint32_t)fb_stride * 4U, rects, rect_count) == 0)
@@ -782,8 +795,7 @@ void present_backbuffer_rects(const struct fb_rect *rects,
     const struct fb_rect *rect = &rects[i];
     for (uint32_t row = 0; row < rect->h; row++) {
       uint32_t *src = fb_pix((int)rect->x, (int)(rect->y + row));
-      uint32_t *dst =
-          fb_hw + (size_t)(rect->y + row) * (size_t)fb_stride + (size_t)rect->x;
+      uint32_t *dst = fb_hw + (size_t)(rect->y + row) * (size_t)fb_stride + (size_t)rect->x;
       memcpy(dst, src, (size_t)rect->w * 4);
     }
     fb_damage(rect->x, rect->y, rect->w, rect->h);
@@ -845,21 +857,21 @@ void blend_px(uint32_t *dst, uint32_t src) {
     return;
   }
 
-  uint32_t d = *dst;
+  uint32_t d   = *dst;
   uint32_t inv = 255u - a;
-  uint32_t r = (((src >> 16) & 0xFF) * a + ((d >> 16) & 0xFF) * inv) / 255u;
-  uint32_t g = (((src >> 8) & 0xFF) * a + ((d >> 8) & 0xFF) * inv) / 255u;
-  uint32_t b = ((src & 0xFF) * a + (d & 0xFF) * inv) / 255u;
-  *dst = (r << 16) | (g << 8) | b;
+  uint32_t r   = (((src >> 16) & 0xFF) * a + ((d >> 16) & 0xFF) * inv) / 255u;
+  uint32_t g   = (((src >> 8) & 0xFF) * a + ((d >> 8) & 0xFF) * inv) / 255u;
+  uint32_t b   = ((src & 0xFF) * a + (d & 0xFF) * inv) / 255u;
+  *dst         = (r << 16) | (g << 8) | b;
 }
 
 int cursor_rect(int32_t x, int32_t y, int scale, struct fb_rect *rect) {
   int draw_w = cursor_w() * scale;
   int draw_h = cursor_h() * scale;
-  int x0 = x < 0 ? 0 : (int)x;
-  int y0 = y < 0 ? 0 : (int)y;
-  int x1 = ((int)x + draw_w) > fb_w ? fb_w : (int)x + draw_w;
-  int y1 = ((int)y + draw_h) > fb_h ? fb_h : (int)y + draw_h;
+  int x0     = x < 0 ? 0 : (int)x;
+  int y0     = y < 0 ? 0 : (int)y;
+  int x1     = ((int)x + draw_w) > fb_w ? fb_w : (int)x + draw_w;
+  int y1     = ((int)y + draw_h) > fb_h ? fb_h : (int)y + draw_h;
 
   if (x0 >= x1 || y0 >= y1)
     return 0;
@@ -873,14 +885,12 @@ int cursor_rect(int32_t x, int32_t y, int scale, struct fb_rect *rect) {
   return 1;
 }
 
-void draw_cursor_with_repairs(int32_t x, int32_t y,
-                              const struct fb_rect *repairs,
+void draw_cursor_with_repairs(int32_t x, int32_t y, const struct fb_rect *repairs,
                               uint32_t repair_count) {
   int scale = cursor_scale();
   int src_w = cursor_w();
   int src_h = cursor_h();
-  if (src_w <= 0 || src_h <= 0 || src_w > CURSOR_MAX_SOURCE_DIM ||
-      src_h > CURSOR_MAX_SOURCE_DIM)
+  if (src_w <= 0 || src_h <= 0 || src_w > CURSOR_MAX_SOURCE_DIM || src_h > CURSOR_MAX_SOURCE_DIM)
     return;
 
   struct fb_rect new_rect;
@@ -890,19 +900,18 @@ void draw_cursor_with_repairs(int32_t x, int32_t y,
 
   int clipped_w = (int)new_rect.w;
   int clipped_h = (int)new_rect.h;
-  int x0 = (int)new_rect.x;
-  int y0 = (int)new_rect.y;
+  int x0        = (int)new_rect.x;
+  int y0        = (int)new_rect.y;
 
   for (int yy = 0; yy < clipped_h; yy++) {
     uint32_t *p = fb_pix(x0, y0 + yy);
-    memcpy(cursor_under + (size_t)yy * CURSOR_MAX_DRAW_DIM, p,
-           (size_t)clipped_w * 4);
+    memcpy(cursor_under + (size_t)yy * CURSOR_MAX_DRAW_DIM, p, (size_t)clipped_w * 4);
 
     int src_y = (y0 + yy - (int)y) / scale;
 
     if (cursor_img.pixels) {
       for (int xx = 0; xx < clipped_w; xx++) {
-        int src_x = (x0 + xx - (int)x) / scale;
+        int src_x    = (x0 + xx - (int)x) / scale;
         uint32_t src = cursor_img.pixels[(size_t)src_y * src_w + src_x];
 
         /* Treat pure magenta as transparent for 24-bit cursor images
@@ -915,7 +924,7 @@ void draw_cursor_with_repairs(int32_t x, int32_t y,
       }
     } else {
       for (int xx = 0; xx < clipped_w; xx++) {
-        int src_x = (x0 + xx - (int)x) / scale;
+        int src_x  = (x0 + xx - (int)x) / scale;
         uint8_t mv = fallback_cursor_mask[src_y][src_x];
         if (mv == 1)
           p[xx] = COLOR_BORDER;
@@ -927,8 +936,7 @@ void draw_cursor_with_repairs(int32_t x, int32_t y,
 
   struct fb_rect rects[FB_PRESENT_MAX_RECTS];
   uint32_t rect_count = 0;
-  for (uint32_t i = 0;
-       i < repair_count && rect_count + 1 < FB_PRESENT_MAX_RECTS; i++) {
+  for (uint32_t i = 0; i < repair_count && rect_count + 1 < FB_PRESENT_MAX_RECTS; i++) {
     if (repairs[i].w && repairs[i].h)
       rects[rect_count++] = repairs[i];
   }
@@ -978,10 +986,10 @@ void erase_ghost(int x, int y, int w, int h) {
    * calls.  Keep its four thin damage regions, but hand them to the kernel
    * together so it can copy and flush them as one batch. */
   const int strips[4][4] = {
-      {x, y, w, 1},
-      {x, y + h - 1, w, 1},
-      {x, y, 1, h},
-      {x + w - 1, y, 1, h},
+      {x,         y,         w, 1},
+      {x,         y + h - 1, w, 1},
+      {x,         y,         1, h},
+      {x + w - 1, y,         1, h},
   };
   struct fb_rect rects[4];
   uint32_t rect_count = 0;
@@ -1002,8 +1010,7 @@ void erase_ghost(int x, int y, int w, int h) {
       rh = fb_h - ry;
     if (rw > 0 && rh > 0) {
       rects[rect_count++] = (struct fb_rect){
-          .x = (uint32_t)rx, .y = (uint32_t)ry,
-          .w = (uint32_t)rw, .h = (uint32_t)rh};
+          .x = (uint32_t)rx, .y = (uint32_t)ry, .w = (uint32_t)rw, .h = (uint32_t)rh};
     }
   }
   present_backbuffer_rects(rects, rect_count);

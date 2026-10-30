@@ -9,10 +9,10 @@
 
 #else
 
-#define assert(expr)                                                           \
-  do {                                                                         \
-    if (!(expr))                                                               \
-      panicf("Assertion failed: %s", #expr);                                   \
+#define assert(expr)                                                                               \
+  do {                                                                                             \
+    if (!(expr))                                                                                   \
+      panicf("Assertion failed: %s", #expr);                                                       \
   } while (0)
 
 #endif /* NDEBUG */

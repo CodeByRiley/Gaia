@@ -15,8 +15,21 @@ BOOL WINAPI TextOutW(HDC, INT, INT, const WCHAR *, INT);
 COLORREF WINAPI SetTextColor(HDC, COLORREF);
 COLORREF WINAPI SetBkColor(HDC, COLORREF);
 INT WINAPI SetBkMode(HDC, INT);
-typedef struct {DWORD biSize;LONG biWidth,biHeight;WORD biPlanes,biBitCount;DWORD biCompression,biSizeImage;LONG biXPelsPerMeter,biYPelsPerMeter;DWORD biClrUsed,biClrImportant;} BITMAPINFOHEADER;
-typedef struct {BYTE rgbBlue,rgbGreen,rgbRed,rgbReserved;} RGBQUAD;
-typedef struct {BITMAPINFOHEADER bmiHeader;RGBQUAD bmiColors[1];} BITMAPINFO;
-INT WINAPI SetDIBitsToDevice(HDC,INT,INT,DWORD,DWORD,INT,INT,UINT,UINT,const void *,const BITMAPINFO *,UINT);
+typedef struct {
+  DWORD biSize;
+  LONG biWidth, biHeight;
+  WORD biPlanes, biBitCount;
+  DWORD biCompression, biSizeImage;
+  LONG biXPelsPerMeter, biYPelsPerMeter;
+  DWORD biClrUsed, biClrImportant;
+} BITMAPINFOHEADER;
+typedef struct {
+  BYTE rgbBlue, rgbGreen, rgbRed, rgbReserved;
+} RGBQUAD;
+typedef struct {
+  BITMAPINFOHEADER bmiHeader;
+  RGBQUAD bmiColors[1];
+} BITMAPINFO;
+INT WINAPI SetDIBitsToDevice(HDC, INT, INT, DWORD, DWORD, INT, INT, UINT, UINT, const void *,
+                             const BITMAPINFO *, UINT);
 #endif

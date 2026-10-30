@@ -12,21 +12,18 @@ typedef int pthread_mutexattr_t;
 
 /* Stack records retained until join. */
 struct thread_node {
-    long tid;
-    void *stack_base;
-    struct thread_node *next;
+  long tid;
+  void *stack_base;
+  struct thread_node *next;
 };
 
 struct pthread_arg {
-    void *(*start_routine)(void*);
-    void *arg;
+  void *(*start_routine)(void *);
+  void *arg;
 };
 
-
 void pthread_entry(struct pthread_arg *p);
-int pthread_create(pthread_t *thread,
-                   const pthread_attr_t *attr,
-                   void *(*start_routine)(void *),
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *),
                    void *arg);
 void pthread_exit(void *retval);
 int pthread_join(pthread_t thread, void **retval);

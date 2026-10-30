@@ -5,7 +5,7 @@
 #include <shims/win32/windows.h>
 #define PTR(p) ((int64_t)(uintptr_t)(p))
 void *memcpy(void *d, const void *s, size_t n) {
-  BYTE *a = d;
+  BYTE *a       = d;
   const BYTE *b = s;
   for (size_t i = 0; i < n; i++)
     a[i] = b[i];
@@ -18,7 +18,7 @@ void *memset(void *d, int c, size_t n) {
   return d;
 }
 void *memmove(void *d, const void *s, size_t n) {
-  BYTE *a = d;
+  BYTE *a       = d;
   const BYTE *b = s;
   if (a < b)
     for (size_t i = 0; i < n; i++)
@@ -48,9 +48,7 @@ int strcmp(const char *a, const char *b) {
   }
   return (BYTE)*a - (BYTE)*b;
 }
-void WINAPI RtlMoveMemory(void *a, const void *b, SIZE_T n) {
-  memmove(a, b, n);
-}
+void WINAPI RtlMoveMemory(void *a, const void *b, SIZE_T n) { memmove(a, b, n); }
 void WINAPI RtlZeroMemory(void *a, SIZE_T n) { memset(a, 0, n); }
 struct allocation {
   uint64_t magic, size, mapped;
@@ -63,15 +61,15 @@ void *WINAPI RtlAllocateHeap(HANDLE heap, ULONG flags, SIZE_T n) {
     return 0;
   }
   SIZE_T bytes = (n + sizeof(struct allocation) + 4095) & ~4095ULL;
-  int64_t r = gaia_map(0, bytes, 3);
+  int64_t r    = gaia_map(0, bytes, 3);
   if (r < 0) {
     SetLastError(GaiaError(r));
     return 0;
   }
   struct allocation *a = (void *)(uintptr_t)r;
-  a->magic = ALLOC_MAGIC;
-  a->size = n;
-  a->mapped = bytes;
+  a->magic             = ALLOC_MAGIC;
+  a->size              = n;
+  a->mapped            = bytes;
   return a + 1;
 }
 BOOL WINAPI RtlFreeHeap(HANDLE heap, ULONG flags, void *p) {
@@ -108,11 +106,13 @@ void *WINAPI RtlReAllocateHeap(HANDLE h, ULONG f, void *p, SIZE_T n) {
 static uint32_t initialized;
 static unsigned exiting;
 void WINAPI RtlExitUserProcess(UINT code) {
-  if(!__atomic_exchange_n(&exiting,1,__ATOMIC_ACQ_REL)) {
-    struct gaia_win32_boot *b=NtCurrentTeb()->ProcessEnvironmentBlock->GaiaBoot;
-    while(initialized){uint32_t i=b->init_order[--initialized];
-      BOOL (WINAPI *entry)(HMODULE,DWORD,void *)=(void *)(uintptr_t)b->modules[i].entry;
-      if(entry)entry((void *)(uintptr_t)b->modules[i].base,DLL_PROCESS_DETACH,(void *)1);
+  if (!__atomic_exchange_n(&exiting, 1, __ATOMIC_ACQ_REL)) {
+    struct gaia_win32_boot *b = NtCurrentTeb()->ProcessEnvironmentBlock->GaiaBoot;
+    while (initialized) {
+      uint32_t i                                   = b->init_order[--initialized];
+      BOOL(WINAPI * entry)(HMODULE, DWORD, void *) = (void *)(uintptr_t)b->modules[i].entry;
+      if (entry)
+        entry((void *)(uintptr_t)b->modules[i].base, DLL_PROCESS_DETACH, (void *)1);
     }
   }
   gaia_call(SYS_EXIT_GROUP, code, 0, 0, 0, 0, 0);
@@ -132,8 +132,7 @@ DWORD WINAPI TlsAlloc(void) {
   return TLS_OUT_OF_INDEXES;
 }
 BOOL WINAPI TlsFree(DWORD i) {
-  if (i >= 64 || !(__atomic_fetch_and(&tls_used[i / 32], ~(1u << (i % 32)),
-                                      __ATOMIC_ACQ_REL) &
+  if (i >= 64 || !(__atomic_fetch_and(&tls_used[i / 32], ~(1u << (i % 32)), __ATOMIC_ACQ_REL) &
                    (1u << (i % 32)))) {
     SetLastError(87);
     return FALSE;
@@ -150,8 +149,7 @@ void *WINAPI TlsGetValue(DWORD i) {
   return NtCurrentTeb()->TlsSlots[i];
 }
 BOOL WINAPI TlsSetValue(DWORD i, void *v) {
-  if (i >= 64 || !(__atomic_load_n(&tls_used[i / 32], __ATOMIC_ACQUIRE) &
-                   (1u << (i % 32)))) {
+  if (i >= 64 || !(__atomic_load_n(&tls_used[i / 32], __ATOMIC_ACQUIRE) & (1u << (i % 32)))) {
     SetLastError(87);
     return FALSE;
   }
@@ -164,24 +162,20 @@ BOOL GaiaInitializeDlls(void) {
     uint32_t index = b->init_order[initialized++];
     if (index >= b->module_count)
       return FALSE;
-    BOOL(WINAPI * entry)(HMODULE, DWORD, void *) =
-        (void *)(uintptr_t)b->modules[index].entry;
-    if (entry && !entry((void *)(uintptr_t)b->modules[index].base,
-                        DLL_PROCESS_ATTACH, 0))
+    BOOL(WINAPI * entry)(HMODULE, DWORD, void *) = (void *)(uintptr_t)b->modules[index].entry;
+    if (entry && !entry((void *)(uintptr_t)b->modules[index].base, DLL_PROCESS_ATTACH, 0))
       return FALSE;
   }
   return TRUE;
 }
 void GaiaInitializeProcess(void) {
-  TEB *t = NtCurrentTeb();
+  TEB *t       = NtCurrentTeb();
   t->ProcessId = gaia_pid();
-  t->ThreadId = gaia_tid();
+  t->ThreadId  = gaia_tid();
   if (!GaiaInitializeDlls())
     RtlExitUserProcess(1114);
   struct gaia_win32_boot *b = t->ProcessEnvironmentBlock->GaiaBoot;
   int(WINAPI * entry)(void) = (void *)(uintptr_t)b->image_entry;
   RtlExitUserProcess((UINT)entry());
 }
-NTSTATUS WINAPI NtClose(HANDLE h) {
-  return GaiaHandleClose(h) ? 0 : (NTSTATUS)0xc0000008u;
-}
+NTSTATUS WINAPI NtClose(HANDLE h) { return GaiaHandleClose(h) ? 0 : (NTSTATUS)0xc0000008u; }

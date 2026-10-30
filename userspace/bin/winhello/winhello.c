@@ -3,7 +3,7 @@
 #include <windows.h>
 static int failed;
 static void report(const char *s) {
-  DWORD n = 0;
+  DWORD n       = 0;
   const char *p = s;
   while (*p)
     p++;
@@ -31,9 +31,13 @@ void mainCRTStartup(void) {
   SetLastError(123);
   Sleep(1);
   check(GetLastError() == 123, "last error survives syscall");
-  HANDLE file = CreateFileA("C:\\win32-test.txt", GENERIC_READ | GENERIC_WRITE,
-                            FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+  HANDLE file = CreateFileA("C:\\win32-test.txt",
+                            GENERIC_READ | GENERIC_WRITE,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            NULL,
+                            CREATE_ALWAYS,
+                            FILE_ATTRIBUTE_NORMAL,
+                            NULL);
   check(file != INVALID_HANDLE_VALUE, "CreateFileA");
   if (file != INVALID_HANDLE_VALUE) {
     DWORD n;
@@ -42,12 +46,10 @@ void mainCRTStartup(void) {
     zero.QuadPart = 0;
     check(WriteFile(file, "Gaia", 4, &n, NULL) && n == 4, "WriteFile");
     check(SetFilePointerEx(file, zero, NULL, FILE_BEGIN), "seek");
-    check(ReadFile(file, data, 4, &n, NULL) && n == 4 && data[0] == 'G' &&
-              data[3] == 'a',
+    check(ReadFile(file, data, 4, &n, NULL) && n == 4 && data[0] == 'G' && data[3] == 'a',
           "ReadFile");
     check(CloseHandle(file), "close");
-    check(!CloseHandle(file) && GetLastError() == ERROR_INVALID_HANDLE,
-          "stale handle rejected");
+    check(!CloseHandle(file) && GetLastError() == ERROR_INVALID_HANDLE, "stale handle rejected");
   }
   void *p = VirtualAlloc(NULL, 8192, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
   check(p != NULL, "VirtualAlloc");
@@ -77,19 +79,32 @@ void mainCRTStartup(void) {
     length_fn length = (length_fn)GetProcAddress(dll, "strlen");
     check(length && length("unchanged") == 9, "GetProcAddress");
   }
-  check(GetProcAddress(GetModuleHandleA("kernel32.dll"), "MissingApi") ==
-                NULL &&
+  check(GetProcAddress(GetModuleHandleA("kernel32.dll"), "MissingApi") == NULL &&
             GetLastError() == ERROR_PROC_NOT_FOUND,
         "missing export");
-  HANDLE event=CreateEventA(NULL,FALSE,TRUE,NULL);
-  check(event && WaitForSingleObject(event,0)==WAIT_OBJECT_0 && WaitForSingleObject(event,0)==WAIT_TIMEOUT,"auto-reset event");
-  if(event){check(SetEvent(event)&&WaitForSingleObject(event,1)==WAIT_OBJECT_0,"event signaling");CloseHandle(event);}
-  CRITICAL_SECTION critical;InitializeCriticalSection(&critical);EnterCriticalSection(&critical);check(TryEnterCriticalSection(&critical),"recursive critical section");LeaveCriticalSection(&critical);LeaveCriticalSection(&critical);DeleteCriticalSection(&critical);
+  HANDLE event = CreateEventA(NULL, FALSE, TRUE, NULL);
+  check(event && WaitForSingleObject(event, 0) == WAIT_OBJECT_0 &&
+            WaitForSingleObject(event, 0) == WAIT_TIMEOUT,
+        "auto-reset event");
+  if (event) {
+    check(SetEvent(event) && WaitForSingleObject(event, 1) == WAIT_OBJECT_0, "event signaling");
+    CloseHandle(event);
+  }
+  CRITICAL_SECTION critical;
+  InitializeCriticalSection(&critical);
+  EnterCriticalSection(&critical);
+  check(TryEnterCriticalSection(&critical), "recursive critical section");
+  LeaveCriticalSection(&critical);
+  LeaveCriticalSection(&critical);
+  DeleteCriticalSection(&critical);
   HMODULE probe = LoadLibraryA("compatprobe.dll");
   if (probe) {
-    typedef int (WINAPI *probe_fn)(void);
-    union { FARPROC raw; probe_fn call; } named, ordinal;
-    named.raw = GetProcAddress(probe, "ProbeValue");
+    typedef int(WINAPI * probe_fn)(void);
+    union {
+      FARPROC raw;
+      probe_fn call;
+    } named, ordinal;
+    named.raw   = GetProcAddress(probe, "ProbeValue");
     ordinal.raw = GetProcAddress(probe, (const char *)7);
     check(named.call && ordinal.call && named.call() == 42 && ordinal.call() == 42,
           "relocated DLLs, dependency initialization, name and ordinal exports");

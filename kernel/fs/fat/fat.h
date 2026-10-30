@@ -14,16 +14,16 @@
 #include <stdint.h>
 #include <utilities/types.h>
 
-#define FAT_PATH_MAX    260
-#define FAT_LFN_MAX     255
-#define FAT_NAME_LEN    11
-#define FAT_DIRENT_MAX  (FAT_LFN_MAX + 2)
+#define FAT_PATH_MAX 260
+#define FAT_LFN_MAX 255
+#define FAT_NAME_LEN 11
+#define FAT_DIRENT_MAX (FAT_LFN_MAX + 2)
 
-#define FAT_ATTR_READ_ONLY  0x01
-#define FAT_ATTR_HIDDEN     0x02
-#define FAT_ATTR_SYSTEM     0x04
-#define FAT_ATTR_DIRECTORY  0x10
-#define FAT_ATTR_ARCHIVE    0x20
+#define FAT_ATTR_READ_ONLY 0x01
+#define FAT_ATTR_HIDDEN 0x02
+#define FAT_ATTR_SYSTEM 0x04
+#define FAT_ATTR_DIRECTORY 0x10
+#define FAT_ATTR_ARCHIVE 0x20
 
 typedef void (*fat_sector_writer)(uint32_t lba, const void *data);
 
@@ -54,18 +54,14 @@ int fat_stat(const char *path, struct fat_stat *out);
 size_t fat_read(struct fat_file *file, void *buffer, size_t length);
 size_t fat_write(struct fat_file *file, const void *buffer, size_t length);
 int fat_seek(struct fat_file *file, uint32_t position);
-long fat_read_dir(const char *path, uint32_t *index, char *buffer,
-                  size_t length);
+long fat_read_dir(const char *path, uint32_t *index, char *buffer, size_t length);
 long fat_read_root_dir(uint32_t *index, char *buffer, size_t length);
-long fat_read_dir_one(const char *path, uint32_t *index, char *buffer,
-                      size_t length, int *is_dir);
+long fat_read_dir_one(const char *path, uint32_t *index, char *buffer, size_t length, int *is_dir);
 void fat_set_sector_writer(fat_sector_writer writer);
 int fat_write_through_enabled(void);
 
 /* Storage-backend helpers; neither exposes an on-disk structure. */
-size_t fat_volume_size(const void *boot_sector,
-                       uint32_t *bytes_per_sector_out);
-uint8_t *fat_image_base(size_t *size_out,
-                        uint32_t *bytes_per_sector_out);
+size_t fat_volume_size(const void *boot_sector, uint32_t *bytes_per_sector_out);
+uint8_t *fat_image_base(size_t *size_out, uint32_t *bytes_per_sector_out);
 
 #endif

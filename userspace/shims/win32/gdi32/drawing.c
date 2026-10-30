@@ -26,7 +26,7 @@ HBRUSH WINAPI CreateSolidBrush(COLORREF c) {
   for (unsigned i = 0; i < 64; i++)
     if (!brushes[i].used) {
       brushes[i].color = argb(c);
-      brushes[i].used = 1;
+      brushes[i].used  = 1;
       return (HBRUSH)(uintptr_t)(256 + i);
     }
   SetLastError(8);
@@ -42,9 +42,7 @@ BOOL WINAPI DeleteObject(HGDIOBJ b) {
   return FALSE;
 }
 HGDIOBJ WINAPI GetStockObject(INT index) {
-  return index == WHITE_BRUSH   ? (HGDIOBJ)1
-         : index == BLACK_BRUSH ? (HGDIOBJ)2
-                                : 0;
+  return index == WHITE_BRUSH ? (HGDIOBJ)1 : index == BLACK_BRUSH ? (HGDIOBJ)2 : 0;
 }
 INT WINAPI FillRect(HDC dc, const RECT *rect, HBRUSH b) {
   struct gaia_dc *d = GaiaGetDC(dc);
@@ -52,11 +50,10 @@ INT WINAPI FillRect(HDC dc, const RECT *rect, HBRUSH b) {
   if (!d || !rect || !brush(b, &color))
     return 0;
   LONG l = rect->left < 0 ? 0 : rect->left, t = rect->top < 0 ? 0 : rect->top,
-       r = rect->right > d->window.w ? d->window.w : rect->right,
+       r   = rect->right > d->window.w ? d->window.w : rect->right,
        bot = rect->bottom > d->window.h ? d->window.h : rect->bottom;
   for (LONG y = t; y < bot; y++) {
-    DWORD *row = (DWORD *)(uintptr_t)(d->window.surface_va +
-                                      (uint64_t)y * d->window.pitch);
+    DWORD *row = (DWORD *)(uintptr_t)(d->window.surface_va + (uint64_t)y * d->window.pitch);
     for (LONG x = l; x < r; x++)
       row[x] = color;
   }
@@ -66,9 +63,8 @@ COLORREF WINAPI SetPixel(HDC dc, INT x, INT y, COLORREF c) {
   struct gaia_dc *d = GaiaGetDC(dc);
   if (!d || x < 0 || y < 0 || x >= d->window.w || y >= d->window.h)
     return 0xffffffffu;
-  DWORD *p = (DWORD *)(uintptr_t)(d->window.surface_va +
-                                  (uint64_t)y * d->window.pitch);
-  p[x] = argb(c);
+  DWORD *p = (DWORD *)(uintptr_t)(d->window.surface_va + (uint64_t)y * d->window.pitch);
+  p[x]     = argb(c);
   return c;
 }
 BOOL WINAPI Rectangle(HDC dc, INT l, INT t, INT r, INT b) {
@@ -88,7 +84,7 @@ COLORREF WINAPI SetTextColor(HDC dc, COLORREF c) {
   struct gaia_dc *d = GaiaGetDC(dc);
   if (!d)
     return 0xffffffffu;
-  DWORD old = d->text_color;
+  DWORD old     = d->text_color;
   d->text_color = c;
   return old;
 }
@@ -96,7 +92,7 @@ COLORREF WINAPI SetBkColor(HDC dc, COLORREF c) {
   struct gaia_dc *d = GaiaGetDC(dc);
   if (!d)
     return 0xffffffffu;
-  DWORD old = d->background_color;
+  DWORD old           = d->background_color;
   d->background_color = c;
   return old;
 }
@@ -104,7 +100,7 @@ INT WINAPI SetBkMode(HDC dc, INT mode) {
   struct gaia_dc *d = GaiaGetDC(dc);
   if (!d || mode < 1 || mode > 2)
     return 0;
-  INT old = d->background_mode;
+  INT old            = d->background_mode;
   d->background_mode = mode;
   return old;
 }
@@ -139,11 +135,39 @@ BOOL WINAPI TextOutW(HDC dc, INT x, INT y, const WCHAR *text, INT count) {
   return TRUE;
 }
 
-INT WINAPI SetDIBitsToDevice(HDC dc,INT x,INT y,DWORD width,DWORD height,INT sx,INT sy,UINT start,UINT lines,const void *bits,const BITMAPINFO *info,UINT use){
- struct gaia_dc *d=GaiaGetDC(dc);if(!d||!bits||!info)return 0;const BITMAPINFOHEADER *h=&info->bmiHeader;
- if(h->biSize<40||h->biPlanes!=1||h->biBitCount!=32||h->biCompression||use||start||h->biWidth<=0||h->biWidth>16384||h->biHeight==0||h->biHeight==INT32_MIN||sx<0||sy<0||width>16384||height>16384){SetLastError(120);return 0;}
- unsigned rows=h->biHeight<0?-h->biHeight:h->biHeight;if(rows>16384||lines<rows||(uint64_t)sx+width>(unsigned)h->biWidth||(uint64_t)sy+height>rows){SetLastError(87);return 0;}
- const DWORD *source=bits;for(DWORD row=0;row<height;row++){int64_t dy=(int64_t)y+row;if(dy<0||dy>=d->window.h)continue;unsigned source_y=sy+row;if(h->biHeight>0)source_y=rows-1-source_y;DWORD *dest=(DWORD *)(uintptr_t)(d->window.surface_va+(uint64_t)dy*d->window.pitch);
- for(DWORD col=0;col<width;col++){int64_t dx=(int64_t)x+col;if(dx>=0&&dx<d->window.w)dest[dx]=0xff000000|source[(size_t)source_y*h->biWidth+sx+col];}}
- return height;
+INT WINAPI SetDIBitsToDevice(HDC dc, INT x, INT y, DWORD width, DWORD height, INT sx, INT sy,
+                             UINT start, UINT lines, const void *bits, const BITMAPINFO *info,
+                             UINT use) {
+  struct gaia_dc *d = GaiaGetDC(dc);
+  if (!d || !bits || !info)
+    return 0;
+  const BITMAPINFOHEADER *h = &info->bmiHeader;
+  if (h->biSize < 40 || h->biPlanes != 1 || h->biBitCount != 32 || h->biCompression || use ||
+      start || h->biWidth <= 0 || h->biWidth > 16384 || h->biHeight == 0 ||
+      h->biHeight == INT32_MIN || sx < 0 || sy < 0 || width > 16384 || height > 16384) {
+    SetLastError(120);
+    return 0;
+  }
+  unsigned rows = h->biHeight < 0 ? -h->biHeight : h->biHeight;
+  if (rows > 16384 || lines < rows || (uint64_t)sx + width > (unsigned)h->biWidth ||
+      (uint64_t)sy + height > rows) {
+    SetLastError(87);
+    return 0;
+  }
+  const DWORD *source = bits;
+  for (DWORD row = 0; row < height; row++) {
+    int64_t dy = (int64_t)y + row;
+    if (dy < 0 || dy >= d->window.h)
+      continue;
+    unsigned source_y = sy + row;
+    if (h->biHeight > 0)
+      source_y = rows - 1 - source_y;
+    DWORD *dest = (DWORD *)(uintptr_t)(d->window.surface_va + (uint64_t)dy * d->window.pitch);
+    for (DWORD col = 0; col < width; col++) {
+      int64_t dx = (int64_t)x + col;
+      if (dx >= 0 && dx < d->window.w)
+        dest[dx] = 0xff000000 | source[(size_t)source_y * h->biWidth + sx + col];
+    }
+  }
+  return height;
 }

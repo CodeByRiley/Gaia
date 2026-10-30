@@ -12,9 +12,9 @@ int errno = 0;
  * reserves [-4095, -1] for failures; values outside that range are ordinary
  * successful results and must be passed through unchanged. */
 long syscall_result(sysarg_t result) {
-    if (result < 0 && result >= -4095) {
-        errno = (int)-result;
-        return -1;
-    }
-    return (long)result;
+  if (result < 0 && result >= -4095) {
+    errno = (int)-result;
+    return -1;
+  }
+  return (long)result;
 }

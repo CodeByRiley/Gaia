@@ -29,47 +29,47 @@
 #define MAY_ALIAS __attribute__((may_alias))
 
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* --- Linux-style short names ------------------------------------------ */
-typedef unsigned char  uchar;
+typedef unsigned char uchar;
 typedef unsigned short ushort;
-typedef unsigned int   uint;
-typedef unsigned long  ulong;
-typedef long long      llong;
+typedef unsigned int uint;
+typedef unsigned long ulong;
+typedef long long llong;
 
 /* --- Doom-style fixed-width aliases ----------------------------------- */
-typedef int8_t   i8;
-typedef uint8_t  ui8;
-typedef int16_t  i16;
+typedef int8_t i8;
+typedef uint8_t ui8;
+typedef int16_t i16;
 typedef uint16_t ui16;
-typedef int32_t  i32;
+typedef int32_t i32;
 typedef uint32_t ui32;
-typedef int64_t  i64;
+typedef int64_t i64;
 typedef uint64_t ui64;
 
 /* --- Single-letter unsigned aliases ----------------------------------- */
-typedef uint8_t  u8;
+typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
 /* --- "intN"-style aliases without underscore -------------------------- */
-typedef int8_t   int8;
-typedef uint8_t  uint8;
-typedef int16_t  int16;
+typedef int8_t int8;
+typedef uint8_t uint8;
+typedef int16_t int16;
 typedef uint16_t uint16;
-typedef int32_t  int32;
+typedef int32_t int32;
 typedef uint32_t uint32;
-typedef int64_t  int64;
+typedef int64_t int64;
 typedef uint64_t uint64;
 
 /* --- Pointer-sized + size types --------------------------------------- */
-typedef intptr_t  iptr;
+typedef intptr_t iptr;
 typedef uintptr_t uptr;
-typedef size_t    usize;
-typedef intptr_t  isize;
+typedef size_t usize;
+typedef intptr_t isize;
 
 /* --- Address spaces (mostly kernel-facing) ---------------------------- */
 typedef uintptr_t addr_t;
@@ -86,22 +86,21 @@ typedef long time_t;
 #define _TIME_T_DEFINED
 #endif
 #ifndef OFF_T
-typedef int64_t       off_t;
+typedef int64_t off_t;
 #define OFF_T
 #endif
-typedef int           pid_t;
-typedef unsigned int  mode_t;
-typedef unsigned int  uid_t;
-typedef unsigned int  gid_t;
+typedef int pid_t;
+typedef unsigned int mode_t;
+typedef unsigned int uid_t;
+typedef unsigned int gid_t;
 
 typedef void (*func_ptr)(void);
 
 /* --- OS-Specific Subsystem Handles --------------------------------- */
-typedef int pid_t;       /* Process ID */
-typedef int dev_t;       /* Device ID */
-typedef int fd_t;        /* File Descriptor */
+typedef int pid_t;  /* Process ID */
+typedef int dev_t;  /* Device ID */
+typedef int fd_t;   /* File Descriptor */
 typedef u64 tick_t; /* System timer ticks */
-
 
 /* --- Common Helper Macros ------------------------------------------ */
 #ifndef NULL
@@ -122,8 +121,6 @@ typedef u64 tick_t; /* System timer ticks */
 #define OFFSET_OF(type, member) __builtin_offsetof(type, member)
 
 /* Container_of macro (crucial for intrusive linked lists in kernels) */
-#define CONTAINER_OF(ptr, type, member)                                        \
-  ((type *)((char *)(ptr) - OFFSET_OF(type, member)))
-
+#define CONTAINER_OF(ptr, type, member) ((type *)((char *)(ptr) - OFFSET_OF(type, member)))
 
 #endif

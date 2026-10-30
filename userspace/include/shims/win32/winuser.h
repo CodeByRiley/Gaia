@@ -84,10 +84,10 @@ typedef struct {
 ATOM WINAPI RegisterClassA(const WNDCLASSA *);
 ATOM WINAPI RegisterClassW(const WNDCLASSW *);
 ATOM WINAPI RegisterClassExA(const WNDCLASSEXA *);
-HWND WINAPI CreateWindowExA(DWORD, const char *, const char *, DWORD, INT, INT,
-                            INT, INT, HWND, HMENU, HINSTANCE, void *);
-HWND WINAPI CreateWindowExW(DWORD, const WCHAR *, const WCHAR *, DWORD, INT,
-                            INT, INT, INT, HWND, HMENU, HINSTANCE, void *);
+HWND WINAPI CreateWindowExA(DWORD, const char *, const char *, DWORD, INT, INT, INT, INT, HWND,
+                            HMENU, HINSTANCE, void *);
+HWND WINAPI CreateWindowExW(DWORD, const WCHAR *, const WCHAR *, DWORD, INT, INT, INT, INT, HWND,
+                            HMENU, HINSTANCE, void *);
 BOOL WINAPI DestroyWindow(HWND);
 BOOL WINAPI ShowWindow(HWND, INT);
 BOOL WINAPI UpdateWindow(HWND);

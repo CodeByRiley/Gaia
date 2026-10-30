@@ -17,13 +17,13 @@
 #include <devices/serial.h>
 #include <interrupts/idt.h>
 #include <interrupts/pic.h>
-#include <sched/signal.h>
 #include <memory/hhdm.h>
 #include <memory/pmm.h>
 #include <memory/uvm.h>
 #include <memory/vma.h>
 #include <memory/vmm.h>
 #include <sched/sched.h>
+#include <sched/signal.h>
 #include <stdint.h>
 #include <utilities/log.h>
 #include <utilities/panic.h>
@@ -55,13 +55,13 @@ extern void isr255(void);
 #define VEC_NMI 2
 
 static void idt_set_ist(int vec, u64 handler, u8 ist) {
-  idt[vec].offset_low = handler & 0xFFFF;
-  idt[vec].selector = 0x08;
-  idt[vec].ist = ist;
-  idt[vec].type_attr = 0x8E;
-  idt[vec].offset_mid = (handler >> 16) & 0xFFFF;
+  idt[vec].offset_low  = handler & 0xFFFF;
+  idt[vec].selector    = 0x08;
+  idt[vec].ist         = ist;
+  idt[vec].type_attr   = 0x8E;
+  idt[vec].offset_mid  = (handler >> 16) & 0xFFFF;
   idt[vec].offset_high = (handler >> 32) & 0xFFFFFFFF;
-  idt[vec].zero = 0;
+  idt[vec].zero        = 0;
 }
 
 static void idt_set(int vec, u64 handler) { idt_set_ist(vec, handler, 0); }
@@ -75,12 +75,11 @@ void idt_init(void) {
   /* #DF is the last chance to say anything before a triple fault resets
    * the machine. Give it a stack that cannot itself be the problem ,
    * a stack overflow or a bad rsp0 otherwise reboots with no output. */
-  idt_set_ist(VEC_DOUBLE_FAULT, isr_stub_table[VEC_DOUBLE_FAULT],
-              IST_DOUBLE_FAULT);
+  idt_set_ist(VEC_DOUBLE_FAULT, isr_stub_table[VEC_DOUBLE_FAULT], IST_DOUBLE_FAULT);
   /* NMI must not push onto a user RSP during the SWAPGS/IRETQ return window. */
   idt_set_ist(VEC_NMI, isr_stub_table[VEC_NMI], IST_NMI);
   idtr.limit = sizeof(idt) - 1;
-  idtr.base = (u64)&idt;
+  idtr.base  = (u64)&idt;
   __asm__ volatile("lidt %0" : : "m"(idtr));
 }
 
@@ -117,9 +116,9 @@ int irq_uninstall(u8 irq, irq_fn fn) {
   /* IRQs off: the dispatch loop stops at the first empty slot, so the
    * compaction below must not be observed half-done. */
   u64 flags = irq_save();
-  int n = 0;
+  int n     = 0;
   for (int i = 0; i < MAX_IRQ_SHARED; i++) {
-    irq_fn h = irq_handlers[irq][i];
+    irq_fn h             = irq_handlers[irq][i];
     irq_handlers[irq][i] = 0;
     if (h && h != fn)
       irq_handlers[irq][n++] = h;
@@ -140,12 +139,12 @@ struct exception_recovery_state {
 static struct exception_recovery_state exception_recovery = {0};
 
 static void exception_recovery_arm(void *resume_ip) {
-  exception_recovery.armed = 1;
-  exception_recovery.faulted = 0;
+  exception_recovery.armed      = 1;
+  exception_recovery.faulted    = 0;
   exception_recovery.resume_rip = (u64)resume_ip;
-  exception_recovery.int_num = 0;
-  exception_recovery.err_code = 0;
-  exception_recovery.rip = 0;
+  exception_recovery.int_num    = 0;
+  exception_recovery.err_code   = 0;
+  exception_recovery.rip        = 0;
 }
 
 int exception_recovery_try(void) {
@@ -154,21 +153,19 @@ int exception_recovery_try(void) {
 }
 
 void exception_recovery_clear(void) {
-  exception_recovery.armed = 0;
-  exception_recovery.faulted = 0;
+  exception_recovery.armed      = 0;
+  exception_recovery.faulted    = 0;
   exception_recovery.resume_rip = 0;
-  exception_recovery.int_num = 0;
-  exception_recovery.err_code = 0;
-  exception_recovery.rip = 0;
+  exception_recovery.int_num    = 0;
+  exception_recovery.err_code   = 0;
+  exception_recovery.rip        = 0;
 }
 
 int exception_recovery_faulted(void) { return exception_recovery.faulted; }
 
 u64 exception_recovery_int_num(void) { return exception_recovery.int_num; }
 
-u64 exception_recovery_err_code(void) {
-  return exception_recovery.err_code;
-}
+u64 exception_recovery_err_code(void) { return exception_recovery.err_code; }
 
 u64 exception_recovery_rip(void) { return exception_recovery.rip; }
 
@@ -227,8 +224,7 @@ static void fault_hex(const char *label, u64 value) {
   serial_write_str("\n");
 }
 
-static void fault_hex2(const char *left_label, u64 left,
-                       const char *right_label, u64 right) {
+static void fault_hex2(const char *left_label, u64 left, const char *right_label, u64 right) {
   serial_write_str("[KERNEL]:   ");
   serial_write_str(left_label);
   serial_write_str("=");
@@ -291,8 +287,7 @@ static u64 *fault_table(u64 physical) {
   return phys_to_virt(physical);
 }
 
-static int fault_walk_next(const char *level, u64 index, u64 entry,
-                           u64 **next) {
+static int fault_walk_next(const char *level, u64 index, u64 entry, u64 **next) {
   serial_write_str("[KERNEL]:   ");
   serial_write_str(level);
   serial_write_str("[");
@@ -309,7 +304,7 @@ static int fault_walk_next(const char *level, u64 index, u64 entry,
   }
 
   u64 physical = entry & PF_ADDR_MASK;
-  *next = fault_table(physical);
+  *next        = fault_table(physical);
   if (!*next) {
     serial_write_str("[KERNEL]:   walk stopped: next table physical ");
     serial_write_hex(physical);
@@ -332,8 +327,7 @@ static void page_fault_walk(u64 address, u64 cr3) {
 
   u64 *table = fault_table(cr3 & PF_ADDR_MASK);
   if (!table) {
-    serial_write_str(
-        "[KERNEL]:   walk stopped: CR3 root is outside mapped RAM\n");
+    serial_write_str("[KERNEL]:   walk stopped: CR3 root is outside mapped RAM\n");
     return;
   }
 
@@ -352,15 +346,13 @@ static void page_fault_walk(u64 address, u64 cr3) {
     return;
   }
   if (entry & PF_HUGE) {
-    u64 physical =
-        (entry & 0x000FFFFFC0000000ULL) | (address & 0x3FFFFFFFULL);
+    u64 physical = (entry & 0x000FFFFFC0000000ULL) | (address & 0x3FFFFFFFULL);
     fault_hex("resolved 1 GiB physical", physical);
     return;
   }
   table = fault_table(entry & PF_ADDR_MASK);
   if (!table) {
-    serial_write_str(
-        "[KERNEL]:   walk stopped: PD physical is outside mapped RAM\n");
+    serial_write_str("[KERNEL]:   walk stopped: PD physical is outside mapped RAM\n");
     return;
   }
 
@@ -375,15 +367,13 @@ static void page_fault_walk(u64 address, u64 cr3) {
     return;
   }
   if (entry & PF_HUGE) {
-    u64 physical =
-        (entry & 0x000FFFFFFFE00000ULL) | (address & 0x1FFFFFULL);
+    u64 physical = (entry & 0x000FFFFFFFE00000ULL) | (address & 0x1FFFFFULL);
     fault_hex("resolved 2 MiB physical", physical);
     return;
   }
   table = fault_table(entry & PF_ADDR_MASK);
   if (!table) {
-    serial_write_str(
-        "[KERNEL]:   walk stopped: PT physical is outside mapped RAM\n");
+    serial_write_str("[KERNEL]:   walk stopped: PT physical is outside mapped RAM\n");
     return;
   }
 
@@ -400,8 +390,7 @@ static void page_fault_walk(u64 address, u64 cr3) {
   fault_hex("resolved physical", (entry & PF_ADDR_MASK) | (address & 0xFFF));
 }
 
-static void page_fault_report(const struct interrupt_frame *r,
-                              u64 address) {
+static void page_fault_report(const struct interrupt_frame *r, u64 address) {
   u64 error = r->err_code;
   u64 cr0;
   u64 cr4;
@@ -413,9 +402,10 @@ static void page_fault_report(const struct interrupt_frame *r,
   serial_write_str("[KERNEL]: page-fault details\n");
   fault_hex("address", address);
   fault_text("region", fault_address_region(address));
-  fault_text("access", (error & (1ULL << 4))   ? "instruction fetch"
-                       : (error & (1ULL << 1)) ? "write"
-                                               : "read");
+  fault_text("access",
+             (error & (1ULL << 4))   ? "instruction fetch"
+             : (error & (1ULL << 1)) ? "write"
+                                     : "read");
   fault_text("origin", (error & (1ULL << 2)) ? "user" : "supervisor");
   const char *cause = (error & (1ULL << 3))    ? "reserved page-table bit"
                       : (error & (1ULL << 5))  ? "protection key"
@@ -452,13 +442,11 @@ static void page_fault_report(const struct interrupt_frame *r,
 
   struct task *task = task_current();
   if (task) {
-    fault_hex2("task pid", (u64)(u32)task->pid, "task cr3",
-               task->cr3);
+    fault_hex2("task pid", (u64)(u32)task->pid, "task cr3", task->cr3);
     fault_text("task name", task->name[0] ? task->name : "unnamed");
     if (task->kstack) {
       u64 stack_base = (u64)(uintptr_t)task->kstack;
-      fault_hex2("kstack base", stack_base, "kstack top",
-                 task->syscall_kstack_top);
+      fault_hex2("kstack base", stack_base, "kstack top", task->syscall_kstack_top);
     }
   } else {
     fault_text("task", "scheduler not initialised");
@@ -476,7 +464,7 @@ static void page_fault_report(const struct interrupt_frame *r,
   extern char _kernel_start[];
   extern char _kernel_end[];
   u64 kernel_start = (u64)(uintptr_t)_kernel_start;
-  u64 kernel_end = (u64)(uintptr_t)_kernel_end;
+  u64 kernel_end   = (u64)(uintptr_t)_kernel_end;
   if (r->rip >= kernel_start && r->rip < kernel_end)
     fault_hex("kernel RIP offset", r->rip - kernel_start);
 
@@ -493,13 +481,13 @@ void isr_handler(struct interrupt_frame *r) {
 
     if (exception_recovery.armed) {
       log_write_exception(r->int_num, name, r->err_code, r->rip);
-      exception_recovery.armed = 0;
-      exception_recovery.faulted = 1;
-      exception_recovery.int_num = r->int_num;
+      exception_recovery.armed    = 0;
+      exception_recovery.faulted  = 1;
+      exception_recovery.int_num  = r->int_num;
       exception_recovery.err_code = r->err_code;
-      exception_recovery.rip = r->rip;
-      r->rip = exception_recovery.resume_rip;
-      r->rax = 1;
+      exception_recovery.rip      = r->rip;
+      r->rip                      = exception_recovery.resume_rip;
+      r->rax                      = 1;
       return;
     }
 
@@ -510,11 +498,10 @@ void isr_handler(struct interrupt_frame *r) {
       /* KERNEL DEMAND PAGING */
       if (!(r->err_code & 0x1) && cr2 >= VMA_KERNEL_START) {
         u64 page_addr = cr2 & ~0xFFFULL;
-        u64 phys = pmm_alloc_frame();
+        u64 phys      = pmm_alloc_frame();
         if (phys) {
           memset((void *)phys_to_virt(phys), 0, 4096);
-          if (vmm_map_in(kernel_pml4, page_addr, phys,
-                         VMM_PRESENT | VMM_WRITE | VMM_NX) == 0)
+          if (vmm_map_in(kernel_pml4, page_addr, phys, VMM_PRESENT | VMM_WRITE | VMM_NX) == 0)
             return;
           pmm_free_frame(phys);
         }
@@ -548,8 +535,7 @@ void isr_handler(struct interrupt_frame *r) {
      *
      * Killing the current task for one of those loses the report and blames
      * an innocent process. Route them to the panic path whatever the CPL. */
-    int blame_task = (r->cs & 3) == 3 && r->int_num != 2 && r->int_num != 8 &&
-                     r->int_num != 18;
+    int blame_task = (r->cs & 3) == 3 && r->int_num != 2 && r->int_num != 8 && r->int_num != 18;
 
     if (blame_task) {
       // User program misbehaved (e.g., null pointer). Kill it!

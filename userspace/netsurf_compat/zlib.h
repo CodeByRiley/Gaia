@@ -8,13 +8,13 @@ typedef unsigned int uInt;
 typedef void *voidpf;
 
 typedef struct z_stream_s {
-	Bytef *next_in;
-	uInt avail_in;
-	Bytef *next_out;
-	uInt avail_out;
-	voidpf zalloc;
-	voidpf zfree;
-	voidpf opaque;
+  Bytef *next_in;
+  uInt avail_in;
+  Bytef *next_out;
+  uInt avail_out;
+  voidpf zalloc;
+  voidpf zfree;
+  voidpf opaque;
 } z_stream;
 
 typedef z_stream *z_streamp;

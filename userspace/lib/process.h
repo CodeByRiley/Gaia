@@ -11,21 +11,18 @@
 #define PROCESS_WAIT_FOREVER UINT32_MAX
 
 enum process_wait_result {
-    PROCESS_ERROR   = -1,
-    PROCESS_TIMEOUT = 0,
-    PROCESS_EXITED  = 1,
+  PROCESS_ERROR   = -1,
+  PROCESS_TIMEOUT = 0,
+  PROCESS_EXITED  = 1,
 };
 
 /* Resolve `program` directly when it contains a slash, otherwise search a
  * colon-separated path. NULL/empty search_path uses PROCESS_DEFAULT_PATH.
  * An extensionless name probes the exact spelling, then .elf and .exe. */
-int process_resolve(const char *program, const char *search_path,
-                    char *out, size_t capacity);
+int process_resolve(const char *program, const char *search_path, char *out, size_t capacity);
 
-long process_spawn(const char *program, char *const argv[],
-                   const char *search_path);
-long process_exec(const char *program, char *const argv[],
-                  const char *search_path);
+long process_spawn(const char *program, char *const argv[], const char *search_path);
+long process_exec(const char *program, char *const argv[], const char *search_path);
 
 long process_snapshot(struct proc_info *out, size_t capacity);
 int process_get(int pid, struct proc_info *out);

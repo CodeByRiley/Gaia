@@ -21,10 +21,10 @@
 #ifndef NET_ARP_H
 #define NET_ARP_H
 
-#include <utilities/types.h>
 #include <net/eth.h>
 #include <net/inet.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 #define ARP_HTYPE_ETHERNET 1U
 #define ARP_OP_REQUEST 1U
@@ -56,8 +56,7 @@ int arp_lookup(const u8 ip[IPV4_ALEN], u8 mac_out[ETH_ALEN]);
  *  -1  no interface, bad argument, or the frame could not be queued
  * A return of 1 is success from the caller's point of view: the frame goes
  * out when the reply arrives, or is dropped after ARP_MAX_RETRIES. */
-int arp_send_or_queue(const u8 ip[IPV4_ALEN], u8 *frame,
-                      u16 payload_len, u16 type);
+int arp_send_or_queue(const u8 ip[IPV4_ALEN], u8 *frame, u16 payload_len, u16 type);
 
 /* Broadcast a request for `ip` without queueing anything. */
 void arp_request(const u8 ip[IPV4_ALEN]);

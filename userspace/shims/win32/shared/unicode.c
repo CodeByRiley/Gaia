@@ -31,21 +31,21 @@ int GaiaUtf16(const char *in, WCHAR *out, size_t cap) {
     return -1;
   size_t n = 0;
   for (size_t i = 0; in[i];) {
-    uint32_t c = (unsigned char)in[i++];
+    uint32_t c     = (unsigned char)in[i++];
     unsigned extra = 0;
-    uint32_t min = 0;
+    uint32_t min   = 0;
     if (c >= 0xc2 && c <= 0xdf) {
       c &= 31;
       extra = 1;
-      min = 0x80;
+      min   = 0x80;
     } else if (c >= 0xe0 && c <= 0xef) {
       c &= 15;
       extra = 2;
-      min = 0x800;
+      min   = 0x800;
     } else if (c >= 0xf0 && c <= 0xf4) {
       c &= 7;
       extra = 3;
-      min = 0x10000;
+      min   = 0x10000;
     } else if (c >= 0x80)
       return -1;
     while (extra--) {

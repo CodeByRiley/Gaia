@@ -14,8 +14,8 @@
 #ifndef NET_INET_H
 #define NET_INET_H
 
-#include <utilities/types.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 #ifndef IPPROTO_ICMP
 #define IPPROTO_ICMP 1U
@@ -29,9 +29,7 @@
 
 #define IPV4_ALEN 4
 
-SINLINE u16 bswap16(u16 value) {
-  return (u16)((value << 8) | (value >> 8));
-}
+SINLINE u16 bswap16(u16 value) { return (u16)((value << 8) | (value >> 8)); }
 
 SINLINE u32 bswap32(u32 value) {
   return ((value & 0x000000FFu) << 24) | ((value & 0x0000FF00u) << 8) |
@@ -53,13 +51,10 @@ SINLINE int ipv4_addr_equal(const u8 *a, const u8 *b) {
   return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3];
 }
 
-SINLINE int ipv4_addr_is_zero(const u8 *a) {
-  return (a[0] | a[1] | a[2] | a[3]) == 0;
-}
+SINLINE int ipv4_addr_is_zero(const u8 *a) { return (a[0] | a[1] | a[2] | a[3]) == 0; }
 
 /* Broadcast for `ip` under `mask`: every host bit set. */
-SINLINE int ipv4_is_broadcast(const u8 *addr, const u8 *ip,
-                                    const u8 *mask) {
+SINLINE int ipv4_is_broadcast(const u8 *addr, const u8 *ip, const u8 *mask) {
   for (int i = 0; i < IPV4_ALEN; i++) {
     if ((u8)(addr[i] | mask[i]) != 0xFFu)
       return 0;
@@ -71,8 +66,7 @@ SINLINE int ipv4_is_broadcast(const u8 *addr, const u8 *ip,
 
 /* Same subnet as `ip` under `mask` , decides ARP-for-the-host versus
  * ARP-for-the-gateway in ipv4_output(). */
-SINLINE int ipv4_same_subnet(const u8 *a, const u8 *b,
-                                   const u8 *mask) {
+SINLINE int ipv4_same_subnet(const u8 *a, const u8 *b, const u8 *mask) {
   for (int i = 0; i < IPV4_ALEN; i++) {
     if ((u8)(a[i] & mask[i]) != (u8)(b[i] & mask[i]))
       return 0;

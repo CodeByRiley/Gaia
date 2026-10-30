@@ -18,7 +18,7 @@
 #define PIT_GATE2 0x61
 #define PIT_FREQ 1193182 /* 8254 input clock , divides down */
 
-static volatile u64 ticks = 0;
+static volatile u64 ticks  = 0;
 static u32 current_freq_hz = 0;
 
 /* IRQ0 handler. Kept cheap on purpose. */

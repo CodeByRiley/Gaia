@@ -10,19 +10,19 @@
 #ifndef RTC_H
 #define RTC_H
 
-#include <utilities/types.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 /* Broken-down local time as the CMOS reports it. `year` is absolute
  * (2026, not 26). All fields are zero if the clock could not be read. */
 struct rtc_time {
-    u16 year;
-    u8 month;   /* 1-12 */
-    u8 day;     /* 1-31 */
-    u8 hour;    /* 0-23 */
-    u8 minute;  /* 0-59 */
-    u8 second;  /* 0-59 */
-    u8 valid;   /* 0 when the read failed or the clock is implausible */
+  u16 year;
+  u8 month;  /* 1-12 */
+  u8 day;    /* 1-31 */
+  u8 hour;   /* 0-23 */
+  u8 minute; /* 0-59 */
+  u8 second; /* 0-59 */
+  u8 valid;  /* 0 when the read failed or the clock is implausible */
 };
 
 /* Read the current time. Handles the update-in-progress flag, BCD encoding,

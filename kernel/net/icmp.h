@@ -12,10 +12,10 @@
 #ifndef NET_ICMP_H
 #define NET_ICMP_H
 
-#include <utilities/types.h>
+#include <arch/syscall_abi.h>
 #include <net/ipv4.h>
 #include <stdint.h>
-#include <arch/syscall_abi.h>
+#include <utilities/types.h>
 
 #define ICMP_HDR_LEN 8
 #define ICMP_ECHO_REPLY 0U
@@ -41,8 +41,7 @@ struct icmp_hdr {
 
 /* Called by ipv4_input for IPPROTO_ICMP. `payload` is the ICMP message,
  * `len` its length; the IPv4 header is passed for the source address. */
-void icmp_input(const struct ipv4_hdr *ip, const u8 *payload,
-                u16 len);
+void icmp_input(const struct ipv4_hdr *ip, const u8 *payload, u16 len);
 
 /* Send one echo request to `dst` and wait for the reply that matches
  * `ident` and `seq`.
@@ -54,7 +53,6 @@ void icmp_input(const struct ipv4_hdr *ip, const u8 *payload,
  * task and can only arrive once this one stops running. That makes it
  * illegal to call from an interrupt handler or with a lock held, and it
  * is why the syscall wrapper copies its arguments in before calling. */
-long icmp_ping(const u8 dst[IPV4_ALEN], u16 ident, u16 seq,
-               u32 timeout_ms, u32 *rtt_ms_out);
+long icmp_ping(const u8 dst[IPV4_ALEN], u16 ident, u16 seq, u32 timeout_ms, u32 *rtt_ms_out);
 
 #endif /* NET_ICMP_H */

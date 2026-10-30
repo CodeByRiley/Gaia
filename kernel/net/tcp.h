@@ -107,8 +107,8 @@ enum tcp_error {
 
 /* Checksum input only; never transmitted. */
 struct tcp_pseudo_header {
-  u8 src[4];   /* network byte order */
-  u8 dst[4];   /* network byte order */
+  u8 src[4]; /* network byte order */
+  u8 dst[4]; /* network byte order */
   u8 zero;
   u8 protocol; /* IPPROTO_TCP */
   u16 tcp_len; /* network byte order: header + payload */
@@ -127,29 +127,18 @@ static inline void tcp_hdr_set_data_offset(struct tcp_header *h, u8 words) {
 }
 
 /* Host-byte-order reads, so callers never touch the raw fields. */
-static inline u16 tcp_hdr_src_port(const struct tcp_header *h) {
-  return from_be16(h->src_port);
-}
+static inline u16 tcp_hdr_src_port(const struct tcp_header *h) { return from_be16(h->src_port); }
 
-static inline u16 tcp_hdr_dst_port(const struct tcp_header *h) {
-  return from_be16(h->dst_port);
-}
+static inline u16 tcp_hdr_dst_port(const struct tcp_header *h) { return from_be16(h->dst_port); }
 
-static inline u32 tcp_hdr_seq(const struct tcp_header *h) {
-  return from_be32(h->seq_num);
-}
+static inline u32 tcp_hdr_seq(const struct tcp_header *h) { return from_be32(h->seq_num); }
 
-static inline u32 tcp_hdr_ack(const struct tcp_header *h) {
-  return from_be32(h->ack_num);
-}
+static inline u32 tcp_hdr_ack(const struct tcp_header *h) { return from_be32(h->ack_num); }
 
-static inline u16 tcp_hdr_window(const struct tcp_header *h) {
-  return from_be16(h->win_size);
-}
+static inline u16 tcp_hdr_window(const struct tcp_header *h) { return from_be16(h->win_size); }
 
 /* SYN and FIN each consume one sequence number despite carrying no data. */
-static inline u32 tcp_seg_seq_len(const struct tcp_header *h,
-                                  u16 payload_len) {
+static inline u32 tcp_seg_seq_len(const struct tcp_header *h, u16 payload_len) {
   return (u32)payload_len + (tcp_flags_any(h, TCP_SYN) ? 1u : 0u) +
          (tcp_flags_any(h, TCP_FIN) ? 1u : 0u);
 }
@@ -158,8 +147,7 @@ static inline u32 tcp_seg_seq_len(const struct tcp_header *h,
  *   To send:  zero hdr->checksum, then store the return value in it.
  *   To check: pass the segment exactly as received, checksum field
  *             included; a valid segment sums to 0. */
-u16 tcp_checksum(const u8 src_ip[4], const u8 dst_ip[4],
-                 const struct tcp_header *hdr, u16 seg_len);
+u16 tcp_checksum(const u8 src_ip[4], const u8 dst_ip[4], const struct tcp_header *hdr, u16 seg_len);
 
 /* Walks the option bytes after the fixed 20-byte header into `out`.
  * Unknown options are skipped by length; anything malformed stops the walk. */

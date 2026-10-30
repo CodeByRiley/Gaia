@@ -1,7 +1,7 @@
 /* Create the FAT32 layout supported by Gaia on an unmounted whole volume. */
+#include <errno.h>
 #include <lib/syscall.h>
 #include <stdint.h>
-#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #define SECTOR 512u
@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
   uint32_t fat = 1;
   for (;;) {
     uint64_t clusters = total - RESERVED - FATS * fat;
-    uint32_t need = (uint32_t)(((clusters + 2) * 4 + SECTOR - 1) / SECTOR);
+    uint32_t need     = (uint32_t)(((clusters + 2) * 4 + SECTOR - 1) / SECTOR);
     if (need == fat)
       break;
     fat = need;
@@ -53,8 +53,7 @@ int main(int argc, char **argv) {
     printf("mkfs: device is too small for FAT32\n");
     return 1;
   }
-  static unsigned char zero[CHUNK * SECTOR], boot[SECTOR], fsinfo[SECTOR],
-      table[SECTOR];
+  static unsigned char zero[CHUNK * SECTOR], boot[SECTOR], fsinfo[SECTOR], table[SECTOR];
   /* Clear old allocation data and file contents before publishing a boot
    * sector. */
   for (uint64_t lba = 0; lba < total;) {
@@ -95,14 +94,12 @@ int main(int argc, char **argv) {
   put32(table, 0x0ffffff8);
   put32(table + 4, 0x0fffffff);
   put32(table + 8, 0x0fffffff);
-  if (write_one(argv[1], 0, boot) || write_one(argv[1], 6, boot) ||
-      write_one(argv[1], 1, fsinfo) || write_one(argv[1], 7, fsinfo) ||
-      write_one(argv[1], RESERVED, table) ||
+  if (write_one(argv[1], 0, boot) || write_one(argv[1], 6, boot) || write_one(argv[1], 1, fsinfo) ||
+      write_one(argv[1], 7, fsinfo) || write_one(argv[1], RESERVED, table) ||
       write_one(argv[1], RESERVED + fat, table) || blockdev_flush(argv[1])) {
     printf("mkfs: metadata write failed: %s\n", strerror(errno));
     return 1;
   }
-  printf("mkfs: created FAT32 on %s (%llu sectors)\n", argv[1],
-         (unsigned long long)total);
+  printf("mkfs: created FAT32 on %s (%llu sectors)\n", argv[1], (unsigned long long)total);
   return 0;
 }

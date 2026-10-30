@@ -2,11 +2,10 @@
 
 #include <math.h>
 
-double sqrt(double x)
-{
-	double r;
-	__asm__("sqrt.d %0,%1" : "=f"(r) : "f"(x));
-	return r;
+double sqrt(double x) {
+  double r;
+  __asm__("sqrt.d %0,%1" : "=f"(r) : "f"(x));
+  return r;
 }
 
 #else

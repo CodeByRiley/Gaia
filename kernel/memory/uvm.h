@@ -40,17 +40,17 @@
 
 /* A freed arena range awaiting reuse. A zero len means the slot is free. */
 struct vm_hole {
-    u64 base;
-    u64 len;
+  u64 base;
+  u64 len;
 };
 
 /* One reserved range. pte_flags are the flags its pages receive when they
  * are materialised, so they carry the range's permissions as well. */
 struct user_vma {
-    u64 start;
-    u64 end;
-    u64 pte_flags;
-    u32 used;
+  u64 start;
+  u64 end;
+  u64 pte_flags;
+  u32 used;
 };
 
 /*
@@ -61,18 +61,18 @@ struct user_vma {
  * syscalls, not by this module.
  */
 struct task_vm {
-    struct pe_process *pe_process;
-    u64 *user_pml4;
-    int *pml4_ref_count;
+  struct pe_process *pe_process;
+  u64 *user_pml4;
+  int *pml4_ref_count;
 
-    u64 brk_base,brk_current;
-    u64 shmem_next_va;
-    u64 mmap_next_va;
+  u64 brk_base, brk_current;
+  u64 shmem_next_va;
+  u64 mmap_next_va;
 
-    struct vm_hole mmap_holes[TASK_MMAP_HOLES];
-    struct user_vma vmas[MAX_USER_VMAS];
+  struct vm_hole mmap_holes[TASK_MMAP_HOLES];
+  struct user_vma vmas[MAX_USER_VMAS];
 
-    int shmem_shared_out;
+  int shmem_shared_out;
 };
 
 /* Put a freshly allocated address space into its empty state: both arenas
@@ -92,8 +92,7 @@ int uvm_range_ok(u64 base, u64 bytes);
  * and entirely unmapped. Without it `addr` is ignored and the range comes
  * from the mmap arena: first-fit over freed ranges, then a bump pointer.
  * `bytes` must already be page-rounded and non-zero. */
-u64 uvm_reserve(struct task_vm *vm, u64 addr, u64 bytes, u64 pte_flags,
-                int fixed);
+u64 uvm_reserve(struct task_vm *vm, u64 addr, u64 bytes, u64 pte_flags, int fixed);
 
 /* Change the permissions of an already-reserved range. All-or-nothing: the
  * range is validated and every lazy page committed before a single PTE
@@ -122,7 +121,6 @@ int uvm_fault_in(struct task_vm *vm, u64 addr, int writable);
 /* Validate a user buffer and materialise every page it covers. A
  * zero-length buffer passes. Returns 1 when the whole range is present and
  * usable for the access. */
-int uvm_buffer_ok(struct task_vm *vm, const void *pointer, u64 bytes,
-                  int writable);
+int uvm_buffer_ok(struct task_vm *vm, const void *pointer, u64 bytes, int writable);
 
 #endif /* UVM_H */

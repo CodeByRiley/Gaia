@@ -1,7 +1,7 @@
 #define HEIMDALL_DECLARE_STATE
+#include "heimdall.h"
 #include "key_codes.h"
 #include "syscall.h"
-#include "heimdall.h"
 #include <display/print.h>
 #include <stdbool.h>
 #include <string.h>
@@ -47,16 +47,16 @@ int win_get_rect(int handle, int *x, int *y, int *cw, int *ch) {
     struct console *c = con_for_handle(handle);
     if (!c)
       return 0;
-    *x = c->win.x;
-    *y = c->win.y;
+    *x  = c->win.x;
+    *y  = c->win.y;
     *cw = c->win.client_w;
     *ch = c->win.client_h;
     return 1;
   }
   for (int i = 0; i < MAX_WINDOWS; i++) {
     if (windows[i].in_use && windows[i].handle == handle) {
-      *x = windows[i].x;
-      *y = windows[i].y;
+      *x  = windows[i].x;
+      *y  = windows[i].y;
       *cw = windows[i].client_w;
       *ch = windows[i].client_h;
       return 1;
@@ -90,9 +90,7 @@ int outer_w_dims(int cw) { return cw + 2 * BORDER_PX; }
  * because most callers already hold the window and the ones that don't must
  * be made to say which window they mean , a frame height that silently
  * omits the strip leaves it unpainted or untestable. */
-int outer_h_dims(int ch, int status_h) {
-  return ch + TITLEBAR_PX + BORDER_PX + status_h;
-}
+int outer_h_dims(int ch, int status_h) { return ch + TITLEBAR_PX + BORDER_PX + status_h; }
 
 /* Status height for a handle, 0 if it has no window or no strip. For the
  * call sites that only carry a handle. */
@@ -104,8 +102,7 @@ int status_h_of(int handle) {
 /* True iff (mx,my) lies inside titlebar button `idx_from_right` for a window
  * whose outer rect is (win_x, win_y, outer_w, _). Used by hit_test_at to
  * carve close/min/max regions out of HIT_TITLEBAR before returning. */
-int in_titlebar_btn(int win_x, int win_y, int outer_w, int idx_from_right,
-                    int mx, int my) {
+int in_titlebar_btn(int win_x, int win_y, int outer_w, int idx_from_right, int mx, int my) {
   int bx, by, bw, bh;
   titlebar_btn_rect(win_x, win_y, outer_w, idx_from_right, &bx, &by, &bw, &bh);
   return mx >= bx && mx < bx + bw && my >= by && my < by + bh;
@@ -121,7 +118,7 @@ int build_taskbar_entries(struct tb_entry *out, int max) {
     if (!cons[i].win.in_use)
       continue;
     out[n].handle = HANDLE_CONSOLE_BASE + i;
-    out[n].title = cons[i].win.title;
+    out[n].title  = cons[i].win.title;
     n++;
   }
 
@@ -130,7 +127,7 @@ int build_taskbar_entries(struct tb_entry *out, int max) {
   for (int i = 0; i < MAX_WINDOWS && n < max; i++) {
     if (!windows[i].in_use)
       continue;
-    out[n].handle = windows[i].handle;
+    out[n].handle    = windows[i].handle;
     size_t title_len = strlen(windows[i].title);
 
     if ((int)title_len <= max_chars) {
@@ -189,8 +186,7 @@ int in_start_menu(int menu_x, int menu_y, int mx, int my) {
   if (!start_menu_open)
     return 0;
   int menu_h = start_menu_count * START_MENU_ITEM_H + START_MENU_PAD * 2;
-  return mx >= menu_x && mx < menu_x + START_MENU_W && my >= menu_y &&
-         my < menu_y + menu_h;
+  return mx >= menu_x && mx < menu_x + START_MENU_W && my >= menu_y && my < menu_y + menu_h;
 }
 
 /* Classify a screen-space hit by walking the z-order topmost-first. The
@@ -283,17 +279,16 @@ void client_window_resize(int handle, int new_cw, int new_ch) {
     }
   }
   if (!w) {
-    printf("heimdall: client_window_resize: no window found for handle=%d\n",
-           handle);
+    printf("heimdall: client_window_resize: no window found for handle=%d\n", handle);
     return;
   }
   if (new_cw == w->client_w && new_ch == w->client_h)
     return;
 
   size_t pixel_bytes = (size_t)new_cw * (size_t)new_ch * 4;
-  size_t pages = (pixel_bytes + 4095) / 4096;
+  size_t pages       = (pixel_bytes + 4095) / 4096;
 
-  void *raw = 0;
+  void *raw         = 0;
   uint32_t *surface = (uint32_t *)page_aligned_alloc(pages, &raw);
   if (!surface)
     return;
@@ -306,13 +301,13 @@ void client_window_resize(int handle, int new_cw, int new_ch) {
     int copy_h = w->client_h < new_ch ? w->client_h : new_ch;
     for (int y = 0; y < copy_h; y++) {
       memcpy(surface + (size_t)y * (size_t)new_cw,
-             w->surface + (size_t)y * (size_t)w->client_w, (size_t)copy_w * 4);
+             w->surface + (size_t)y * (size_t)w->client_w,
+             (size_t)copy_w * 4);
     }
   }
 
   uint64_t client_va = 0;
-  if (shmem_share(w->owner_pid, (uint64_t)surface, (long)pages, &client_va) !=
-      0) {
+  if (shmem_share(w->owner_pid, (uint64_t)surface, (long)pages, &client_va) != 0) {
     free(raw);
     return;
   }
@@ -320,25 +315,25 @@ void client_window_resize(int handle, int new_cw, int new_ch) {
   mark_dirty(w->x, w->y, outer_w(w), outer_h(w));
 
   uint64_t old_client_va = w->client_va;
-  int old_n_pages = w->n_pages;
-  void *old_raw = w->surface_raw;
+  int old_n_pages        = w->n_pages;
+  void *old_raw          = w->surface_raw;
 
-  w->surface = surface;
+  w->surface     = surface;
   w->surface_raw = raw;
-  w->n_pages = (int)pages;
-  w->client_va = client_va;
-  w->client_w = new_cw;
-  w->client_h = new_ch;
+  w->n_pages     = (int)pages;
+  w->client_va   = client_va;
+  w->client_w    = new_cw;
+  w->client_h    = new_ch;
 
   mark_dirty(w->x, w->y, outer_w(w), outer_h(w));
 
   struct ipc_msg note;
   memset(&note, 0, (sizeof(note)));
-  note.type = IPC_WM_RESIZE_NOTIFY;
-  note.a = handle;
-  note.b = new_cw;
-  note.c = new_ch;
-  note.va = client_va;
+  note.type  = IPC_WM_RESIZE_NOTIFY;
+  note.a     = handle;
+  note.b     = new_cw;
+  note.c     = new_ch;
+  note.va    = client_va;
   note.pitch = (uint32_t)(new_cw * 4);
   ipc_send(w->owner_pid, &note);
 
@@ -403,11 +398,9 @@ struct window *find_handle(int handle) {
   return NULL;
 }
 
-int handle_create(int client_pid, int w, int h, const char *title,
-                  uint32_t flags, uint64_t *out_client_va, uint32_t *out_pitch,
-                  int *out_handle) {
-  if (w <= 0 || h <= 0 || w > CLIENT_DIM_HARD_LIMIT ||
-      h > CLIENT_DIM_HARD_LIMIT)
+int handle_create(int client_pid, int w, int h, const char *title, uint32_t flags,
+                  uint64_t *out_client_va, uint32_t *out_pitch, int *out_handle) {
+  if (w <= 0 || h <= 0 || w > CLIENT_DIM_HARD_LIMIT || h > CLIENT_DIM_HARD_LIMIT)
     return -1;
   struct window *win = find_slot();
   if (!win) {
@@ -416,9 +409,9 @@ int handle_create(int client_pid, int w, int h, const char *title,
   }
 
   size_t pixel_bytes = (size_t)w * (size_t)h * 4;
-  size_t pages = (pixel_bytes + 4095) / 4096;
+  size_t pages       = (pixel_bytes + 4095) / 4096;
 
-  void *raw = 0;
+  void *raw         = 0;
   uint32_t *surface = (uint32_t *)page_aligned_alloc(pages, &raw);
   if (!surface)
     return -1;
@@ -426,15 +419,14 @@ int handle_create(int client_pid, int w, int h, const char *title,
   /* Map the same physical pages into the client's PML4 so the client
    * can write pixels without going through heimdall. */
   uint64_t client_va = 0;
-  if (shmem_share(client_pid, (uint64_t)surface, (long)pages, &client_va) !=
-      0) {
+  if (shmem_share(client_pid, (uint64_t)surface, (long)pages, &client_va) != 0) {
     free(raw);
     return -1;
   }
 
   win->in_use = 1;
   /* Handles remain stable until their slot is reused. */
-  win->handle = (int)(win - windows) + 1;
+  win->handle    = (int)(win - windows) + 1;
   win->owner_pid = client_pid;
   /* Cascade new windows. */
   int placed = 0;
@@ -442,14 +434,14 @@ int handle_create(int client_pid, int w, int h, const char *title,
     if (&windows[i] != win && windows[i].in_use)
       placed++;
   }
-  win->x = 60 + placed * 24;
-  win->y = 60 + placed * 24;
-  win->client_w = w;
-  win->client_h = h;
-  win->surface = surface;
+  win->x           = 60 + placed * 24;
+  win->y           = 60 + placed * 24;
+  win->client_w    = w;
+  win->client_h    = h;
+  win->surface     = surface;
   win->surface_raw = raw;
-  win->n_pages = (int)pages;
-  win->client_va = client_va;
+  win->n_pages     = (int)pages;
+  win->client_va   = client_va;
   if (title) {
     size_t i = 0;
     while (i < sizeof(win->title) - 1 && title[i]) {
@@ -463,7 +455,7 @@ int handle_create(int client_pid, int w, int h, const char *title,
 
   /* Opt-in status strip. Set before the first mark_dirty below so the
    * initial damage rect covers the taller frame. */
-  win->status_h = (flags & WM_CREATE_STATUSBAR) ? STATUSBAR_PX : 0;
+  win->status_h  = (flags & WM_CREATE_STATUSBAR) ? STATUSBAR_PX : 0;
   win->status[0] = 0;
 
   focused_handle = win->handle;
@@ -471,11 +463,16 @@ int handle_create(int client_pid, int w, int h, const char *title,
   mark_dirty(win->x, win->y, outer_w(win), outer_h(win));
 
   *out_client_va = client_va;
-  *out_pitch = (uint32_t)(w * 4);
-  *out_handle = win->handle;
+  *out_pitch     = (uint32_t)(w * 4);
+  *out_handle    = win->handle;
   printf("heimdall: create handle=%d owner=%d %dx%d pages=%d client_va=%lx "
          "active=%d\n",
-         win->handle, client_pid, w, h, (int)pages, (unsigned long)client_va,
+         win->handle,
+         client_pid,
+         w,
+         h,
+         (int)pages,
+         (unsigned long)client_va,
          window_count());
   return 0;
 }
@@ -505,22 +502,21 @@ void handle_destroy_internal(int handle, int client_pid_check) {
 
   struct window *w = find_handle(handle);
   if (!w) {
-    printf("heimdall: handle_destroy_internal: no window found for handle=%d\n",
-           handle);
+    printf("heimdall: handle_destroy_internal: no window found for handle=%d\n", handle);
     return;
   }
   if (client_pid_check && w->owner_pid != client_pid_check)
     return;
 
   /* Preserve cleanup state before clearing the window. */
-  int old_x = w->x;
-  int old_y = w->y;
-  int old_ow = outer_w(w);
-  int old_oh = outer_h(w);
-  int old_owner_pid = w->owner_pid;
+  int old_x              = w->x;
+  int old_y              = w->y;
+  int old_ow             = outer_w(w);
+  int old_oh             = outer_h(w);
+  int old_owner_pid      = w->owner_pid;
   uint64_t old_client_va = w->client_va;
-  int old_n_pages = w->n_pages;
-  void *old_surface_raw = w->surface_raw;
+  int old_n_pages        = w->n_pages;
+  void *old_surface_raw  = w->surface_raw;
 
   /* Revoke the receiver mapping before making the owner allocation reusable.
    * A client may close one window and remain alive, so relying on process exit
@@ -559,13 +555,10 @@ void handle_destroy_internal(int handle, int client_pid_check) {
   }
 
   mark_dirty(old_x, old_y, old_ow, old_oh);
-  printf("heimdall: destroy handle=%d owner=%d active=%d\n", handle,
-         old_owner_pid, window_count());
+  printf("heimdall: destroy handle=%d owner=%d active=%d\n", handle, old_owner_pid, window_count());
 }
 
-void handle_destroy(int client_pid, int handle) {
-  handle_destroy_internal(handle, client_pid);
-}
+void handle_destroy(int client_pid, int handle) { handle_destroy_internal(handle, client_pid); }
 
 void destroy_windows_for_owner(int owner_pid, const char *why) {
   if (owner_pid <= 0)
@@ -574,8 +567,7 @@ void destroy_windows_for_owner(int owner_pid, const char *why) {
     if (!windows[i].in_use || windows[i].owner_pid != owner_pid)
       continue;
     int h = windows[i].handle;
-    printf("heimdall: reap window %d owner_pid=%d (%s)\n", h, owner_pid,
-           why ? why : "owner-exit");
+    printf("heimdall: reap window %d owner_pid=%d (%s)\n", h, owner_pid, why ? why : "owner-exit");
     handle_destroy_internal(h, 0);
   }
 }
@@ -637,8 +629,8 @@ void toggle_maximize(int handle) {
     win_set_pos(handle, w->saved_x, w->saved_y);
     w->maximized = 0;
   } else {
-    w->saved_x = w->x;
-    w->saved_y = w->y;
+    w->saved_x  = w->x;
+    w->saved_y  = w->y;
     w->saved_cw = w->client_w;
     w->saved_ch = w->client_h;
     win_set_pos(handle, 0, 0);
@@ -666,11 +658,11 @@ void reap_dead_windows(void) {
   for (int i = 0; i < MAX_WINDOWS; i++) {
     if (!windows[i].in_use)
       continue;
-    int owner = windows[i].owner_pid;
+    int owner    = windows[i].owner_pid;
     int terminal = 1; /* Assume dead if not found in the list */
     for (long j = 0; j < n; j++) {
       if (procs[j].pid == owner) {
-        int s = procs[j].state;
+        int s    = procs[j].state;
         terminal = (s == PROC_STATE_ZOMBIE || s == PROC_STATE_DEAD);
         break;
       }
@@ -694,7 +686,7 @@ void reap_dead_windows(void) {
     int terminal = 1;
     for (long j = 0; j < n; j++) {
       if (procs[j].pid == c->pid) {
-        int s = procs[j].state;
+        int s    = procs[j].state;
         terminal = (s == PROC_STATE_ZOMBIE || s == PROC_STATE_DEAD);
         break;
       }

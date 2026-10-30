@@ -35,7 +35,7 @@ static void *acpi_map(u64 phys, usize len) {
 
 static u8 checksum(const void *p, usize n) {
   const u8 *b = (const u8 *)p;
-  u8 s = 0;
+  u8 s        = 0;
   for (usize i = 0; i < n; i++)
     s += b[i];
   return s;
@@ -76,8 +76,7 @@ static const struct acpi_rsdp_v1 *scan_for_rsdp(u64 start, u64 end) {
 
 static const struct acpi_rsdp_v1 *find_rsdp(u64 mb2_addr) {
   /* Multiboot tag (preferred , explicit, validated). */
-  struct MB2_TAG_ACPI *t =
-      (struct MB2_TAG_ACPI *)mb2_find_tag(mb2_addr, MULTIBOOT_TAG_ACPI_NEW);
+  struct MB2_TAG_ACPI *t = (struct MB2_TAG_ACPI *)mb2_find_tag(mb2_addr, MULTIBOOT_TAG_ACPI_NEW);
   if (!t)
     t = (struct MB2_TAG_ACPI *)mb2_find_tag(mb2_addr, MULTIBOOT_TAG_ACPI_OLD);
   if (t) {
@@ -89,7 +88,7 @@ static const struct acpi_rsdp_v1 *find_rsdp(u64 mb2_addr) {
   /* EBDA pointer at 0x40E (segment) -> first 1 KiB of EBDA. */
   u16 ebda_seg = *(u16 *)phys_to_virt(0x40E);
   if (ebda_seg) {
-    u64 ebda = (u64)ebda_seg << 4;
+    u64 ebda                     = (u64)ebda_seg << 4;
     const struct acpi_rsdp_v1 *r = scan_for_rsdp(ebda, ebda + 0x400);
     if (r)
       return r;
@@ -106,21 +105,19 @@ static int parse_madt(const struct acpi_madt *madt) {
     return -1;
 
   lapic_phys = madt->lapic_phys;
-  cpu_count = 0;
+  cpu_count  = 0;
 
-  const u8 *p = (const u8 *)madt + sizeof(*madt);
+  const u8 *p   = (const u8 *)madt + sizeof(*madt);
   const u8 *end = (const u8 *)madt + madt->h.length;
   while (p + 2 <= end) {
     u8 type = p[0];
-    u8 len = p[1];
+    u8 len  = p[1];
     if (len < 2 || p + len > end)
       break;
-    if (type == MADT_TYPE_LOCAL_APIC &&
-        len >= sizeof(struct madt_entry_local_apic)) {
-      const struct madt_entry_local_apic *e =
-          (const struct madt_entry_local_apic *)p;
-      int usable = (e->flags & MADT_LAPIC_FLAG_ENABLED) ||
-                   (e->flags & MADT_LAPIC_FLAG_ONLINE_CAPABLE);
+    if (type == MADT_TYPE_LOCAL_APIC && len >= sizeof(struct madt_entry_local_apic)) {
+      const struct madt_entry_local_apic *e = (const struct madt_entry_local_apic *)p;
+      int usable =
+          (e->flags & MADT_LAPIC_FLAG_ENABLED) || (e->flags & MADT_LAPIC_FLAG_ONLINE_CAPABLE);
       if (usable && cpu_count < ACPI_MAX_CPUS) {
         cpu_ids[cpu_count++] = e->apic_id;
       }
@@ -139,8 +136,7 @@ static const struct acpi_sdt_header *map_sdt(u64 phys) {
 
   /* Map header first to learn the table's length, then re-map the full
    * extent. Two-step because the length field is inside the header itself. */
-  const struct acpi_sdt_header *h =
-      acpi_map(phys, sizeof(struct acpi_sdt_header));
+  const struct acpi_sdt_header *h = acpi_map(phys, sizeof(struct acpi_sdt_header));
   if (h->length < sizeof(*h) || h->length > ACPI_MAX_TABLE_LENGTH)
     return 0;
   return acpi_map(phys, h->length);
@@ -155,17 +151,16 @@ static int set_root_sdt(u64 phys, const char signature[4], u8 entry_size) {
   if ((root->length - sizeof(*root)) % entry_size != 0)
     return -1;
 
-  root_sdt = root;
+  root_sdt        = root;
   root_entry_size = entry_size;
   return 0;
 }
 
-const struct acpi_sdt_header *acpi_find_table(const char signature[4],
-                                              u32 index) {
+const struct acpi_sdt_header *acpi_find_table(const char signature[4], u32 index) {
   if (!root_sdt || !root_entry_size)
     return 0;
 
-  u32 count = (root_sdt->length - sizeof(*root_sdt)) / root_entry_size;
+  u32 count         = (root_sdt->length - sizeof(*root_sdt)) / root_entry_size;
   const u8 *entries = (const u8 *)root_sdt + sizeof(*root_sdt);
 
   for (u32 i = 0; i < count; i++) {
@@ -188,10 +183,10 @@ const struct acpi_sdt_header *acpi_find_table(const char signature[4],
 }
 
 int acpi_init(u64 mb2_addr) {
-  root_sdt = 0;
+  root_sdt        = 0;
   root_entry_size = 0;
-  lapic_phys = 0;
-  cpu_count = 0;
+  lapic_phys      = 0;
+  cpu_count       = 0;
   pci_mcfg_init(0);
 
   const struct acpi_rsdp_v1 *rsdp = find_rsdp(mb2_addr);
@@ -223,8 +218,7 @@ int acpi_init(u64 mb2_addr) {
     log_write("ACPI: no MCFG, PCI will use legacy config IO", KERNEL, LOG_INFO);
   }
 
-  const struct acpi_madt *madt =
-      (const struct acpi_madt *)acpi_find_table(ACPI_SIG_APIC, 0);
+  const struct acpi_madt *madt = (const struct acpi_madt *)acpi_find_table(ACPI_SIG_APIC, 0);
   if (!madt) {
     log_write("ACPI: no MADT (APIC table) found", KERNEL, LOG_ERROR);
     return -1;

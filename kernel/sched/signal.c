@@ -1,11 +1,11 @@
 /* kernel/sched/signal.c , see signal.h. */
-#include <sched/signal.h>
 #include <arch/irq.h>
 #include <arch/syscall.h>
 #include <interrupts/idt.h>
 #include <loader/process.h>
 #include <memory/uvm.h>
 #include <sched/sched.h>
+#include <sched/signal.h>
 #include <utilities/errno.h>
 #include <utilities/log.h>
 #include <utilities/string.h>
@@ -21,8 +21,7 @@ struct linux_sigcontext {
   u64 fpstate; /* user address of the fxsave image */
   u64 reserved[8];
 };
-_Static_assert(sizeof(struct linux_sigcontext) == 256,
-               "sigcontext must match Linux x86_64");
+_Static_assert(sizeof(struct linux_sigcontext) == 256, "sigcontext must match Linux x86_64");
 
 struct linux_ucontext {
   u64 uc_flags;
@@ -96,8 +95,7 @@ static int discarded(struct task *t, int sig) {
   if (sig == LINUX_SIGKILL)
     return 0;
   u64 handler = action_of(t, sig)->handler;
-  return handler == LINUX_SIG_IGN ||
-         (handler == LINUX_SIG_DFL && default_ignored(sig));
+  return handler == LINUX_SIG_IGN || (handler == LINUX_SIG_DFL && default_ignored(sig));
 }
 
 /* ---- sending ----------------------------------------------------------- */
@@ -116,8 +114,8 @@ long signal_send(int pid, int sig) {
   if (sig < 0 || sig > TASK_SIGNAL_COUNT)
     return -EINVAL;
   struct task *t = task_find(pid);
-  if (!t || !t->vm || !t->context || t->is_thread ||
-      t->state == TASK_ZOMBIE || t->state == TASK_DEAD)
+  if (!t || !t->vm || !t->context || t->is_thread || t->state == TASK_ZOMBIE ||
+      t->state == TASK_DEAD)
     return -ESRCH;
   if (sig == 0)
     return 0;
@@ -147,8 +145,7 @@ long signal_send(int pid, int sig) {
 }
 
 void signal_child_exited(struct task *parent) {
-  if (!parent || !parent->context || parent->state == TASK_ZOMBIE ||
-      parent->state == TASK_DEAD)
+  if (!parent || !parent->context || parent->state == TASK_ZOMBIE || parent->state == TASK_DEAD)
     return;
   /* Only a handler makes SIGCHLD observable; default and ignore are both
    * "nothing happens", and wait4 does not need the signal. */
@@ -163,9 +160,7 @@ static void terminate(int sig) {
   task_exit(-sig);
 }
 
-static int user_code_address(u64 va) {
-  return va >= USER_VA_MIN && va < USER_VA_MAX;
-}
+static int user_code_address(u64 va) { return va >= USER_VA_MIN && va < USER_VA_MAX; }
 
 /* The common half of delivery. `sc` holds the registers about to return to
  * ring 3; on a handler it is rewritten to enter the handler instead.
@@ -203,22 +198,21 @@ static int deliver(struct linux_sigcontext *sc) {
   /* Below the interrupted code's red zone: the FPU image, 64-aligned for
    * fxsave's 16, then the frame, placed so the handler starts with
    * rsp % 16 == 8 exactly as if it had been called. */
-  u64 sp = sc->rsp - RED_ZONE;
-  u64 fx = (sp - FXSAVE_BYTES) & ~63ULL;
+  u64 sp       = sc->rsp - RED_ZONE;
+  u64 fx       = (sp - FXSAVE_BYTES) & ~63ULL;
   u64 frame_va = ((fx - sizeof(struct rt_sigframe)) & ~15ULL) - 8;
-  if (frame_va < USER_VA_MIN ||
-      !uvm_buffer_ok(t->vm, (void *)frame_va, sc->rsp - frame_va, 1))
+  if (frame_va < USER_VA_MIN || !uvm_buffer_ok(t->vm, (void *)frame_va, sc->rsp - frame_va, 1))
     terminate(LINUX_SIGSEGV); /* no room on the stack: what Linux does too */
 
   struct rt_sigframe *frame = (struct rt_sigframe *)frame_va;
   memset(frame, 0, sizeof(*frame));
-  frame->pretcode = act->restorer;
-  frame->uc.mcontext = *sc;
+  frame->pretcode            = act->restorer;
+  frame->uc.mcontext         = *sc;
   frame->uc.mcontext.fpstate = fx;
   frame->uc.mcontext.oldmask = t->sig_blocked;
-  frame->uc.sigmask = t->sig_blocked;
-  frame->info.si_signo = sig;
-  frame->info.si_code = SI_USER;
+  frame->uc.sigmask          = t->sig_blocked;
+  frame->info.si_signo       = sig;
+  frame->info.si_code        = SI_USER;
   /* The state saved on entry from ring 3, not the live registers: kernel
    * code has been running on those since. */
   memcpy((void *)fx, t->context->user_fx, FXSAVE_BYTES);
@@ -227,7 +221,7 @@ static int deliver(struct linux_sigcontext *sc) {
   if (!(act->flags & LINUX_SA_NODEFER))
     mask |= SIG_BIT(sig);
   t->sig_blocked = (t->sig_blocked | mask) & ~SIG_UNBLOCKABLE;
-  u64 handler = act->handler;
+  u64 handler    = act->handler;
   if (act->flags & LINUX_SA_RESETHAND)
     act->handler = LINUX_SIG_DFL;
 
@@ -243,25 +237,50 @@ static int deliver(struct linux_sigcontext *sc) {
 
 /* The two return paths save the same general registers in different
  * orders. These move them through linux_sigcontext and back. */
-#define REGS_TO_SC(sc, f)                                                      \
-  do {                                                                         \
-    (sc).r8 = (f)->r8; (sc).r9 = (f)->r9; (sc).r10 = (f)->r10;                 \
-    (sc).r11 = (f)->r11; (sc).r12 = (f)->r12; (sc).r13 = (f)->r13;             \
-    (sc).r14 = (f)->r14; (sc).r15 = (f)->r15; (sc).rdi = (f)->rdi;             \
-    (sc).rsi = (f)->rsi; (sc).rbp = (f)->rbp; (sc).rbx = (f)->rbx;             \
-    (sc).rdx = (f)->rdx; (sc).rax = (f)->rax; (sc).rcx = (f)->rcx;             \
-    (sc).rsp = (f)->rsp; (sc).rip = (f)->rip; (sc).eflags = (f)->rflags;       \
-    (sc).cs = (u16)(f)->cs; (sc).ss = (u16)(f)->ss;                            \
+#define REGS_TO_SC(sc, f)                                                                          \
+  do {                                                                                             \
+    (sc).r8     = (f)->r8;                                                                         \
+    (sc).r9     = (f)->r9;                                                                         \
+    (sc).r10    = (f)->r10;                                                                        \
+    (sc).r11    = (f)->r11;                                                                        \
+    (sc).r12    = (f)->r12;                                                                        \
+    (sc).r13    = (f)->r13;                                                                        \
+    (sc).r14    = (f)->r14;                                                                        \
+    (sc).r15    = (f)->r15;                                                                        \
+    (sc).rdi    = (f)->rdi;                                                                        \
+    (sc).rsi    = (f)->rsi;                                                                        \
+    (sc).rbp    = (f)->rbp;                                                                        \
+    (sc).rbx    = (f)->rbx;                                                                        \
+    (sc).rdx    = (f)->rdx;                                                                        \
+    (sc).rax    = (f)->rax;                                                                        \
+    (sc).rcx    = (f)->rcx;                                                                        \
+    (sc).rsp    = (f)->rsp;                                                                        \
+    (sc).rip    = (f)->rip;                                                                        \
+    (sc).eflags = (f)->rflags;                                                                     \
+    (sc).cs     = (u16)(f)->cs;                                                                    \
+    (sc).ss     = (u16)(f)->ss;                                                                    \
   } while (0)
 
-#define SC_TO_REGS(f, sc)                                                      \
-  do {                                                                         \
-    (f)->r8 = (sc).r8; (f)->r9 = (sc).r9; (f)->r10 = (sc).r10;                 \
-    (f)->r11 = (sc).r11; (f)->r12 = (sc).r12; (f)->r13 = (sc).r13;             \
-    (f)->r14 = (sc).r14; (f)->r15 = (sc).r15; (f)->rdi = (sc).rdi;             \
-    (f)->rsi = (sc).rsi; (f)->rbp = (sc).rbp; (f)->rbx = (sc).rbx;             \
-    (f)->rdx = (sc).rdx; (f)->rax = (sc).rax; (f)->rcx = (sc).rcx;             \
-    (f)->rsp = (sc).rsp; (f)->rip = (sc).rip; (f)->rflags = (sc).eflags;       \
+#define SC_TO_REGS(f, sc)                                                                          \
+  do {                                                                                             \
+    (f)->r8     = (sc).r8;                                                                         \
+    (f)->r9     = (sc).r9;                                                                         \
+    (f)->r10    = (sc).r10;                                                                        \
+    (f)->r11    = (sc).r11;                                                                        \
+    (f)->r12    = (sc).r12;                                                                        \
+    (f)->r13    = (sc).r13;                                                                        \
+    (f)->r14    = (sc).r14;                                                                        \
+    (f)->r15    = (sc).r15;                                                                        \
+    (f)->rdi    = (sc).rdi;                                                                        \
+    (f)->rsi    = (sc).rsi;                                                                        \
+    (f)->rbp    = (sc).rbp;                                                                        \
+    (f)->rbx    = (sc).rbx;                                                                        \
+    (f)->rdx    = (sc).rdx;                                                                        \
+    (f)->rax    = (sc).rax;                                                                        \
+    (f)->rcx    = (sc).rcx;                                                                        \
+    (f)->rsp    = (sc).rsp;                                                                        \
+    (f)->rip    = (sc).rip;                                                                        \
+    (f)->rflags = (sc).eflags;                                                                     \
   } while (0)
 
 void signal_deliver_syscall(struct syscall_frame *f) {
@@ -278,7 +297,7 @@ void signal_deliver_irq(struct interrupt_frame *r) {
   struct linux_sigcontext sc;
   memset(&sc, 0, sizeof(sc));
   REGS_TO_SC(sc, r);
-  sc.err = r->err_code;
+  sc.err    = r->err_code;
   sc.trapno = r->int_num;
   if (deliver(&sc))
     SC_TO_REGS(r, sc);
@@ -290,8 +309,7 @@ long signal_sigreturn(struct syscall_frame *f) {
   struct task *t = task_current();
   /* The handler's ret consumed pretcode, so rsp is the ucontext. */
   u64 uc_va = f->rsp;
-  if (!t || !t->vm ||
-      !uvm_buffer_ok(t->vm, (void *)uc_va, sizeof(struct linux_ucontext), 0))
+  if (!t || !t->vm || !uvm_buffer_ok(t->vm, (void *)uc_va, sizeof(struct linux_ucontext), 0))
     terminate(LINUX_SIGSEGV);
 
   struct linux_ucontext uc;
@@ -303,8 +321,7 @@ long signal_sigreturn(struct syscall_frame *f) {
   SC_TO_REGS(f, *sc);
 
   if (sc->fpstate) {
-    if ((sc->fpstate & 15) ||
-        !uvm_buffer_ok(t->vm, (void *)sc->fpstate, FXSAVE_BYTES, 0))
+    if ((sc->fpstate & 15) || !uvm_buffer_ok(t->vm, (void *)sc->fpstate, FXSAVE_BYTES, 0))
       terminate(LINUX_SIGSEGV);
     /* Into the image the syscall exit restores. */
     u8 *fx = t->context->user_fx;
@@ -315,7 +332,7 @@ long signal_sigreturn(struct syscall_frame *f) {
     memcpy(fx + MXCSR_OFFSET, &mxcsr, sizeof(mxcsr));
   }
 
-  u64 flags = irq_save();
+  u64 flags      = irq_save();
   t->sig_blocked = uc.sigmask & ~SIG_UNBLOCKABLE;
   irq_restore(flags);
   return (long)f->rax;

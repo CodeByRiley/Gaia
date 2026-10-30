@@ -26,10 +26,10 @@
 #ifndef NETMON_H
 #define NETMON_H
 
+#include <arch/syscall_abi.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <utilities/types.h>
-#include <arch/syscall_abi.h>
 
 #define NETMON_RING_FRAMES 64
 
@@ -59,7 +59,6 @@ long netmon_read_stats(struct net_stats *out);
 /* Copies frames from *cursor onward, advancing it past what was returned.
  * A cursor behind the ring jumps to the oldest frame still held. Compare
  * out[0].seq with the input cursor to detect the jump. */
-long netmon_read_frames(u64 *cursor, struct net_frame *out,
-                        long max);
+long netmon_read_frames(u64 *cursor, struct net_frame *out, long max);
 
 #endif /* NETMON_H */

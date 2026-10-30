@@ -81,13 +81,13 @@
 
 /* PORTSC register */
 #define PORTSC_REG_CONNECT_STATUS (UINT32_C(1) << 0)
-#define PORTSC_REG_CONNECT_STATUS_CHANGE                                       \
-  (UINT32_C(1) << 1) /* Write 1 to clear */
+#define PORTSC_REG_CONNECT_STATUS_CHANGE (UINT32_C(1) << 1) /* Write 1 to clear */
 #define PORTSC_REG_ENABLE (UINT32_C(1) << 2)
 #define PORTSC_REG_ENABLE_CHANGE (UINT32_C(1) << 3) /* Write 1 to clear */
 #define PORTSC_REG_OVERCURRENT_ACTIVE (UINT32_C(1) << 4)
-#define PORTSC_REG_OVERCURRENT_CHANGE (UINT32_C(1) << 5) /* Write 1 to clear   \
-                                                          */
+#define PORTSC_REG_OVERCURRENT_CHANGE                                                              \
+  (UINT32_C(1) << 5) /* Write 1 to clear                                                           \
+                      */
 #define PORTSC_REG_FORCE_PORT_RESUME (UINT32_C(1) << 6)
 #define PORTSC_REG_SUSPEND (UINT32_C(1) << 7)
 #define PORTSC_REG_RESET (UINT32_C(1) << 8)
@@ -100,9 +100,8 @@
 #define PORTSC_REG_WAKE_ON_DISCONNECT_ENABLE (UINT32_C(1) << 21)
 #define PORTSC_REG_WAKE_ON_OVERCURRENT_ENABLE (UINT32_C(1) << 22)
 #define PORTSC_REG_RESERVED_31_23 FIELD_MASK(9, 23)
-#define PORTSC_REG_WC_MASK                                                   \
-  (PORTSC_REG_CONNECT_STATUS_CHANGE | PORTSC_REG_ENABLE_CHANGE |             \
-   PORTSC_REG_OVERCURRENT_CHANGE)
+#define PORTSC_REG_WC_MASK                                                                         \
+  (PORTSC_REG_CONNECT_STATUS_CHANGE | PORTSC_REG_ENABLE_CHANGE | PORTSC_REG_OVERCURRENT_CHANGE)
 
 /* HCSPARAMS capability fields */
 #define HCSPARAMS_REG_N_PORTS FIELD_MASK(4, 0) /* bits 3–0 */
@@ -119,9 +118,8 @@
 #define HCCPARAMS_REG_64_BIT_ADDRESSING (UINT32_C(1) << 0)
 #define HCCPARAMS_REG_PROG_FRAME_LIST_FLAG (UINT32_C(1) << 1)
 #define HCCPARAMS_REG_ASYNC_SCHEDULE_PARK_CAP (UINT32_C(1) << 2)
-#define HCCPARAMS_REG_ISOCHRONOUS_SCHED_THRESHOLD                              \
-  FIELD_MASK(4, 4)                          /* bits 7–4 */
-#define HCCPARAMS_REG_EECP FIELD_MASK(8, 8) /* bits 15–8 */
+#define HCCPARAMS_REG_ISOCHRONOUS_SCHED_THRESHOLD FIELD_MASK(4, 4) /* bits 7–4 */
+#define HCCPARAMS_REG_EECP FIELD_MASK(8, 8)                        /* bits 15–8 */
 #define HCCPARAMS_REG_RESERVED_31_16 FIELD_MASK(16, 16)
 #define CTRLDSSEGMENT_REG_BASE UINT32_C(0xFFFFFFFF)
 #define PERIODICLISTBASE_REG_BASE UINT32_C(0xFFFFF000)
@@ -133,33 +131,36 @@
 
 /* Shared link pointer format (frame list entries, QH/QTD chains) */
 #define LINK_TERMINATE UINT32_C(1)
-#define LINK_TYPE_QH                                                           \
-  (UINT32_C(1) << 1) /* bits 2-1: 00 iTD, 01 QH, 10 siTD, 11 FSTN */
+#define LINK_TYPE_QH (UINT32_C(1) << 1)     /* bits 2-1: 00 iTD, 01 QH, 10 siTD, 11 FSTN */
 #define LINK_ADDR_MASK UINT32_C(0xFFFFFFE0) /* 32-byte aligned pointers */
 
 /* QH endpoint characteristics (dword 1) */
-#define QH_EPCHAR_ADDR_MASK      FIELD_MASK(7, 0)    /* bits 6-0: device address */
-#define QH_EPCHAR_I              (UINT32_C(1) << 7)  /* inactive on next transaction */
-#define QH_EPCHAR_EP_MASK        FIELD_MASK(4, 8)    /* bits 11-8: endpoint number */
-#define QH_EPCHAR_SPEED_MASK     FIELD_MASK(2, 12)   /* bits 13-12 */
-#define QH_EPCHAR_SPEED_FULL     (UINT32_C(0) << 12) /* pre-shifted, like the PIDs */
-#define QH_EPCHAR_SPEED_LOW      (UINT32_C(1) << 12)
-#define QH_EPCHAR_SPEED_HIGH     (UINT32_C(2) << 12)
-#define QH_EPCHAR_DTC            (UINT32_C(1) << 14) /* data toggle from qTD */
-#define QH_EPCHAR_H              (UINT32_C(1) << 15) /* reclamation-list head */
-#define QH_EPCHAR_MAXP_MASK      FIELD_MASK(11, 16)  /* bits 26-16: max packet size */
-#define QH_EPCHAR_C              (UINT32_C(1) << 27) /* split control endpoint */
-#define QH_EPCHAR_RL_MASK        FIELD_MASK(4, 28)   /* bits 31-28: NAK reload */
+#define QH_EPCHAR_ADDR_MASK FIELD_MASK(7, 0)     /* bits 6-0: device address */
+#define QH_EPCHAR_I (UINT32_C(1) << 7)           /* inactive on next transaction */
+#define QH_EPCHAR_EP_MASK FIELD_MASK(4, 8)       /* bits 11-8: endpoint number */
+#define QH_EPCHAR_SPEED_MASK FIELD_MASK(2, 12)   /* bits 13-12 */
+#define QH_EPCHAR_SPEED_FULL (UINT32_C(0) << 12) /* pre-shifted, like the PIDs */
+#define QH_EPCHAR_SPEED_LOW (UINT32_C(1) << 12)
+#define QH_EPCHAR_SPEED_HIGH (UINT32_C(2) << 12)
+#define QH_EPCHAR_DTC (UINT32_C(1) << 14) /* data toggle from qTD */
+#define QH_EPCHAR_H (UINT32_C(1) << 15)   /* reclamation-list head */
+#define QH_EPCHAR_MAXP_MASK                                                                        \
+  FIELD_MASK(11, 16)                        /* bits 26-16: max packet size                         \
+                                             */
+#define QH_EPCHAR_C (UINT32_C(1) << 27)     /* split control endpoint */
+#define QH_EPCHAR_RL_MASK FIELD_MASK(4, 28) /* bits 31-28: NAK reload */
 
 /* QH endpoint capabilities (dword 2) */
-#define QH_EPCAP_MULT_MASK       FIELD_MASK(2, 30)   /* bits 31-30 */
-#define QH_EPCAP_MULT_1          (UINT32_C(1) << 30) /* 1 transaction per microframe */
-#define QH_EPCAP_MULT_2          (UINT32_C(2) << 30)
-#define QH_EPCAP_MULT_3          (UINT32_C(3) << 30)
-#define QH_EPCAP_PORT_MASK       FIELD_MASK(7, 23)   /* bits 29-23: TT port (split) */
-#define QH_EPCAP_HUB_MASK        FIELD_MASK(7, 16)   /* bits 22-16: TT hub (split) */
-#define QH_EPCAP_SCMASK_MASK     FIELD_MASK(8, 8)    /* bits 15-8: split completion */
-#define QH_EPCAP_SMASK_MASK      FIELD_MASK(8, 0)    /* bits 7-0: int schedule mask */
+#define QH_EPCAP_MULT_MASK FIELD_MASK(2, 30) /* bits 31-30 */
+#define QH_EPCAP_MULT_1 (UINT32_C(1) << 30)  /* 1 transaction per microframe */
+#define QH_EPCAP_MULT_2 (UINT32_C(2) << 30)
+#define QH_EPCAP_MULT_3 (UINT32_C(3) << 30)
+#define QH_EPCAP_PORT_MASK FIELD_MASK(7, 23) /* bits 29-23: TT port (split) */
+#define QH_EPCAP_HUB_MASK FIELD_MASK(7, 16)  /* bits 22-16: TT hub (split) */
+#define QH_EPCAP_SCMASK_MASK                                                                       \
+  FIELD_MASK(8, 8)                           /* bits 15-8: split completion                        \
+                                              */
+#define QH_EPCAP_SMASK_MASK FIELD_MASK(8, 0) /* bits 7-0: int schedule mask */
 
 /* qTD token */
 #define QTD_PID_OUT (UINT32_C(0) << 8)
@@ -177,17 +178,16 @@
 #define QTD_CURRENT_PAGE_MASK FIELD_MASK(3, 12)
 #define QTD_TOTAL_LEN_MASK FIELD_MASK(15, 16)
 #define QTD_TOGGLE (UINT32_C(1) << 31)
-#define QTD_ERROR_MASK                                                       \
-  (QTD_STATUS_HALTED | QTD_STATUS_BUFFER_ERR | QTD_STATUS_BABBLE |           \
-   QTD_STATUS_XACT_ERR | QTD_STATUS_MISSED_MFRAME)
+#define QTD_ERROR_MASK                                                                             \
+  (QTD_STATUS_HALTED | QTD_STATUS_BUFFER_ERR | QTD_STATUS_BABBLE | QTD_STATUS_XACT_ERR |           \
+   QTD_STATUS_MISSED_MFRAME)
 
 /* Legacy support (PCI config space, via EECP) */
 #define USBLEGSUP_CAP_ID UINT8_C(0x01)
 #define USBLEGSUP_BIOS_OWNED (UINT32_C(1) << 16) /* RO: BIOS owns HC */
 #define USBLEGSUP_OS_OWNED (UINT32_C(1) << 24)   /* W1S: OS takes ownership */
-#define USBLEGSUP_NEXT_MASK                                                    \
-  FIELD_MASK(8, 8)            /* next legacy cap offset, 0 = end */
-#define USBLEGCTLSTS_OFFSET 4 /* SMI enable/status, at EECP+4 */
+#define USBLEGSUP_NEXT_MASK FIELD_MASK(8, 8)     /* next legacy cap offset, 0 = end */
+#define USBLEGCTLSTS_OFFSET 4                    /* SMI enable/status, at EECP+4 */
 
 /* The 8 overlay dwords — same shape as a qTD, but WITHOUT the 32-byte
  * alignment attribute, so it can sit at offset 16 inside a QH. */

@@ -1,7 +1,4 @@
-#include <threads.h>
 #include "syscall.h"
+#include <threads.h>
 
-void thrd_yield()
-{
-	__syscall(SYS_sched_yield);
-}
+void thrd_yield() { __syscall(SYS_sched_yield); }

@@ -5,12 +5,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #undef assert
-#define assert(condition) do { \
-    if (!(condition)) { \
-        fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #condition); \
-        abort(); \
-    } \
-} while (0)
+#define assert(condition)                                                      \
+  do {                                                                         \
+    if (!(condition)) {                                                        \
+      fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #condition);          \
+      abort();                                                                 \
+    }                                                                          \
+  } while (0)
 
 void vfs_test_wait_parked(unsigned count);
 void vfs_test_context(int cpu, int irq, int boot);

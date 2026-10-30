@@ -7,11 +7,11 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-#include <memory/pmm.h>
-#include <memory/vmm.h>
-#include <memory/hhdm.h>
 #include <memory/heap.h>
+#include <memory/hhdm.h>
+#include <memory/pmm.h>
 #include <memory/vma.h>
+#include <memory/vmm.h>
 
 /* Standard page size on x86_64 */
 #define PAGE_SIZE 4096

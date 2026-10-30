@@ -1,14 +1,7 @@
 #include "pwf.h"
 
-void setspent()
-{
-}
+void setspent() {}
 
-void endspent()
-{
-}
+void endspent() {}
 
-struct spwd *getspent()
-{
-	return 0;
-}
+struct spwd *getspent() { return 0; }

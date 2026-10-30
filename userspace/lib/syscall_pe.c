@@ -17,74 +17,59 @@
 #include <lib/syscall.h>
 
 sysarg_t syscall0(sysarg_t n) {
-    sysarg_t ret;
-    __asm__ volatile ("syscall"
-                      : "=a"(ret)
-                      : "a"(n)
-                      : "rcx", "r11", "memory");
-    return ret;
+  sysarg_t ret;
+  __asm__ volatile("syscall" : "=a"(ret) : "a"(n) : "rcx", "r11", "memory");
+  return ret;
 }
 
 sysarg_t syscall1(sysarg_t n, sysarg_t a) {
-    sysarg_t ret;
-    __asm__ volatile ("syscall"
-                      : "=a"(ret)
-                      : "a"(n), "D"(a)
-                      : "rcx", "r11", "memory");
-    return ret;
+  sysarg_t ret;
+  __asm__ volatile("syscall" : "=a"(ret) : "a"(n), "D"(a) : "rcx", "r11", "memory");
+  return ret;
 }
 
 sysarg_t syscall2(sysarg_t n, sysarg_t a, sysarg_t b) {
-    sysarg_t ret;
-    __asm__ volatile ("syscall"
-                      : "=a"(ret)
-                      : "a"(n), "D"(a), "S"(b)
-                      : "rcx", "r11", "memory");
-    return ret;
+  sysarg_t ret;
+  __asm__ volatile("syscall" : "=a"(ret) : "a"(n), "D"(a), "S"(b) : "rcx", "r11", "memory");
+  return ret;
 }
 
 sysarg_t syscall3(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c) {
-    sysarg_t ret;
-    __asm__ volatile ("syscall"
-                      : "=a"(ret)
-                      : "a"(n), "D"(a), "S"(b), "d"(c)
-                      : "rcx", "r11", "memory");
-    return ret;
+  sysarg_t ret;
+  __asm__ volatile("syscall" : "=a"(ret) : "a"(n), "D"(a), "S"(b), "d"(c) : "rcx", "r11", "memory");
+  return ret;
 }
 
-sysarg_t syscall4(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c,
-                  sysarg_t d) {
-    sysarg_t ret;
-    register sysarg_t r10 __asm__("r10") = d;
-    __asm__ volatile ("syscall"
-                      : "=a"(ret)
-                      : "a"(n), "D"(a), "S"(b), "d"(c), "r"(r10)
-                      : "rcx", "r11", "memory");
-    return ret;
+sysarg_t syscall4(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d) {
+  sysarg_t ret;
+  register sysarg_t r10 __asm__("r10") = d;
+  __asm__ volatile("syscall"
+                   : "=a"(ret)
+                   : "a"(n), "D"(a), "S"(b), "d"(c), "r"(r10)
+                   : "rcx", "r11", "memory");
+  return ret;
 }
 
-sysarg_t syscall5(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c,
-                  sysarg_t d, sysarg_t e) {
-    sysarg_t ret;
-    register sysarg_t r10 __asm__("r10") = d;
-    register sysarg_t r8  __asm__("r8")  = e;
-    __asm__ volatile ("syscall"
-                      : "=a"(ret)
-                      : "a"(n), "D"(a), "S"(b), "d"(c), "r"(r10), "r"(r8)
-                      : "rcx", "r11", "memory");
-    return ret;
+sysarg_t syscall5(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d, sysarg_t e) {
+  sysarg_t ret;
+  register sysarg_t r10 __asm__("r10") = d;
+  register sysarg_t r8 __asm__("r8")   = e;
+  __asm__ volatile("syscall"
+                   : "=a"(ret)
+                   : "a"(n), "D"(a), "S"(b), "d"(c), "r"(r10), "r"(r8)
+                   : "rcx", "r11", "memory");
+  return ret;
 }
 
-sysarg_t syscall6(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c,
-                  sysarg_t d, sysarg_t e, sysarg_t f) {
-    sysarg_t ret;
-    register sysarg_t r10 __asm__("r10") = d;
-    register sysarg_t r8  __asm__("r8")  = e;
-    register sysarg_t r9  __asm__("r9")  = f;
-    __asm__ volatile ("syscall"
-                      : "=a"(ret)
-                      : "a"(n), "D"(a), "S"(b), "d"(c),
-                        "r"(r10), "r"(r8), "r"(r9)
-                      : "rcx", "r11", "memory");
-    return ret;
+sysarg_t syscall6(sysarg_t n, sysarg_t a, sysarg_t b, sysarg_t c, sysarg_t d, sysarg_t e,
+                  sysarg_t f) {
+  sysarg_t ret;
+  register sysarg_t r10 __asm__("r10") = d;
+  register sysarg_t r8 __asm__("r8")   = e;
+  register sysarg_t r9 __asm__("r9")   = f;
+  __asm__ volatile("syscall"
+                   : "=a"(ret)
+                   : "a"(n), "D"(a), "S"(b), "d"(c), "r"(r10), "r"(r8), "r"(r9)
+                   : "rcx", "r11", "memory");
+  return ret;
 }

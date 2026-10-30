@@ -16,63 +16,63 @@
 #include <stdint.h>
 
 enum device_bus {
-    DEVICE_BUS_NONE = 0,
-    DEVICE_BUS_PCI  = 1,
-    DEVICE_BUS_ISA  = 2,
+  DEVICE_BUS_NONE = 0,
+  DEVICE_BUS_PCI  = 1,
+  DEVICE_BUS_ISA  = 2,
 };
 
 struct isa_device {
-	u16 io_base;
-	u16 irq;
+  u16 io_base;
+  u16 irq;
 };
 
 struct device;
 
 struct driver {
-    const char *name;
-    enum device_bus bus;
-    int (*match)(const struct device *device);
-    int (*probe)(struct device *device);
+  const char *name;
+  enum device_bus bus;
+  int (*match)(const struct device *device);
+  int (*probe)(struct device *device);
 
-    /* Optional non-blocking maintenance pass. The driver core calls this
-     * from one shared poll task for every bound device that provides it.
-     *
-     * Returns non-zero when the pass actually did something - a frame
-     * received, a completion reaped. The poll task uses that to decide
-     * whether to come straight back or sleep, so a driver that always
-     * reports work will spin the CPU exactly as the loop used to. Report
-     * honestly: routine bookkeeping that happens every pass is not work. */
-    int (*poll)(struct device *device);
+  /* Optional non-blocking maintenance pass. The driver core calls this
+   * from one shared poll task for every bound device that provides it.
+   *
+   * Returns non-zero when the pass actually did something - a frame
+   * received, a completion reaped. The poll task uses that to decide
+   * whether to come straight back or sleep, so a driver that always
+   * reports work will spin the CPU exactly as the loop used to. Report
+   * honestly: routine bookkeeping that happens every pass is not work. */
+  int (*poll)(struct device *device);
 
-    /* Optional. Undo probe: stop the hardware so no DMA is in flight, give
-     * back its IRQ, withdraw anything it published, free driver_data and
-     * set it to NULL. Afterwards the device is inert and safe to hand to
-     * pci_disable. The driver core must not call poll once this returns. */
-    void (*remove)(struct device *device);
+  /* Optional. Undo probe: stop the hardware so no DMA is in flight, give
+   * back its IRQ, withdraw anything it published, free driver_data and
+   * set it to NULL. Afterwards the device is inert and safe to hand to
+   * pci_disable. The driver core must not call poll once this returns. */
+  void (*remove)(struct device *device);
 };
 
 struct device {
-    enum device_bus bus;
-    union {
-        struct pci_device pci;
-        struct isa_device isa;
-    } bus_info;
+  enum device_bus bus;
+  union {
+    struct pci_device pci;
+    struct isa_device isa;
+  } bus_info;
 
-    int enabled;
-    const struct driver *driver;
-    void *driver_data;
+  int enabled;
+  const struct driver *driver;
+  void *driver_data;
 };
 
 /* Maximum number of driver snapshots to retain for debugging & panic use. */
-#define DRIVER_SNAP_MAX      16
+#define DRIVER_SNAP_MAX 16
 #define DRIVER_SNAP_NAME_MAX 32
 
 struct driver_snap {
-    char name[DRIVER_SNAP_NAME_MAX];
-    int bus;
-    int poll;
-    int enabled;
-    u32 bound_devices;
+  char name[DRIVER_SNAP_NAME_MAX];
+  int bus;
+  int poll;
+  int enabled;
+  u32 bound_devices;
 };
 
 void driver_core_init(void);

@@ -10,8 +10,8 @@
 /* Copy n bytes from src to dst (no overlap). 8-byte chunked. */
 void *memcpy(void *dst, const void *src, usize n) {
   void *ret = dst;
-  usize q = n >> 3;
-  usize b = n & 7;
+  usize q   = n >> 3;
+  usize b   = n & 7;
   __asm__ volatile("cld; rep movsq" : "+D"(dst), "+S"(src), "+c"(q)::"memory");
   __asm__ volatile("rep movsb" : "+D"(dst), "+S"(src), "+c"(b)::"memory");
   return ret;
@@ -20,7 +20,7 @@ void *memcpy(void *dst, const void *src, usize n) {
 /* Fill n bytes of dst with byte c. 8-byte chunked. */
 void *memset(void *dst, int c, usize n) {
   void *ret = dst;
-  u64 v = (u8)c;
+  u64 v     = (u8)c;
   v |= v << 8;
   v |= v << 16;
   v |= v << 32;
@@ -33,7 +33,7 @@ void *memset(void *dst, int c, usize n) {
 
 /* Overlap-safe memcpy. Forward when dst < src, backward otherwise. */
 void *memmove(void *dst, const void *src, usize n) {
-  u8 *d = (u8 *)dst;
+  u8 *d       = (u8 *)dst;
   const u8 *s = (const u8 *)src;
   if (d == s || n == 0)
     return dst;
@@ -117,9 +117,7 @@ int strncmp(const char *a, const char *b, usize n) {
   return n == 0 ? 0 : (u8)*a - (u8)*b;
 }
 
-static char to_lower_byte(char c) {
-  return (c >= 'A' && c <= 'Z') ? c + 32 : c;
-}
+static char to_lower_byte(char c) { return (c >= 'A' && c <= 'Z') ? c + 32 : c; }
 
 int strcasecmp(const char *a, const char *b) {
   while (*a && *b) {
@@ -156,7 +154,7 @@ char *strchr(const char *s, int c) {
 
 /* strlwr(3). Converts string to lowercase in-place. */
 char *strlwr(const char *s) {
-  usize len = strlen(s);
+  usize len    = strlen(s);
   char *result = (char *)kmalloc(len + 1);
 
   if (!result)
@@ -203,7 +201,7 @@ char *strstr(const char *h, const char *n) {
 /* strdup(3). Allocates with kmalloc; caller frees with kfree. */
 char *strdup(const char *s) {
   usize len = strlen(s) + 1;
-  char *p = (char *)kmalloc(len);
+  char *p   = (char *)kmalloc(len);
   if (!p)
     return 0;
   memcpy(p, s, len);

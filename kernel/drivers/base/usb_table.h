@@ -15,41 +15,35 @@ struct usb_device_desc {
 
 static const struct usb_device_desc usb_known_devices[] = {
     /* Intel */
-    {USB_VENDOR_INTEL, USB_PRODUCT_INTEL_USB3_HUB, "Intel USB 3.x Hub"},
+    {USB_VENDOR_INTEL,     USB_PRODUCT_INTEL_USB3_HUB,     "Intel USB 3.x Hub"                    },
 
     /* Logitech */
-    {USB_VENDOR_LOGITECH, USB_PRODUCT_LOGITECH_UNIFYING,
-     "Logitech Unifying Receiver"},
-    {USB_VENDOR_LOGITECH, USB_PRODUCT_LOGITECH_K120, "Logitech K120 Keyboard"},
+    {USB_VENDOR_LOGITECH,  USB_PRODUCT_LOGITECH_UNIFYING,  "Logitech Unifying Receiver"           },
+    {USB_VENDOR_LOGITECH,  USB_PRODUCT_LOGITECH_K120,      "Logitech K120 Keyboard"               },
 
     /* Microsoft */
-    {USB_VENDOR_MICROSOFT, USB_PRODUCT_MICROSOFT_XBOX_360,
-     "Microsoft Xbox 360 Controller"},
+    {USB_VENDOR_MICROSOFT, USB_PRODUCT_MICROSOFT_XBOX_360, "Microsoft Xbox 360 Controller"        },
 
     /* FTDI */
-    {USB_VENDOR_FTDI, USB_PRODUCT_FTDI_SERIAL, "FTDI USB Serial Converter"},
+    {USB_VENDOR_FTDI,      USB_PRODUCT_FTDI_SERIAL,        "FTDI USB Serial Converter"            },
 
     /* Prolific */
-    {USB_VENDOR_PROLIFIC, USB_PRODUCT_PROLIFIC_PL2303,
-     "Prolific PL2303 USB Serial Converter"},
+    {USB_VENDOR_PROLIFIC,  USB_PRODUCT_PROLIFIC_PL2303,    "Prolific PL2303 USB Serial Converter" },
 
     /* SanDisk */
-    {USB_VENDOR_SANDISK, USB_PRODUCT_SANDISK_CRUZER,
-     "SanDisk Cruzer USB Flash Drive"},
+    {USB_VENDOR_SANDISK,   USB_PRODUCT_SANDISK_CRUZER,     "SanDisk Cruzer USB Flash Drive"       },
 
     /* Kingston */
-    {USB_VENDOR_KINGSTON, USB_PRODUCT_KINGSTON_DATATRAVELER,
-     "Kingston DataTraveler USB Flash Drive"},
+    {USB_VENDOR_KINGSTON,
+     USB_PRODUCT_KINGSTON_DATATRAVELER,                    "Kingston DataTraveler USB Flash Drive"},
 
     /* QEMU */
-    {USB_VENDOR_QEMU, USB_PRODUCT_QEMU_TABLET, "QEMU USB Tablet"},
+    {USB_VENDOR_QEMU,      USB_PRODUCT_QEMU_TABLET,        "QEMU USB Tablet"                      },
 };
 
-#define USB_KNOWN_DEVICE_COUNT                                                 \
-  (sizeof(usb_known_devices) / sizeof(usb_known_devices[0]))
+#define USB_KNOWN_DEVICE_COUNT (sizeof(usb_known_devices) / sizeof(usb_known_devices[0]))
 
-SINLINE const struct usb_device_desc *usb_device_lookup(u16 vendor,
-                                                        u16 product) {
+SINLINE const struct usb_device_desc *usb_device_lookup(u16 vendor, u16 product) {
   for (unsigned i = 0; i < USB_KNOWN_DEVICE_COUNT; ++i) {
     const struct usb_device_desc *device = &usb_known_devices[i];
 

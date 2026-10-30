@@ -32,8 +32,8 @@
  * BLOCKDEV_WRITABLE is derived from the device itself and need not be passed.
  * Returns 0 or a negative errno: EINVAL for an invalid descriptor, EEXIST
  * for a duplicate name, or ENOSPC when the fixed registry is full. */
-int blockdev_register(const char *name, const struct block_device *device,
-                      uint64_t start_lba, uint32_t flags);
+int blockdev_register(const char *name, const struct block_device *device, uint64_t start_lba,
+                      uint32_t flags);
 
 /* OR extra bits into an already-published volume. A disk is only known to be
  * partitioned once its table has been read, which happens after it is named. */

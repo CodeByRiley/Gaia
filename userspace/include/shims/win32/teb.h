@@ -2,8 +2,7 @@
 #define GAIA_TEB_H
 #include "peb.h"
 typedef struct {
-  void *ExceptionList, *StackBase, *StackLimit, *SubSystemTib, *FiberData,
-      *ArbitraryUserPointer;
+  void *ExceptionList, *StackBase, *StackLimit, *SubSystemTib, *FiberData, *ArbitraryUserPointer;
   void *Self, *EnvironmentPointer;
   uint64_t ProcessId, ThreadId;
   void *ActiveRpcHandle, *ThreadLocalStoragePointer;

@@ -20,28 +20,27 @@ struct interrupt_frame;
 NORETURN
 void panic_at(const char *msg, const char *file, int line, const char *func);
 NORETURN
-void panicf_at(const char *file, int line, const char *func, const char *fmt,
-               ...) PRINTF_FORMAT(4, 5);
+void panicf_at(const char *file, int line, const char *func, const char *fmt, ...)
+    PRINTF_FORMAT(4, 5);
 
 /* Fatal CPU exception entry. The IDT recovery path handles recoverable probe
  * faults before calling this, so this function never returns. */
 NORETURN
-void panic_from_exception(const char *name, const struct interrupt_frame *frame,
-                          u64 fault_address, int has_fault_address);
+void panic_from_exception(const char *name, const struct interrupt_frame *frame, u64 fault_address,
+                          int has_fault_address);
 
 #define panic(msg) panic_at((msg), __FILE__, __LINE__, __func__)
-#define panicf(fmt, ...)                                                       \
-  panicf_at(__FILE__, __LINE__, __func__, (fmt), ##__VA_ARGS__)
+#define panicf(fmt, ...) panicf_at(__FILE__, __LINE__, __func__, (fmt), ##__VA_ARGS__)
 
 /* Guard for code that cannot make forward progress with interrupts off.
  * Callers that sleep, yield, or wait on pit_ticks() belong here: without IRQ0
  * they hang the machine with no output, so fail loudly and name the function
  * instead. Busy-waits driven by polled hardware (see pit_delay_us) are exempt
  * , they are the correct thing to call in that window. */
-#define REQUIRE_INTERRUPTS()                                                   \
-  do {                                                                         \
-    if (!interrupts_enabled())                                                 \
-      panic("called with interrupts disabled");                                \
+#define REQUIRE_INTERRUPTS()                                                                       \
+  do {                                                                                             \
+    if (!interrupts_enabled())                                                                     \
+      panic("called with interrupts disabled");                                                    \
   } while (0)
 
 #endif

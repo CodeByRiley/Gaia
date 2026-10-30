@@ -1,7 +1,4 @@
-#include <unistd.h>
 #include "syscall.h"
+#include <unistd.h>
 
-void sync(void)
-{
-	__syscall(SYS_sync);
-}
+void sync(void) { __syscall(SYS_sync); }

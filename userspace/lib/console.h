@@ -36,9 +36,9 @@ void console_write(const char *buf, size_t len);
 void console_set_color(uint32_t fg, uint32_t bg);
 
 /* Push the current TTY screen + cursor on a 1-deep stack and clear. */
-int  console_save(void);
+int console_save(void);
 
 /* Pop the screen previously saved by console_save(). */
-int  console_restore(void);
+int console_restore(void);
 
 #endif

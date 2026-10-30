@@ -29,11 +29,11 @@ typedef long time_t;
 
 /* Matches the kernel's struct linux_timespec byte for byte. */
 struct timespec {
-    long tv_sec;
-    long tv_nsec;
+  long tv_sec;
+  long tv_nsec;
 };
 
-#define CLOCK_REALTIME  0
+#define CLOCK_REALTIME 0
 #define CLOCK_MONOTONIC 1
 
 /* Seconds since the epoch, and 0 if the clock is unreadable. Also stored
@@ -51,13 +51,13 @@ int clock_gettime(int clock_id, struct timespec *ts);
  * absolute, month is 1-12 , because every caller here formats them directly
  * and tm_year + 1900 is a reliable source of off-by-1900 bugs. */
 struct calendar_time {
-    int year;    /* e.g. 2026 */
-    int month;   /* 1-12     */
-    int day;     /* 1-31     */
-    int hour;    /* 0-23     */
-    int minute;  /* 0-59     */
-    int second;  /* 0-59     */
-    int weekday; /* 0 = Sunday */
+  int year;    /* e.g. 2026 */
+  int month;   /* 1-12     */
+  int day;     /* 1-31     */
+  int hour;    /* 0-23     */
+  int minute;  /* 0-59     */
+  int second;  /* 0-59     */
+  int weekday; /* 0 = Sunday */
 };
 
 /* Split an epoch timestamp into calendar fields. No timezone handling: the

@@ -1,6 +1,6 @@
-#include <lib/services.h>
-#include <lib/keymap.h>
 #include <include/key_codes.h>
+#include <lib/keymap.h>
+#include <lib/services.h>
 #include <shims/win32/bridge.h>
 #include <shims/win32/handles.h>
 void *memcpy(void *, const void *, size_t);
@@ -43,8 +43,7 @@ void GaiaPresentDC(HDC h) {
     wm_window_invalidate(w->dc.window.handle);
 }
 ATOM WINAPI RegisterClassA(const WNDCLASSA *c) {
-  if (!c || !c->lpszClassName || !c->lpfnWndProc || c->cbClsExtra ||
-      c->cbWndExtra) {
+  if (!c || !c->lpszClassName || !c->lpfnWndProc || c->cbClsExtra || c->cbWndExtra) {
     SetLastError(87);
     return 0;
   }
@@ -62,7 +61,7 @@ ATOM WINAPI RegisterClassA(const WNDCLASSA *c) {
     if (!classes[i].atom) {
       memcpy(classes[i].name, c->lpszClassName, n + 1);
       classes[i].procedure = c->lpfnWndProc;
-      classes[i].atom = i + 1;
+      classes[i].atom      = i + 1;
       return i + 1;
     }
   SetLastError(8);
@@ -74,18 +73,30 @@ ATOM WINAPI RegisterClassW(const WNDCLASSW *c) {
   char name[64];
   if (GaiaUtf8(c->lpszClassName, name, 64) < 0)
     return 0;
-  WNDCLASSA a = {c->style,      c->lpfnWndProc,   c->cbClsExtra,
-                 c->cbWndExtra, c->hInstance,     c->hIcon,
-                 c->hCursor,    c->hbrBackground, 0,
+  WNDCLASSA a = {c->style,
+                 c->lpfnWndProc,
+                 c->cbClsExtra,
+                 c->cbWndExtra,
+                 c->hInstance,
+                 c->hIcon,
+                 c->hCursor,
+                 c->hbrBackground,
+                 0,
                  name};
   return RegisterClassA(&a);
 }
 ATOM WINAPI RegisterClassExA(const WNDCLASSEXA *c) {
   if (!c || c->cbSize != sizeof(*c))
     return 0;
-  WNDCLASSA a = {c->style,        c->lpfnWndProc,   c->cbClsExtra,
-                 c->cbWndExtra,   c->hInstance,     c->hIcon,
-                 c->hCursor,      c->hbrBackground, c->lpszMenuName,
+  WNDCLASSA a = {c->style,
+                 c->lpfnWndProc,
+                 c->cbClsExtra,
+                 c->cbWndExtra,
+                 c->hInstance,
+                 c->hIcon,
+                 c->hCursor,
+                 c->hbrBackground,
+                 c->lpszMenuName,
                  c->lpszClassName};
   return RegisterClassA(&a);
 }
@@ -101,23 +112,19 @@ BOOL WINAPI PostMessageA(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   queue[count++] = (MSG){.hwnd = h, .message = msg, .wParam = wp, .lParam = lp};
   return TRUE;
 }
-void WINAPI PostQuitMessage(INT code) {
-  PostMessageA(0, WM_QUIT, (WPARAM)code, 0);
-}
-HWND WINAPI CreateWindowExA(DWORD ex, const char *class_name, const char *title,
-                            DWORD style, INT x, INT y, INT width, INT height,
-                            HWND parent, HMENU menu, HINSTANCE instance,
-                            void *param) {
+void WINAPI PostQuitMessage(INT code) { PostMessageA(0, WM_QUIT, (WPARAM)code, 0); }
+HWND WINAPI CreateWindowExA(DWORD ex, const char *class_name, const char *title, DWORD style, INT x,
+                            INT y, INT width, INT height, HWND parent, HMENU menu,
+                            HINSTANCE instance, void *param) {
   if (ex || parent || menu) {
     SetLastError(120);
     return 0;
   }
-  struct cls *c = 0;
+  struct cls *c  = 0;
   uintptr_t atom = (uintptr_t)class_name;
   for (unsigned i = 0; i < 16; i++)
-    if (classes[i].atom &&
-        ((atom <= 65535 && classes[i].atom == atom) ||
-         (atom > 65535 && !strcmp(classes[i].name, class_name)))) {
+    if (classes[i].atom && ((atom <= 65535 && classes[i].atom == atom) ||
+                            (atom > 65535 && !strcmp(classes[i].name, class_name)))) {
       c = classes + i;
       break;
     }
@@ -149,15 +156,13 @@ HWND WINAPI CreateWindowExA(DWORD ex, const char *class_name, const char *title,
     return 0;
   }
   w->generation++;
-  w->handle =
-      (HWND)(uintptr_t)(((uint64_t)w->generation << 16) | (slot + 1024));
-  w->procedure = c->procedure;
-  w->dc.text_color = 0;
+  w->handle              = (HWND)(uintptr_t)(((uint64_t)w->generation << 16) | (slot + 1024));
+  w->procedure           = c->procedure;
+  w->dc.text_color       = 0;
   w->dc.background_color = 0xffffff;
-  w->paint = 1;
-  CREATESTRUCTA create = {param,       instance, menu,       parent,
-                          height,      width,    y,          x,
-                          (LONG)style, title,    class_name, ex};
+  w->paint               = 1;
+  CREATESTRUCTA create   = {
+      param, instance, menu, parent, height, width, y, x, (LONG)style, title, class_name, ex};
   if (!w->procedure(w->handle, WM_NCCREATE, 0, (LPARAM)(uintptr_t)&create) ||
       w->procedure(w->handle, WM_CREATE, 0, (LPARAM)(uintptr_t)&create) == -1) {
     DestroyWindow(w->handle);
@@ -166,9 +171,8 @@ HWND WINAPI CreateWindowExA(DWORD ex, const char *class_name, const char *title,
   PostMessageA(w->handle, WM_PAINT, 0, 0);
   return w->handle;
 }
-HWND WINAPI CreateWindowExW(DWORD ex, const WCHAR *c, const WCHAR *t, DWORD s,
-                            INT x, INT y, INT w, INT h, HWND p, HMENU m,
-                            HINSTANCE i, void *arg) {
+HWND WINAPI CreateWindowExW(DWORD ex, const WCHAR *c, const WCHAR *t, DWORD s, INT x, INT y, INT w,
+                            INT h, HWND p, HMENU m, HINSTANCE i, void *arg) {
   char name[64], title[256];
   if ((uintptr_t)c > 65535) {
     if (GaiaUtf8(c, name, 64) < 0)
@@ -179,8 +183,8 @@ HWND WINAPI CreateWindowExW(DWORD ex, const WCHAR *c, const WCHAR *t, DWORD s,
       return 0;
   } else
     title[0] = 0;
-  return CreateWindowExA(ex, (uintptr_t)c <= 65535 ? (const char *)c : name,
-                         title, s, x, y, w, h, p, m, i, arg);
+  return CreateWindowExA(
+      ex, (uintptr_t)c <= 65535 ? (const char *)c : name, title, s, x, y, w, h, p, m, i, arg);
 }
 BOOL WINAPI DestroyWindow(HWND h) {
   struct win *w = lookup(h);
@@ -249,9 +253,9 @@ HDC WINAPI BeginPaint(HWND h, PAINTSTRUCT *p) {
   if (!w || !p)
     return 0;
   memset(p, 0, sizeof(*p));
-  p->hdc = h;
+  p->hdc     = h;
   p->rcPaint = (RECT){0, 0, w->dc.window.w, w->dc.window.h};
-  w->paint = 0;
+  w->paint   = 0;
   return h;
 }
 BOOL WINAPI EndPaint(HWND h, const PAINTSTRUCT *p) {
@@ -269,7 +273,8 @@ static void events(void) {
       shift_held = e.type == WM_EV_KEY_DOWN;
     if (e.type == WM_EV_KEY_DOWN || e.type == WM_EV_KEY_UP) {
       char ch = keymap_to_ascii(e.param, shift_held);
-      if (ch) e.param = (unsigned char)ch;
+      if (ch)
+        e.param = (unsigned char)ch;
     }
     for (unsigned i = 0; i < 32; i++) {
       struct win *w = windows + i;
@@ -281,11 +286,10 @@ static void events(void) {
       } else if (e.type == WM_EV_RESIZE) {
         {
           w->dc.window.surface_va = e.surface_va;
-          w->dc.window.pitch = e.pitch;
-          w->dc.window.w = e.w;
-          w->dc.window.h = e.h;
-          PostMessageA(w->handle, WM_SIZE, 0,
-                       (LPARAM)((e.h << 16) | (e.w & 65535)));
+          w->dc.window.pitch      = e.pitch;
+          w->dc.window.w          = e.w;
+          w->dc.window.h          = e.h;
+          PostMessageA(w->handle, WM_SIZE, 0, (LPARAM)((e.h << 16) | (e.w & 65535)));
           InvalidateRect(w->handle, 0, TRUE);
         }
       } else {
@@ -296,8 +300,8 @@ static void events(void) {
                    : e.type == WM_EV_MOUSE_UP   ? WM_LBUTTONUP
                                                 : 0;
         if (msg)
-          PostMessageA(w->handle, msg, (WPARAM)e.param,
-                       (LPARAM)(((uint32_t)e.y << 16) | (e.x & 65535)));
+          PostMessageA(
+              w->handle, msg, (WPARAM)e.param, (LPARAM)(((uint32_t)e.y << 16) | (e.x & 65535)));
       }
     }
   }
@@ -311,8 +315,7 @@ BOOL WINAPI PeekMessageA(MSG *out, HWND h, UINT min, UINT max, UINT flags) {
   for (unsigned i = 0; i < count; i++)
     if (queue[i].message == WM_QUIT ||
         ((!h || queue[i].hwnd == h) &&
-         ((!min && !max) ||
-          (queue[i].message >= min && queue[i].message <= max)))) {
+         ((!min && !max) || (queue[i].message >= min && queue[i].message <= max)))) {
       *out = queue[i];
       if (flags & PM_REMOVE) {
         for (unsigned j = i + 1; j < count; j++)
@@ -335,9 +338,7 @@ BOOL WINAPI GetMessageA(MSG *out, HWND h, UINT min, UINT max) {
     gaia_sleep(1000000);
   return out->message == WM_QUIT ? 0 : 1;
 }
-BOOL WINAPI GetMessageW(MSG *o, HWND h, UINT a, UINT b) {
-  return GetMessageA(o, h, a, b);
-}
+BOOL WINAPI GetMessageW(MSG *o, HWND h, UINT a, UINT b) { return GetMessageA(o, h, a, b); }
 BOOL WINAPI TranslateMessage(const MSG *m) {
   if (m && m->message == WM_KEYDOWN && m->wParam >= 32 && m->wParam < 127) {
     PostMessageA(m->hwnd, WM_CHAR, m->wParam, m->lParam);

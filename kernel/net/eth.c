@@ -33,7 +33,7 @@ void eth_input(const u8 *frame, u16 len) {
   log_write("eth_input: frame is addressed to us", KERNEL, LOG_DEBUG);
 
   const u8 *payload = frame + ETH_HDR_LEN;
-  u16 payload_len = (u16)(len - ETH_HDR_LEN);
+  u16 payload_len   = (u16)(len - ETH_HDR_LEN);
 
   switch (from_be16(eth->type)) {
   case ETH_TYPE_ARP:
@@ -46,15 +46,17 @@ void eth_input(const u8 *frame, u16 len) {
     break;
   default:
     /* Ignore unknown types */
-    log_write_fmt(KERNEL, LOG_DEBUG,
+    log_write_fmt(KERNEL,
+                  LOG_DEBUG,
                   "eth_input: unknown type %04x, frame, len",
-                  from_be16(eth->type), frame, len);
+                  from_be16(eth->type),
+                  frame,
+                  len);
     break;
   }
 }
 
-int eth_output_framed(u8 *frame, const u8 dst[ETH_ALEN],
-                      u16 type, u16 payload_len) {
+int eth_output_framed(u8 *frame, const u8 dst[ETH_ALEN], u16 type, u16 payload_len) {
   struct netif *nif = netif_get();
   if (!nif || !frame || !dst || payload_len > nif->mtu)
     return -1;
@@ -67,8 +69,7 @@ int eth_output_framed(u8 *frame, const u8 dst[ETH_ALEN],
   return netif_tx(frame, (u16)(ETH_HDR_LEN + payload_len));
 }
 
-int eth_output(const u8 dst[ETH_ALEN], u16 type, const void *payload,
-               u16 payload_len) {
+int eth_output(const u8 dst[ETH_ALEN], u16 type, const void *payload, u16 payload_len) {
   if (payload_len > ETH_FRAME_MAX - ETH_HDR_LEN)
     return -1;
 

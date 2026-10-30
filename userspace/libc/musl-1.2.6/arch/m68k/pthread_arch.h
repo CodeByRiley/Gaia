@@ -1,7 +1,4 @@
-static inline uintptr_t __get_tp()
-{
-	return __syscall(SYS_get_thread_area);
-}
+static inline uintptr_t __get_tp() { return __syscall(SYS_get_thread_area); }
 
 #define TLS_ABOVE_TP
 #define GAP_ABOVE_TP 0

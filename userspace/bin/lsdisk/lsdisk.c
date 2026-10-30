@@ -5,8 +5,8 @@
  * so this command keeps the exact count visible and adds a convenient MiB
  * column for people at the console.
  */
-#include <lib/syscall.h>
 #include <errno.h>
+#include <lib/syscall.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -34,8 +34,7 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  printf("%-20s %-14s %-10s %-12s %s\n", "DEVICE", "SECTORS", "SECTOR", "SIZE",
-         "ACCESS");
+  printf("%-20s %-14s %-10s %-12s %s\n", "DEVICE", "SECTORS", "SECTOR", "SIZE", "ACCESS");
   for (long i = 0; i < count; i++) {
     struct blockdev_info *volume = &volumes[i];
 
@@ -48,8 +47,11 @@ int main(int argc, char **argv) {
     unsigned long long mib = 0;
     if (volume->sector_size && volume->sector_size <= MIB)
       mib = (unsigned long long)(volume->sectors / (MIB / volume->sector_size));
-    printf("/dev/%-15s %-14llu %-10u %-8llu MiB %s\n", volume->name,
-           (unsigned long long)volume->sectors, volume->sector_size, mib,
+    printf("/dev/%-15s %-14llu %-10u %-8llu MiB %s\n",
+           volume->name,
+           (unsigned long long)volume->sectors,
+           volume->sector_size,
+           mib,
            volume->flags & BLOCKDEV_WRITABLE ? "rw" : "ro");
   }
   return 0;

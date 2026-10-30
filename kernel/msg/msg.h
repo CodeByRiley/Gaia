@@ -18,10 +18,10 @@
 #ifndef MSG_H
 #define MSG_H
 
+#include <arch/syscall_abi.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <utilities/types.h>
-#include <arch/syscall_abi.h>
 
 void msg_init(void);
 
@@ -35,19 +35,19 @@ void msg_post_to(int pid, const struct msg *m);
 
 /* Pop one event from the calling task's ring. Returns 1 on success,
  * 0 if ring empty / task has no ring. */
-int  msg_get(struct msg *out);
-int  msg_peek(struct msg *out);
+int msg_get(struct msg *out);
+int msg_peek(struct msg *out);
 
 /* Post an IPC message to `target_pid`. Kernel fills out->from_pid. */
-int  ipc_send(int target_pid, const struct ipc_msg *m, int from_pid);
+int ipc_send(int target_pid, const struct ipc_msg *m, int from_pid);
 
 /* Pop one IPC message from the calling task's ring. */
-int  ipc_recv(struct ipc_msg *out);
+int ipc_recv(struct ipc_msg *out);
 
 /* Set / get the input owner. Returns 0 on success, -1 if already owned. */
-int  msg_input_owner_register(int pid);
+int msg_input_owner_register(int pid);
 void msg_input_owner_force(int pid);
 void msg_input_owner_clear(int pid);
-int  msg_input_owner(void);
+int msg_input_owner(void);
 
 #endif

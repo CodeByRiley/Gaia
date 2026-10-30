@@ -10,12 +10,12 @@
 static int alt_pressed = 0;
 
 /* Double-click tracking */
-static int last_icon_clicked = -1;
-static u32 last_icon_click_tick = 0;
-static int last_title_clicked = -1;
+static int last_icon_clicked     = -1;
+static u32 last_icon_click_tick  = 0;
+static int last_title_clicked    = -1;
 static u32 last_title_click_tick = 0;
-static int last_title_click_x = 0;
-static int last_title_click_y = 0;
+static int last_title_click_x    = 0;
+static int last_title_click_y    = 0;
 
 /* Close escalation. The close button is a request , the owner is expected to
  * tear its own window down so it can prompt about unsaved work first. An app
@@ -29,10 +29,10 @@ static int last_title_click_y = 0;
  * Ticks come from the PIT at 250 Hz, so this is roughly three seconds. */
 #define CLOSE_ESCALATE_TICKS 750u
 int close_pending_handle = -1;
-u32 close_pending_tick = 0;
+u32 close_pending_tick   = 0;
 
 void reset_titlebar_click(void) {
-  last_title_clicked = -1;
+  last_title_clicked    = -1;
   last_title_click_tick = 0;
 }
 
@@ -47,17 +47,16 @@ int titlebar_click_is_double(int handle, int x, int y, uint32_t now) {
   if (dy < 0)
     dy = -dy;
 
-  if (handle == last_title_clicked &&
-      now - last_title_click_tick < DOUBLE_CLICK_TICKS &&
+  if (handle == last_title_clicked && now - last_title_click_tick < DOUBLE_CLICK_TICKS &&
       dx <= DOUBLE_CLICK_SLOP && dy <= DOUBLE_CLICK_SLOP) {
     reset_titlebar_click();
     return 1;
   }
 
-  last_title_clicked = handle;
+  last_title_clicked    = handle;
   last_title_click_tick = now;
-  last_title_click_x = x;
-  last_title_click_y = y;
+  last_title_click_x    = x;
+  last_title_click_y    = y;
   return 0;
 }
 
@@ -78,19 +77,18 @@ void handle_set_status(int owner_pid, int handle, const char *text) {
   }
   w->status[i] = 0;
   /* Only the strip changed, so damage just it rather than the whole frame. */
-  mark_dirty(w->x + BORDER_PX, w->y + TITLEBAR_PX + w->client_h,
-             outer_w(w) - 2 * BORDER_PX, w->status_h);
+  mark_dirty(
+      w->x + BORDER_PX, w->y + TITLEBAR_PX + w->client_h, outer_w(w) - 2 * BORDER_PX, w->status_h);
 }
 
-void send_create_resp(int target_pid, int handle, uint64_t va, uint32_t pitch,
-                      int w, int h) {
+void send_create_resp(int target_pid, int handle, uint64_t va, uint32_t pitch, int w, int h) {
   struct ipc_msg resp;
   memset(&resp, 0, sizeof(resp));
-  resp.type = IPC_WM_CREATE_RESP;
-  resp.a = handle;
-  resp.b = w;
-  resp.c = h;
-  resp.va = va;
+  resp.type  = IPC_WM_CREATE_RESP;
+  resp.a     = handle;
+  resp.b     = w;
+  resp.c     = h;
+  resp.va    = va;
   resp.pitch = pitch;
   ipc_send(target_pid, &resp);
 }
@@ -101,11 +99,10 @@ void pump_ipc(void) {
     int from = (int)m.from_pid;
     switch (m.type) {
     case IPC_WM_CREATE_REQ: {
-      uint64_t va = 0;
+      uint64_t va    = 0;
       uint32_t pitch = 0;
-      int handle = 0;
-      int rc =
-          handle_create(from, m.a, m.b, m.str, m.flags, &va, &pitch, &handle);
+      int handle     = 0;
+      int rc         = handle_create(from, m.a, m.b, m.str, m.flags, &va, &pitch, &handle);
       if (rc == 0) {
         send_create_resp(from, handle, va, pitch, m.a, m.b);
       } else {
@@ -156,12 +153,11 @@ void forward_input(int target_pid, int win_handle, const struct msg *m) {
 
   struct ipc_msg out;
   memset(&out, 0, sizeof(out));
-  out.type = IPC_WM_INPUT;
-  out.a = m->type;
+  out.type  = IPC_WM_INPUT;
+  out.a     = m->type;
   out.flags = (uint32_t)win_handle;
 
-  if (m->type == MSG_MOUSE_MOVE || m->type == MSG_MOUSE_DOWN ||
-      m->type == MSG_MOUSE_UP) {
+  if (m->type == MSG_MOUSE_MOVE || m->type == MSG_MOUSE_DOWN || m->type == MSG_MOUSE_UP) {
     int wx = 0, wy = 0, wcw = 0, wch = 0;
     int local_x = m->x;
     int local_y = m->y;
@@ -178,8 +174,8 @@ void forward_input(int target_pid, int win_handle, const struct msg *m) {
     /* Keyboard event: pass key parameters cleanly without transforming mouse
      * coords */
     out.b = m->param; /* Key code / ASCII value */
-    out.c = m->x; /* Pass auxiliary key details (e.g. key flags or scancodes) if
-                     set */
+    out.c = m->x;     /* Pass auxiliary key details (e.g. key flags or scancodes) if
+                         set */
     out.d = m->y;
   }
 
@@ -193,8 +189,7 @@ void request_window_close(int handle, u32 now) {
    * shell , so closing the last one is allowed. */
   struct console *c = con_for_handle(handle);
   if (c) {
-    printf("heimdall: close button -> console handle=%d tty=%d\n", handle,
-           c->tty);
+    printf("heimdall: close button -> console handle=%d tty=%d\n", handle, c->tty);
     console_close(c);
     return;
   }
@@ -207,10 +202,8 @@ void request_window_close(int handle, u32 now) {
    * owner had its chance to exit cleanly and did not take it, so take the
    * window away. Passing 0 for the pid check makes this unconditional ,
    * the owner is not the one asking. */
-  if (close_pending_handle == handle &&
-      now - close_pending_tick < CLOSE_ESCALATE_TICKS) {
-    printf("heimdall: close button -> force handle=%d owner=%d\n", handle,
-           w->owner_pid);
+  if (close_pending_handle == handle && now - close_pending_tick < CLOSE_ESCALATE_TICKS) {
+    printf("heimdall: close button -> force handle=%d owner=%d\n", handle, w->owner_pid);
     close_pending_handle = -1;
     handle_destroy_internal(handle, 0);
     return;
@@ -218,12 +211,12 @@ void request_window_close(int handle, u32 now) {
 
   printf("heimdall: close button -> request handle=%d\n", handle);
   close_pending_handle = handle;
-  close_pending_tick = now;
+  close_pending_tick   = now;
 
   struct ipc_msg out;
   memset(&out, 0, sizeof(out));
-  out.type = IPC_WM_INPUT;
-  out.a = WM_EV_QUIT;
+  out.type  = IPC_WM_INPUT;
+  out.a     = WM_EV_QUIT;
   out.flags = (uint32_t)handle;
   ipc_send(w->owner_pid, &out);
 }
@@ -279,15 +272,14 @@ void pump_input(void) {
         int dx = m.x - drag.grab_mx;
         int dy = m.y - drag.grab_my;
 
-        if (drag.kind == HIT_TITLEBAR &&
-            (dx < -DOUBLE_CLICK_SLOP || dx > DOUBLE_CLICK_SLOP ||
-             dy < -DOUBLE_CLICK_SLOP || dy > DOUBLE_CLICK_SLOP))
+        if (drag.kind == HIT_TITLEBAR && (dx < -DOUBLE_CLICK_SLOP || dx > DOUBLE_CLICK_SLOP ||
+                                          dy < -DOUBLE_CLICK_SLOP || dy > DOUBLE_CLICK_SLOP))
           reset_titlebar_click();
 
         int old_x, old_y, old_cw, old_ch;
         if (win_get_rect(drag.handle, &old_x, &old_y, &old_cw, &old_ch)) {
-          mark_dirty(old_x, old_y, outer_w_dims(old_cw),
-                     outer_h_dims(old_ch, status_h_of(drag.handle)));
+          mark_dirty(
+              old_x, old_y, outer_w_dims(old_cw), outer_h_dims(old_ch, status_h_of(drag.handle)));
         }
 
         if (drag.kind == HIT_TITLEBAR) {
@@ -308,8 +300,8 @@ void pump_input(void) {
 
         int new_x, new_y, new_cw, new_ch;
         if (win_get_rect(drag.handle, &new_x, &new_y, &new_cw, &new_ch)) {
-          mark_dirty(new_x, new_y, outer_w_dims(new_cw),
-                     outer_h_dims(new_ch, status_h_of(drag.handle)));
+          mark_dirty(
+              new_x, new_y, outer_w_dims(new_cw), outer_h_dims(new_ch, status_h_of(drag.handle)));
         }
 
         forward = 0;
@@ -320,20 +312,19 @@ void pump_input(void) {
      * Begin processing a left mouse click.
      */
     else if (m.type == MSG_MOUSE_DOWN && m.param == MOUSE_BTN_LEFT) {
-      int hit_handle = 0;
-      int kind = hit_test_at(m.x, m.y, &hit_handle);
+      int hit_handle            = 0;
+      int kind                  = hit_test_at(m.x, m.y, &hit_handle);
       int titlebar_double_click = 0;
       if (start_menu_open && kind != HIT_START_MENU && kind != HIT_START_BTN) {
-        start_menu_open = 0;
+        start_menu_open  = 0;
         start_menu_hover = -1;
-        int menu_h = start_menu_count * START_MENU_ITEM_H + START_MENU_PAD * 2;
+        int menu_h       = start_menu_count * START_MENU_ITEM_H + START_MENU_PAD * 2;
         mark_dirty(0, taskbar_y() - menu_h, START_MENU_W, menu_h);
         continue;
       }
 
       if (kind == HIT_TITLEBAR) {
-        titlebar_double_click =
-            titlebar_click_is_double(hit_handle, m.x, m.y, (u32)m.when);
+        titlebar_double_click = titlebar_click_is_double(hit_handle, m.x, m.y, (u32)m.when);
       } else {
         reset_titlebar_click();
       }
@@ -359,12 +350,10 @@ void pump_input(void) {
         /* Damage the rect the menu currently occupies before rebuilding: if
          * the rescan changes the entry count the old, taller rect still has
          * to be repainted or its bottom rows are left on screen. */
-        int old_menu_h =
-            start_menu_count * START_MENU_ITEM_H + START_MENU_PAD * 2;
-        mark_dirty(0, taskbar_y() - old_menu_h, START_MENU_W,
-                   old_menu_h + TASKBAR_PX);
+        int old_menu_h = start_menu_count * START_MENU_ITEM_H + START_MENU_PAD * 2;
+        mark_dirty(0, taskbar_y() - old_menu_h, START_MENU_W, old_menu_h + TASKBAR_PX);
 
-        start_menu_open = !start_menu_open;
+        start_menu_open  = !start_menu_open;
         start_menu_hover = -1;
 
         /* Rescan on open rather than per-frame: the directories can gain a
@@ -418,13 +407,11 @@ void pump_input(void) {
         int x, y, cw, ch;
 
         if (win_get_rect(prev_focus, &x, &y, &cw, &ch)) {
-          mark_dirty(x, y, outer_w_dims(cw),
-                     outer_h_dims(ch, status_h_of(prev_focus)));
+          mark_dirty(x, y, outer_w_dims(cw), outer_h_dims(ch, status_h_of(prev_focus)));
         }
 
         if (win_get_rect(hit_handle, &x, &y, &cw, &ch)) {
-          mark_dirty(x, y, outer_w_dims(cw),
-                     outer_h_dims(ch, status_h_of(hit_handle)));
+          mark_dirty(x, y, outer_w_dims(cw), outer_h_dims(ch, status_h_of(hit_handle)));
         }
 
         mark_dirty(0, taskbar_y(), fb_w, TASKBAR_PX);
@@ -435,7 +422,7 @@ void pump_input(void) {
       if (kind == HIT_START_MENU) {
         int menu_h = start_menu_count * START_MENU_ITEM_H + START_MENU_PAD * 2;
 
-        int menu_y = taskbar_y() - menu_h;
+        int menu_y     = taskbar_y() - menu_h;
         int relative_y = m.y - menu_y - START_MENU_PAD;
 
         int clicked_item = relative_y / START_MENU_ITEM_H;
@@ -444,7 +431,7 @@ void pump_input(void) {
           launch_program(start_menu_programs[clicked_item].path);
         }
 
-        start_menu_open = false;
+        start_menu_open  = false;
         start_menu_hover = -1;
 
         mark_dirty(0, menu_y, START_MENU_W, menu_h);
@@ -463,14 +450,14 @@ void pump_input(void) {
           focused_handle = hit_handle;
           z_bring_to_front(hit_handle);
 
-          mark_dirty(x, y, outer_w_dims(cw),
-                     outer_h_dims(ch, status_h_of(hit_handle)));
+          mark_dirty(x, y, outer_w_dims(cw), outer_h_dims(ch, status_h_of(hit_handle)));
 
           if (prev_focus != hit_handle) {
             int prev_x, prev_y, prev_cw, prev_ch;
-            if (win_get_rect(prev_focus, &prev_x, &prev_y, &prev_cw,
-                             &prev_ch)) {
-              mark_dirty(prev_x, prev_y, outer_w_dims(prev_cw),
+            if (win_get_rect(prev_focus, &prev_x, &prev_y, &prev_cw, &prev_ch)) {
+              mark_dirty(prev_x,
+                         prev_y,
+                         outer_w_dims(prev_cw),
                          outer_h_dims(prev_ch, status_h_of(prev_focus)));
             }
           }
@@ -484,13 +471,13 @@ void pump_input(void) {
             continue;
           }
 
-          drag.active = 1;
-          drag.kind = kind;
-          drag.handle = hit_handle;
+          drag.active  = 1;
+          drag.kind    = kind;
+          drag.handle  = hit_handle;
           drag.grab_mx = m.x;
           drag.grab_my = m.y;
-          drag.orig_x = x;
-          drag.orig_y = y;
+          drag.orig_x  = x;
+          drag.orig_y  = y;
           drag.orig_cw = cw;
           drag.orig_ch = ch;
         }
@@ -510,11 +497,9 @@ void pump_input(void) {
 
           int x, y, cw, ch;
           if (win_get_rect(hit_handle, &x, &y, &cw, &ch))
-            mark_dirty(x, y, outer_w_dims(cw),
-                       outer_h_dims(ch, status_h_of(hit_handle)));
+            mark_dirty(x, y, outer_w_dims(cw), outer_h_dims(ch, status_h_of(hit_handle)));
           if (win_get_rect(prev_focus, &x, &y, &cw, &ch))
-            mark_dirty(x, y, outer_w_dims(cw),
-                       outer_h_dims(ch, status_h_of(prev_focus)));
+            mark_dirty(x, y, outer_w_dims(cw), outer_h_dims(ch, status_h_of(prev_focus)));
           mark_dirty(0, taskbar_y(), fb_w, TASKBAR_PX);
         }
         forward = 0;
@@ -532,14 +517,11 @@ void pump_input(void) {
         int x, y, cw, ch;
 
         if (win_get_rect(hit_handle, &x, &y, &cw, &ch)) {
-          mark_dirty(x, y, outer_w_dims(cw),
-                     outer_h_dims(ch, status_h_of(hit_handle)));
+          mark_dirty(x, y, outer_w_dims(cw), outer_h_dims(ch, status_h_of(hit_handle)));
         }
 
-        if (prev_focus != hit_handle &&
-            win_get_rect(prev_focus, &x, &y, &cw, &ch)) {
-          mark_dirty(x, y, outer_w_dims(cw),
-                     outer_h_dims(ch, status_h_of(prev_focus)));
+        if (prev_focus != hit_handle && win_get_rect(prev_focus, &x, &y, &cw, &ch)) {
+          mark_dirty(x, y, outer_w_dims(cw), outer_h_dims(ch, status_h_of(prev_focus)));
         }
 
         mark_dirty(0, taskbar_y(), fb_w, TASKBAR_PX);
@@ -558,10 +540,8 @@ void pump_input(void) {
         int clicked_icon = -1;
 
         for (int i = 0; i < desktop_icon_count; i++) {
-          if (m.x >= desktop_icons[i].x &&
-              m.x < desktop_icons[i].x + desktop_icons[i].w &&
-              m.y >= desktop_icons[i].y &&
-              m.y < desktop_icons[i].y + desktop_icons[i].h) {
+          if (m.x >= desktop_icons[i].x && m.x < desktop_icons[i].x + desktop_icons[i].w &&
+              m.y >= desktop_icons[i].y && m.y < desktop_icons[i].y + desktop_icons[i].h) {
             clicked_icon = i;
             break;
           }
@@ -574,7 +554,9 @@ void pump_input(void) {
 
           printf("heimdall: tick=%u, last_icon=%d, "
                  "last_tick=%u\n",
-                 current_tick, last_icon_clicked, last_icon_click_tick);
+                 current_tick,
+                 last_icon_clicked,
+                 last_icon_click_tick);
 
           if (clicked_icon == last_icon_clicked &&
               current_tick - last_icon_click_tick < DOUBLE_CLICK_TICKS) {
@@ -583,10 +565,10 @@ void pump_input(void) {
             /*
              * Prevent a triple-click from launching twice.
              */
-            last_icon_clicked = -1;
+            last_icon_clicked    = -1;
             last_icon_click_tick = 0;
           } else {
-            last_icon_clicked = clicked_icon;
+            last_icon_clicked    = clicked_icon;
             last_icon_click_tick = current_tick;
           }
         } else {
@@ -594,7 +576,7 @@ void pump_input(void) {
            * Clicking elsewhere invalidates the pending
            * desktop-icon double-click.
            */
-          last_icon_clicked = -1;
+          last_icon_clicked    = -1;
           last_icon_click_tick = 0;
         }
 
@@ -607,8 +589,7 @@ void pump_input(void) {
         int x, y, cw, ch;
 
         if (win_get_rect(prev_focus, &x, &y, &cw, &ch)) {
-          mark_dirty(x, y, outer_w_dims(cw),
-                     outer_h_dims(ch, status_h_of(prev_focus)));
+          mark_dirty(x, y, outer_w_dims(cw), outer_h_dims(ch, status_h_of(prev_focus)));
         }
 
         mark_dirty(0, taskbar_y(), fb_w, TASKBAR_PX);
@@ -631,9 +612,9 @@ void pump_input(void) {
 
       // Escape closes the start menu
       if (m.param == KEY_ESC && start_menu_open) {
-        start_menu_open = 0;
+        start_menu_open  = 0;
         start_menu_hover = -1;
-        int menu_h = start_menu_count * START_MENU_ITEM_H + START_MENU_PAD * 2;
+        int menu_h       = start_menu_count * START_MENU_ITEM_H + START_MENU_PAD * 2;
         mark_dirty(0, taskbar_y() - menu_h, START_MENU_W, menu_h);
         forward = 0; // Consume the event
         continue;
@@ -732,14 +713,13 @@ int main(int argc, char **argv) {
   if (!fb_hw)
     return 3;
 
-  fb_w = (int)info.width;
-  fb_h = (int)info.height;
-  fb_stride = (int)(info.pitch / 4);
-  fb_bytes = info.pitch * info.height;
+  fb_w            = (int)info.width;
+  fb_h            = (int)info.height;
+  fb_stride       = (int)(info.pitch / 4);
+  fb_bytes        = info.pitch * info.height;
   fb_mapped_bytes = fb_bytes;
   update_client_size_limits();
-  printf("heimdall: fb %dx%d pitch=%d bytes=%d\n", fb_w, fb_h, fb_stride * 4,
-         (int)fb_bytes);
+  printf("heimdall: fb %dx%d pitch=%d bytes=%d\n", fb_w, fb_h, fb_stride * 4, (int)fb_bytes);
 
   if (backbuffer_reserve(fb_bytes) != 0) {
     printf("heimdall: back buffer alloc failed\n");
@@ -766,16 +746,18 @@ int main(int argc, char **argv) {
    * kill; the kernel only runs a shell of its own when no WM registers. */
   struct console *boot_con = console_open();
   if (boot_con)
-    printf("heimdall: console tty=%d surface=%p w=%d h=%d\n", boot_con->tty,
-           (void *)boot_con->win.surface, boot_con->win.client_w,
+    printf("heimdall: console tty=%d surface=%p w=%d h=%d\n",
+           boot_con->tty,
+           (void *)boot_con->win.surface,
+           boot_con->win.client_w,
            boot_con->win.client_h);
   else
     printf("heimdall: boot console failed to open\n");
   present_full_desktop();
   printf("heimdall: ready\n");
 
-  int self_pid = (int)get_pid();
-  int tick = 0;
+  int self_pid    = (int)get_pid();
+  int tick        = 0;
   int32_t last_cx = 0, last_cy = 0;
   int have_last = 0;
 
@@ -784,7 +766,7 @@ int main(int argc, char **argv) {
       /* Another process may replace the kernel's single display registration
        * while it owns the framebuffer. Re-establish ours on return. */
       fb_registered = 0;
-      have_last = 0;
+      have_last     = 0;
       sleep_ticks(1);
       continue;
     }
@@ -802,10 +784,9 @@ int main(int argc, char **argv) {
        * as the reaper: a host resize is a rare manual event, so a short delay
        * in noticing costs nothing. */
       if ((tick & 63) == 0) {
-        if (fb_info(&cur) == 0 &&
-            ((int)cur.width != fb_w || (int)cur.height != fb_h ||
-             (int)(cur.pitch / 4) != fb_stride)) {
-          size_t new_bytes = cur.pitch * cur.height;
+        if (fb_info(&cur) == 0 && ((int)cur.width != fb_w || (int)cur.height != fb_h ||
+                                   (int)(cur.pitch / 4) != fb_stride)) {
+          size_t new_bytes    = cur.pitch * cur.height;
           uint32_t *new_fb_hw = fb_hw;
 
           /* The physical pool is stable. Only growing beyond the prefix this
@@ -817,11 +798,11 @@ int main(int argc, char **argv) {
           }
 
           if (new_fb_hw && backbuffer_reserve(new_bytes) == 0) {
-            fb_hw = new_fb_hw;
-            fb_w = (int)cur.width;
-            fb_h = (int)cur.height;
+            fb_hw     = new_fb_hw;
+            fb_w      = (int)cur.width;
+            fb_h      = (int)cur.height;
             fb_stride = (int)(cur.pitch / 4);
-            fb_bytes = new_bytes;
+            fb_bytes  = new_bytes;
             update_client_size_limits();
             if (backbuffer_register() != 0)
               printf("heimdall: resized back buffer registration failed\n");
@@ -897,9 +878,8 @@ int main(int argc, char **argv) {
       int gx, gy, gw, gh;
       compute_ghost((int)mx, (int)my, &gx, &gy, &gw, &gh);
 
-      int ghost_changed = !drag.have_ghost || gx != drag.last_gx ||
-                          gy != drag.last_gy || gw != drag.last_gw ||
-                          gh != drag.last_gh;
+      int ghost_changed = !drag.have_ghost || gx != drag.last_gx || gy != drag.last_gy ||
+                          gw != drag.last_gw || gh != drag.last_gh;
 
       /* Cursor repair can restore pixels over the outline, so redraw on motion.
        */
@@ -915,18 +895,18 @@ int main(int argc, char **argv) {
 
       if (repaint_ghost) {
         draw_ghost(gx, gy, gw, gh);
-        drag.last_gx = gx;
-        drag.last_gy = gy;
-        drag.last_gw = gw;
-        drag.last_gh = gh;
+        drag.last_gx    = gx;
+        drag.last_gy    = gy;
+        drag.last_gw    = gw;
+        drag.last_gh    = gh;
         drag.have_ghost = 1;
       }
 
       if (cursor_refresh)
         draw_cursor(mx, my);
 
-      last_cx = mx;
-      last_cy = my;
+      last_cx   = mx;
+      last_cy   = my;
       have_last = 1;
       yield();
       continue;
@@ -948,13 +928,12 @@ int main(int argc, char **argv) {
     int cursor_moved = have_last && (mx != last_cx || my != last_cy);
     struct fb_rect cursor_repairs[1];
     uint32_t cursor_repair_count = 0;
-    if (cursor_moved &&
-        cursor_rect(last_cx, last_cy, cursor_scale(), &cursor_repairs[0]))
+    if (cursor_moved && cursor_rect(last_cx, last_cy, cursor_scale(), &cursor_repairs[0]))
       cursor_repair_count = 1;
     if (!have_last || recompose || cursor_moved)
       draw_cursor_with_repairs(mx, my, cursor_repairs, cursor_repair_count);
-    last_cx = mx;
-    last_cy = my;
+    last_cx   = mx;
+    last_cy   = my;
     have_last = 1;
 
     yield();

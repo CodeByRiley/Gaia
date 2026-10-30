@@ -17,14 +17,14 @@ struct Char {
 };
 
 struct Char *buffer = (struct Char *)(HHDM_BASE + 0xb8000ULL);
-usize col = 0;
-usize row = 0;
-u8 color = PRINT_COLOR_WHITE | PRINT_COLOR_BLACK << 4;
+usize col           = 0;
+usize row           = 0;
+u8 color            = PRINT_COLOR_WHITE | PRINT_COLOR_BLACK << 4;
 
 void clear_row(usize row) {
   struct Char empty = (struct Char){
-    .character =  ' ',
-    .color =  color,
+      .character = ' ',
+      .color     = color,
   };
 
   for (usize col = 0; col < NUM_COLS; col++) {
@@ -48,7 +48,7 @@ void print_newline() {
 
   for (usize row = 1; row < NUM_ROWS; row++) {
     for (usize col = 0; col < NUM_COLS; col++) {
-      struct Char character = buffer[col + NUM_COLS * row];
+      struct Char character              = buffer[col + NUM_COLS * row];
       buffer[col + NUM_COLS * (row - 1)] = character;
     }
   }
@@ -67,8 +67,8 @@ void print_write_char(char character) {
   }
 
   buffer[col + NUM_COLS * row] = (struct Char){
-    .character =  (u8)character,
-    .color =  color,
+      .character = (u8)character,
+      .color     = color,
   };
 
   col++;
@@ -87,17 +87,17 @@ void print_write_str(const char *str) {
 }
 
 static void u64_to_hex(char *out, u64 value) {
-    static const char digits[] = "0123456789ABCDEF";
+  static const char digits[] = "0123456789ABCDEF";
 
-    out[0] = '0';
-    out[1] = 'x';
+  out[0] = '0';
+  out[1] = 'x';
 
-    for (int i = 0; i < 16; i++) {
-        int shift = 60 - (i * 4);
-        out[2 + i] = digits[(value >> shift) & 0xF];
-    }
+  for (int i = 0; i < 16; i++) {
+    int shift  = 60 - (i * 4);
+    out[2 + i] = digits[(value >> shift) & 0xF];
+  }
 
-    out[18] = '\0';
+  out[18] = '\0';
 }
 
 void print_write_hex(u64 hex) {
@@ -106,6 +106,4 @@ void print_write_hex(u64 hex) {
   print_write_str(hex_str);
 }
 
-void print_set_color(u8 foreground, u8 background) {
-  color = foreground + (background << 4);
-}
+void print_set_color(u8 foreground, u8 background) { color = foreground + (background << 4); }

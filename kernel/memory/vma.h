@@ -2,19 +2,19 @@
 #ifndef VMA_H
 #define VMA_H
 
-#include <utilities/types.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <utilities/types.h>
 
 /* Dynamic kernel VA arena. */
 #define VMA_KERNEL_START 0xFFFFFFFFC0000000ULL
 
 typedef struct vma_node {
-    u64 virt_addr;
-    usize size;
-    u32 ref_count;
-    u64 last_used;
-    struct vma_node *next;
+  u64 virt_addr;
+  usize size;
+  u32 ref_count;
+  u64 last_used;
+  struct vma_node *next;
 } vma_node_t;
 
 void vma_init(void);

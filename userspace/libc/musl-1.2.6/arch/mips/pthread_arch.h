@@ -1,12 +1,11 @@
-static inline uintptr_t __get_tp()
-{
-	register uintptr_t tp __asm__("$3");
+static inline uintptr_t __get_tp() {
+  register uintptr_t tp __asm__("$3");
 #if __mips_isa_rev < 2
-	__asm__ (".word 0x7c03e83b" : "=r" (tp) );
+  __asm__(".word 0x7c03e83b" : "=r"(tp));
 #else
-	__asm__ ("rdhwr %0, $29" : "=r" (tp) );
+  __asm__("rdhwr %0, $29" : "=r"(tp));
 #endif
-	return tp;
+  return tp;
 }
 
 #define TLS_ABOVE_TP

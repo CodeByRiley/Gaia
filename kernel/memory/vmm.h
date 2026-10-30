@@ -10,8 +10,8 @@
 #ifndef VMM_H
 #define VMM_H
 
-#include <utilities/types.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 /* Page table entry (all four levels share this layout) */
 //
@@ -33,42 +33,41 @@
 // Access and Dirty are CPU-written, so a PTE read back may differ from what
 // was stored. Preserve them on read-modify-write rather than rebuilding an
 // entry from flags alone.
-#define VMM_PRESENT  (1ULL << 0)
-#define VMM_WRITE    (1ULL << 1)
-#define VMM_USER     (1ULL << 2)
-#define VMM_PWT      (1ULL << 3)
-#define VMM_PCD      (1ULL << 4)
+#define VMM_PRESENT (1ULL << 0)
+#define VMM_WRITE (1ULL << 1)
+#define VMM_USER (1ULL << 2)
+#define VMM_PWT (1ULL << 3)
+#define VMM_PCD (1ULL << 4)
 #define VMM_ACCESSED (1ULL << 5)
-#define VMM_DIRTY    (1ULL << 6)
-#define VMM_PS       (1ULL << 7)
-#define VMM_GLOBAL   (1ULL << 8)
+#define VMM_DIRTY (1ULL << 6)
+#define VMM_PS (1ULL << 7)
+#define VMM_GLOBAL (1ULL << 8)
 /* Bit 9 is one of the three software-available bits. It marks a non-owning
  * mapping, including shmem receivers and userspace framebuffer mappings.
  * Teardown removes the PTE but must not return the frame to the PMM. */
-#define VMM_SHARED   (1ULL << 9)
-#define VMM_NX       (1ULL << 63)
+#define VMM_SHARED (1ULL << 9)
+#define VMM_NX (1ULL << 63)
 
 /* Frame address occupies bits 51-12; everything else is flags. */
 #define VMM_ADDR_MASK 0x000FFFFFFFFFF000ULL
 
-void     vmm_init(void);
+void vmm_init(void);
 
 /* Operate on the boot kernel_pml4. */
-int      vmm_map(u64 virt, u64 phys, u64 flags);
-int      vmm_unmap(u64 virt);
-u64 vmm_translate(u64 virt);   /* returns 0 if unmapped */
+int vmm_map(u64 virt, u64 phys, u64 flags);
+int vmm_unmap(u64 virt);
+u64 vmm_translate(u64 virt); /* returns 0 if unmapped */
 
 /* Per-PML4 variants. Operate on the supplied PML4 as an HHDM pointer;
  * physical addresses remain physical in the entries themselves.
  * The non-_in versions are wrappers that pass kernel_pml4. */
-int      vmm_map_in(u64 *pml4, u64 virt, u64 phys, u64 flags);
-int      vmm_unmap_in(u64 *pml4, u64 virt);
+int vmm_map_in(u64 *pml4, u64 virt, u64 phys, u64 flags);
+int vmm_unmap_in(u64 *pml4, u64 virt);
 u64 vmm_translate_in(u64 *pml4, u64 virt);
 
 /* Change permissions on an already-mapped page, keeping its frame and its
  * VMM_SHARED ownership bit. Returns -1 if the page is not mapped. */
-int      vmm_protect_in(u64 *pml4, u64 virt, u64 flags);
-
+int vmm_protect_in(u64 *pml4, u64 virt, u64 flags);
 
 /* Raw leaf PTE (frame + flags), or 0 if unmapped. Callers mask with
  * ~0xFFF for the frame and test VMM_* for the flags. */

@@ -9,13 +9,13 @@
 #ifndef PMM_H
 #define PMM_H
 
-#include <utilities/types.h>
 #include <stdint.h>
+#include <utilities/types.h>
 
 #define FRAME_SIZE 4096ULL
 
 /* Parse the MB2 memory map and build the bitmap. */
-void     pmm_init(u64 mb2_addr);
+void pmm_init(u64 mb2_addr);
 
 /* Allocate a frame, returning its physical base. 0 on out-of-memory. */
 u64 pmm_alloc_frame(void);
@@ -26,10 +26,10 @@ u64 pmm_alloc_frame_below(u64 limit);
 /* Use for explicit low-memory/contiguous constraints such as ISA DMA. */
 u64 pmm_alloc_contiguous_below(u64 limit, u64 num_frames);
 
-void     pmm_free_frame(u64 frame);
+void pmm_free_frame(u64 frame);
 
 /* Release a run obtained from pmm_alloc_contiguous_below. */
-void     pmm_free_contiguous(u64 frame, u64 num_frames);
+void pmm_free_contiguous(u64 frame, u64 num_frames);
 
 /* Counters for diagnostics. */
 u64 pmm_total_frames(void);

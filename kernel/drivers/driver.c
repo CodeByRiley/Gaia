@@ -3,9 +3,9 @@
 #include <devices/pit.h>
 #include <drivers/driver.h>
 #include <sched/sched.h>
-#include <sync/waitqueue.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sync/waitqueue.h>
 #include <utilities/log.h>
 
 #define DRIVER_MAX_DRIVERS 16
@@ -65,9 +65,9 @@ static void driver_poll_thread(void) {
     }
     busy = 0;
 
-    u32 freq = pit_get_freq();
+    u32 freq       = pit_get_freq();
     u64 idle_ticks = ((u64)DRIVER_IDLE_MS * (freq ? freq : 100) + 999) / 1000;
-    u64 flags = irq_save();
+    u64 flags      = irq_save();
     if (!poll_kicked)
       wq_wait(&poll_wq, pit_ticks() + (idle_ticks ? idle_ticks : 1));
     poll_kicked = 0;
@@ -125,22 +125,21 @@ static int bind_device(struct device *device) {
 }
 
 static int unbind_device(struct device *device) {
-	if (!device->driver)
-		return 1; // shit doesn't exist
+  if (!device->driver)
+    return 1; // shit doesn't exist
 
-	for (u32 i = 0; i < driver_count; i++) {
-		const struct driver *drvr = drivers[i];
+  for (u32 i = 0; i < driver_count; i++) {
+    const struct driver *drvr = drivers[i];
+  }
 
-	}
-
-	return 0;
+  return 0;
 }
 
 void driver_core_init(void) {
-  driver_count = 0;
-  device_count = 0;
+  driver_count       = 0;
+  device_count       = 0;
   pci_devices_probed = 0;
-  poll_task_started = 0;
+  poll_task_started  = 0;
 }
 
 int driver_register(const struct driver *driver) {
@@ -169,13 +168,13 @@ int driver_register_isa_device(u16 io_base, u8 irq) {
     return -1;
   log_write("DRIVER: registering device", KERNEL, LOG_INFO);
 
-  struct device *device = &devices[device_count];
-  device->bus = DEVICE_BUS_ISA;
-  device->enabled = 0;
-  device->driver = 0;
-  device->driver_data = 0;
+  struct device *device        = &devices[device_count];
+  device->bus                  = DEVICE_BUS_ISA;
+  device->enabled              = 0;
+  device->driver               = 0;
+  device->driver_data          = 0;
   device->bus_info.isa.io_base = io_base;
-  device->bus_info.isa.irq = irq;
+  device->bus_info.isa.irq     = irq;
 
   device_count++;
   log_write_hex("DRIVER: device registered ", device_count, KERNEL, LOG_INFO);
@@ -192,7 +191,7 @@ int driver_probe_pci_devices(void) {
   if (pci_devices_probed)
     return 0;
   pci_devices_probed = 1;
-  u32 imported = 0;
+  u32 imported       = 0;
 
   for (u32 i = 0; i < count; i++) {
     if (device_count >= DRIVER_MAX_DEVICES) {
@@ -204,9 +203,9 @@ int driver_probe_pci_devices(void) {
     if (!pci_device_at(i, &device->bus_info.pci))
       continue;
 
-    device->bus = DEVICE_BUS_PCI;
-    device->enabled = 0;
-    device->driver = 0;
+    device->bus         = DEVICE_BUS_PCI;
+    device->enabled     = 0;
+    device->driver      = 0;
     device->driver_data = 0;
 
     device_count++;
@@ -237,13 +236,13 @@ int driver_snapshot(struct driver_snap *out, int max) {
       continue;
 
     struct driver_snap *s = &out[n];
-    s->bus = (int)drv->bus;
-    s->poll = drv->poll ? 1 : 0;
-    s->bound_devices = 0;
-    s->enabled = 0;
+    s->bus                = (int)drv->bus;
+    s->poll               = drv->poll ? 1 : 0;
+    s->bound_devices      = 0;
+    s->enabled            = 0;
 
     const char *name = drv->name ? drv->name : "unnamed";
-    usize k = 0;
+    usize k          = 0;
     while (k + 1 < DRIVER_SNAP_NAME_MAX && name[k]) {
       s->name[k] = name[k];
       k++;

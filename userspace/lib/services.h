@@ -5,10 +5,10 @@
 /* Platform-neutral service contract: negative Gaia errors, owned descriptors,
  * page-rounded anonymous mappings, and monotonic nanoseconds. No TLS/errno. */
 enum gaia_file_flags {
-  GAIA_READ = 1,
-  GAIA_WRITE = 2,
-  GAIA_CREATE = 4,
-  GAIA_TRUNCATE = 8,
+  GAIA_READ      = 1,
+  GAIA_WRITE     = 2,
+  GAIA_CREATE    = 4,
+  GAIA_TRUNCATE  = 8,
   GAIA_EXCLUSIVE = 16
 };
 int64_t gaia_open(const char *, unsigned);
@@ -27,6 +27,5 @@ int64_t gaia_yield(void);
 int64_t gaia_thread_create(uintptr_t, void *, void *);
 int64_t gaia_thread_join(int64_t);
 int64_t gaia_terminate(int64_t);
-int64_t gaia_call(int64_t, int64_t, int64_t, int64_t, int64_t, int64_t,
-                  int64_t);
+int64_t gaia_call(int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
 #endif

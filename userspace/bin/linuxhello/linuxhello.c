@@ -17,8 +17,7 @@ int main(void) {
   if (read(fd, text, 5) != 5 || strcmp(text, "Linux"))
     return 3;
   close(fd);
-  char *p = mmap(NULL, 8192, PROT_READ | PROT_WRITE,
-                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  char *p = mmap(NULL, 8192, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (p == MAP_FAILED)
     return 4;
   p[4096] = 42;

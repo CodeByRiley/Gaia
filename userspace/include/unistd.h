@@ -7,17 +7,17 @@
 #ifndef UNISTD_H
 #define UNISTD_H
 
-#include <stddef.h>
 #include <lib/syscall.h>
+#include <stddef.h>
 
 /* TTY detection , currently always returns 0 (no isatty support). */
-int    isatty(int fd);
+int isatty(int fd);
 
 /* Busy-wait sleeps against the tick counter. */
 unsigned int sleep(unsigned int seconds);
-int    usleep(unsigned int us);
+int usleep(unsigned int us);
 
-#define STDIN_FILENO  0
+#define STDIN_FILENO 0
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 

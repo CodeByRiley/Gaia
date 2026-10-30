@@ -5,10 +5,10 @@
 #define FDOP_FCHDIR 5
 
 struct fdop {
-	struct fdop *next, *prev;
-	int cmd, fd, srcfd, oflag;
-	mode_t mode;
-	char path[];
+  struct fdop *next, *prev;
+  int cmd, fd, srcfd, oflag;
+  mode_t mode;
+  char path[];
 };
 
 #define malloc __libc_malloc
