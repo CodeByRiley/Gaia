@@ -153,6 +153,7 @@ map_target() {
         userspace/bin/tree/tree.elf)         echo "system/bin/tree.elf" ;;
         userspace/bin/holyd.elf)             echo "system/bin/holyd.elf" ;;
         userspace/bin/cat/cat.elf)           echo "system/bin/cat.elf" ;;
+        userspace/bin/chmod/chmod.elf)       echo "system/bin/chmod.elf" ;;
         userspace/bin/sh/sh.elf)             echo "system/bin/sh.elf" ;;
         userspace/bin/ls/ls.elf)             echo "system/bin/ls.elf" ;;
         build/userspace/pe/shims/*.dll)      echo "system/win32/${1##*/}" ;;

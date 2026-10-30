@@ -26,3 +26,4 @@ configure text eol=lf
 *.ttf binary
 *.pcap binary
 rootfs/system/libexec/gcc/** filter=lfs diff=lfs merge=lfs -text
+rootfs/system/lib/libstdc++.a filter=lfs diff=lfs merge=lfs -text
