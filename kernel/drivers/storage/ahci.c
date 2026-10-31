@@ -1,3 +1,5 @@
+#include "devices/pit.h"
+#include "drivers/storage/discovery.h"
 #include "memory/heap.h"
 #include "memory/vma.h"
 #include <drivers/driver.h>
@@ -24,6 +26,7 @@
  * scheduler exists, so there is no sleep to yield to, and an unbounded loop
  * on a register the HBA never updates wedges the boot. */
 #define AHCI_SPIN_LIMIT 5000000u
+#define AHCI_POLL_THROTTLE 250u
 
 extern u64 *kernel_pml4;
 
@@ -325,6 +328,56 @@ static int ahci_init_port(struct AHCI_DEVICE_DATA *dev, int port) {
   return 0;
 }
 
+static int ahci_port_changed(struct AHCI_DEVICE_DATA *controller, int port) {
+  struct AHCI_PORT *p = &controller->ports[port];
+  volatile void *base = ahci_port_base(controller->abar_virtual, port);
+
+  u32 ssts = ahci_read32(base, AHCI_PORT_PxSSTS);
+
+  int connected = (ssts & AHCI_PxSSTS_DET_MASK) == AHCI_PxSSTS_DET_PRESENT;
+
+  // Establish initial state without treating existing drives as hot-plugged.
+  if (!p->hotplug_initialized) {
+    p->was_connected       = connected;
+    p->hotplug_initialized = 1;
+    return 0;
+  }
+
+  // No physical connection change.
+  if (connected == p->was_connected)
+    return 0;
+
+  p->was_connected = connected;
+
+  if (connected) {
+    log_write_hex("AHCI: New device on port =", port, KERNEL, LOG_INFO);
+
+    if (!p->is_active) {
+      if (ahci_init_port(controller, port) != 0) {
+        log_write_hex("AHCI: Failed to initialize port", port, KERNEL, LOG_ERROR);
+        return 0;
+      }
+
+      // Only publish SATA disks, not ATAPI CD-ROMs.
+      if (p->signature == AHCI_SIG_SATA) {
+        if (storage_publish_ahci_port(controller, port) != 0) {
+          log_write_hex("AHCI: Failed to publish disk", port, KERNEL, LOG_WARN);
+          return 0;
+        }
+      }
+
+      return 1;
+    }
+  } else {
+    log_write_hex("AHCI: Device removed from port =", port, KERNEL, LOG_WARN);
+
+    // Removal isn't supported yet.
+    return 1;
+  }
+
+  return 0;
+}
+
 static int ahci_probe(struct device *dev) {
   struct pci_device *pci = &dev->bus_info.pci;
   log_write_string("AHCI: Found controller", "AHCI", KERNEL, LOG_INFO);
@@ -401,10 +454,33 @@ static int ahci_probe(struct device *dev) {
   return 0; // Success!
 }
 
+static int ahci_poll(struct device *dev) {
+  struct AHCI_DEVICE_DATA *ctrl = dev->driver_data;
+  if (!ctrl)
+    return 0;
+
+  u64 now      = pit_ticks();
+  u64 interval = ((u64)AHCI_POLL_THROTTLE * pit_get_freq() + 999) / 1000;
+  if ((u64)(now - ctrl->last_poll_tick) < interval)
+    return 0;
+
+  ctrl->last_poll_tick = now;
+
+  int changed = 0;
+
+  for (int p = 0; p < AHCI_MAX_PORTS; p++) {
+    if (!(ctrl->ports_implemented & (1u << p)))
+      continue;
+
+    changed |= ahci_port_changed(ctrl, p);
+  }
+  return changed;
+}
+
 const struct driver ahci_driver = {
     .name  = "AHCI SATA Controller",
     .bus   = DEVICE_BUS_PCI,
     .match = ahci_match,
     .probe = ahci_probe,
-    .poll  = 0,
+    .poll  = ahci_poll,
 };

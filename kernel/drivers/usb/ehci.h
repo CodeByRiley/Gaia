@@ -227,5 +227,6 @@ _Static_assert(sizeof(struct ehci_qh) == 64, "QH padded layout");
 
 struct pci_device;
 int ehci_init(struct pci_device *dev);
+int ehci_poll(void);
 
 #endif /* EHCI_H */

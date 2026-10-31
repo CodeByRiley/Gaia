@@ -153,11 +153,23 @@ static void ext2_unmount_image(struct vfs_superblock *super) {
   kfree(fs);
 }
 
+/* The superblock counters are kept current by every allocation, and the
+ * superblock is resident for the life of the mount. */
+static int ext2_statfs(struct vfs_superblock *super, u64 *total, u64 *free) {
+  struct ext2_fs *fs = super->private_data;
+  if (!fs || !fs->superblock)
+    return -1;
+  *total = (u64)fs->superblock->blocks_count * fs->block_size;
+  *free  = (u64)fs->superblock->free_blocks_count * fs->block_size;
+  return 0;
+}
+
 const struct vfs_filesystem ext2_filesystem = {
     .name    = "ext2",
     .probe   = ext2_probe_image,
     .mount   = ext2_mount_image,
     .attach  = ext2_mount_block,
     .sync    = ext2_sync_super,
+    .statfs  = ext2_statfs,
     .unmount = ext2_unmount_image,
 };

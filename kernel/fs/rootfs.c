@@ -43,6 +43,7 @@
  * Implementation of the mount contracts themselves lives with each backend;
  * see kernel/fs/README.md.
  */
+#include "drivers/storage/discovery.h"
 #include <boot/multiboot2.h>
 #include <drivers/storage/ahci.h>
 #include <drivers/storage/ahci_block.h>
@@ -75,7 +76,7 @@ static int mount_any_fs(const char *path, const struct block_device *device, con
  * than a stack record handed to a filesystem and then dropped. Indexed by port
  * so a published name says which port it came from; a zero controller marks a
  * slot that never opened. */
-static struct ahci_block_device ahci_disks[AHCI_MAX_PORTS];
+// static struct ahci_block_device ahci_disks[AHCI_MAX_PORTS];
 
 static void name_with_unit(char *out, const char *prefix, unsigned unit) {
   usize at = 0;
@@ -109,23 +110,15 @@ static void publish_disk(const struct block_device *device, const char *name, u3
 static void publish_ahci(void) {
   if (!g_ahci_dev)
     return;
-  for (int port = 0; port < AHCI_MAX_PORTS; port++) {
-    if (ahci_block_open(&ahci_disks[port], g_ahci_dev, port) != 0)
-      continue;
-    char name[BLOCKDEV_NAME_MAX];
-    name_with_unit(name, "ahci", (unsigned)port);
-    publish_disk(&ahci_disks[port].device, name, 0);
-  }
+
+  for (int port = 0; port < AHCI_MAX_PORTS; port++)
+    storage_publish_ahci_port(g_ahci_dev, port);
 }
 
 static void publish_usb(void) {
-  for (usize i = 0; i < usb_storage_count(); i++) {
-    char name[BLOCKDEV_NAME_MAX];
-    name_with_unit(name, "usb", (unsigned)i);
-    publish_disk(usb_storage_device(i), name, BLOCKDEV_REMOVABLE);
-  }
+  for (usize i = 0; i < usb_storage_count(); i++)
+    storage_publish_usb(i);
 }
-
 /* Directories rather than files, because these are what every root has and
  * no ESP does, and because create_disk.sh makes them whether or not anything
  * is installed into them. Any one of them is enough: a root built by hand

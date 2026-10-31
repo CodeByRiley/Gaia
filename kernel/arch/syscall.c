@@ -2624,6 +2624,45 @@ static long sys_blockdev_list(struct blockdev_info *out, long max) {
   return written;
 }
 
+static void copy_bounded(char *out, usize cap, const char *in) {
+  usize i = 0;
+  while (in && in[i] && i + 1 < cap) {
+    out[i] = in[i];
+    i++;
+  }
+  out[i] = 0;
+}
+
+/* Fill `out` with up to `max` live mounts and return how many were written.
+ * Built on the stack and copied out per entry, so the VFS gate is never held
+ * across a touch of user memory. */
+static long sys_mount_list(struct mount_info *out, long max) {
+  if (max <= 0)
+    return -EINVAL;
+  if (max > VFS_MAX_MOUNTS)
+    max = VFS_MAX_MOUNTS;
+  if (!user_buffer_ok(out, (u64)max * sizeof(*out), 1))
+    return -EFAULT;
+
+  long written = 0;
+  for (usize slot = 0; slot < VFS_MAX_MOUNTS && written < max; slot++) {
+    struct vfs_mount_info info;
+    if (vfs_mount_describe(slot, &info) != 0)
+      continue;
+
+    struct mount_info row;
+    memset(&row, 0, sizeof(row));
+    row.total_bytes = info.total_bytes;
+    row.free_bytes  = info.free_bytes;
+    copy_bounded(row.target, sizeof(row.target), info.path);
+    copy_bounded(row.fstype, sizeof(row.fstype), info.filesystem);
+    if (blockdev_name_of(info.device_context, row.source) != 0)
+      row.source[0] = 0;
+    memcpy(&out[written++], &row, sizeof(row));
+  }
+  return written;
+}
+
 /* Raw maintenance I/O is deliberately synchronous and bounded.  A writer
  * cannot alter a volume whose filesystem cache is currently mounted. */
 #define RAW_BLOCK_MAX_SECTORS 64u
@@ -3869,6 +3908,9 @@ long syscall_dispatch(struct syscall_frame *f) {
     break;
   case SYS_FS_SYNC:
     ret = vfs_sync_all();
+    break;
+  case SYS_MOUNT_LIST:
+    ret = sys_mount_list((struct mount_info *)(uintptr_t)a1, (long)a2);
     break;
   case SYS_MKDIR:
     ret = sys_mkdirat(AT_FDCWD, (const char *)(uintptr_t)a1, (u32)a2);

@@ -1,4 +1,5 @@
 /* kernel/drivers/driver.c - minimal device/driver registry. */
+#include "drivers/usb/ehci.h"
 #include <arch/irq.h>
 #include <devices/pit.h>
 #include <drivers/driver.h>
@@ -48,14 +49,19 @@ void driver_poll_kick(void) {
  * something yields rather than sleeps. */
 static void driver_poll_thread(void) {
   int busy = 0;
+
   for (;;) {
     int worked = 0;
 
+    // Check USB controller ports for hot-plug events.
+    worked |= ehci_poll();
+
+    // Poll registered drivers.
     for (u32 i = 0; i < device_count; i++) {
       struct device *device = &devices[i];
-      if (device->driver && device->driver->poll) {
+
+      if (device->driver && device->driver->poll)
         worked |= device->driver->poll(device);
-      }
     }
 
     if (worked && busy < 8) {

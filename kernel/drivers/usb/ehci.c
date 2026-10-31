@@ -5,6 +5,7 @@
  * requests use the asynchronous schedule; one HID pointer interrupt-IN
  * endpoint per controller can use the periodic schedule.
  */
+#include "drivers/storage/discovery.h"
 #include <devices/pit.h>
 #include <devices/usb.h>
 #include <drivers/usb/ehci.h>
@@ -81,6 +82,7 @@ struct ehci_hcd {
   u8 ports;
   u8 port_power_control;
   u8 next_addr;
+  u64 last_poll_tick;
   u64 periodic_phys;
   u32 *periodic;
   u64 arena_phys;
@@ -673,8 +675,15 @@ static void ehci_enumerate_port(struct ehci_hcd *hc, int port) {
       .control = ehci_storage_control,
       .bulk    = ehci_storage_bulk,
   };
-  if (usb_storage_probe(&transport, ehci_config_buf, config_length) == 0)
+  if (usb_storage_probe(&transport, ehci_config_buf, config_length) == 0) {
     log_write("USB storage: SCSI/BOT disk ready", KERNEL, LOG_INFO);
+
+    size_t index = usb_storage_count() - 1;
+
+    if (storage_publish_usb(index) != 0) {
+      log_write("USB storage: Failed to publish disk", KERNEL, LOG_WARN);
+    }
+  }
   if (!have_pointer)
     return;
   if (usb_hid_set_idle(&pipe, pointer.interface_number) < 0)
@@ -700,6 +709,65 @@ static void ehci_scan_ports(struct ehci_hcd *hc) {
     if (status & PORTSC_REG_CONNECT_STATUS)
       ehci_enumerate_port(hc, port);
   }
+}
+
+#define PORTSC_W1C_MASK                                                                            \
+  (PORTSC_REG_CONNECT_STATUS_CHANGE | PORTSC_REG_ENABLE_CHANGE | PORTSC_REG_OVERCURRENT_CHANGE)
+
+#define EHCI_POLL_THROTTLE 250u
+static int ehci_poll_ports(struct ehci_hcd *hc) {
+  u64 now  = pit_ticks();
+  u64 freq = pit_get_freq();
+
+  u64 interval = ((u64)EHCI_POLL_THROTTLE * (freq ? freq : 100) + 999) / 1000;
+
+  if ((u64)(now - hc->last_poll_tick) < interval)
+    return 0;
+
+  hc->last_poll_tick = now;
+
+  int changed = 0;
+
+  for (int port = 0; port < hc->ports; port++) {
+    u32 status = ehci_op_read(hc, EHCI_PORTSC(port));
+
+    if (!(status & PORTSC_REG_CONNECT_STATUS_CHANGE))
+      continue;
+
+    u32 clear = (status & ~PORTSC_W1C_MASK) | PORTSC_REG_CONNECT_STATUS_CHANGE;
+
+    ehci_op_write(hc, EHCI_PORTSC(port), clear);
+
+    if (status & PORTSC_REG_CONNECT_STATUS) {
+      log_write_int("EHCI: Device inserted on port", port, KERNEL, LOG_INFO);
+
+      ehci_enumerate_port(hc, port);
+      changed = 1;
+    } else {
+      log_write_int("EHCI: Device disconnected on port", port, KERNEL, LOG_WARN);
+
+      hc->storage[port].disconnected = 1;
+
+      changed = 1;
+    }
+  }
+
+  return changed;
+}
+
+int ehci_poll(void) {
+  int changed = 0;
+
+  for (int i = 0; i < ehci_controller_count; i++) {
+    struct ehci_hcd *hc = &ehci_controllers[i];
+
+    if (!hc->op)
+      continue;
+
+    changed |= ehci_poll_ports(hc);
+  }
+
+  return changed;
 }
 
 static void ehci_async_schedule_init(struct ehci_hcd *hc) {

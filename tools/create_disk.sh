@@ -150,6 +150,7 @@ map_target() {
         userspace/bin/sync/sync.elf)         echo "system/bin/sync.elf" ;;
         userspace/bin/wipe/wipe.elf)         echo "system/bin/wipe.elf" ;;
         userspace/bin/mkfs/mkfs.elf)         echo "system/bin/mkfs.elf" ;;
+        userspace/bin/diskutil/diskutil.elf) echo "system/bin/diskutil.elf" ;;
         userspace/bin/tree/tree.elf)         echo "system/bin/tree.elf" ;;
         userspace/bin/holyd.elf)             echo "system/bin/holyd.elf" ;;
         userspace/bin/cat/cat.elf)           echo "system/bin/cat.elf" ;;

@@ -46,6 +46,7 @@
 /* Drive signatures reported in PxSIG */
 #define AHCI_SIG_SATA 0x00000101u
 #define AHCI_SIG_ATAPI 0xEB140101u
+#define AHCI_SIG_PM 0x96690101
 
 enum FIS_TYPE {
   FIS_TYPE_REG_H2D   = 0x27, // Register FIS - host to device
@@ -223,6 +224,8 @@ struct AHCI_PORT {
   struct spinlock io_lock; // Serialize commands, including cache barriers.
   int is_active;           // 1 if a drive is present and initialized
   u32 signature;           // 0x00000101 for SATA, 0xEB140101 for ATAPI
+  u8 was_connected;
+  u8 hotplug_initialized;
 
   void *cmd_list_virt; // Virtual address of the 1KB Command List
   u64 cmd_list_phys;   // Physical address of the Command List
@@ -242,7 +245,7 @@ struct AHCI_DEVICE_DATA {
   void *abar_virtual;    // Virtual memory mapping of ABAR
   u32 ports_implemented; // Bitmap of ports implemented by HBA
   int irq;               // IRQ number (if using legacy interrupts)
-
+  u64 last_poll_tick;
   struct AHCI_PORT ports[AHCI_MAX_PORTS]; // Array of port states
 };
 

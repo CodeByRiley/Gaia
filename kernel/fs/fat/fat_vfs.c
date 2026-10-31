@@ -217,12 +217,26 @@ static void unmount(struct vfs_superblock *super) {
     fat_block_release();
   }
 }
+/* FAT keeps no trustworthy free count (FSInfo is a hint any OS may leave
+ * stale), so walk the table. It is resident, so this costs no I/O. */
+static int statfs(struct vfs_superblock *super, u64 *total, u64 *free) {
+  if (mounted_super != super || fat_volume.cluster_limit < 2)
+    return -1;
+  u64 unused = 0;
+  for (u32 cluster = 2; cluster < fat_volume.cluster_limit; cluster++)
+    if (fat_get(cluster) == 0)
+      unused++;
+  *total = (u64)(fat_volume.cluster_limit - 2) * cluster_bytes();
+  *free  = unused * cluster_bytes();
+  return 0;
+}
 static const struct vfs_filesystem fat_filesystem = {
     .name    = FAT_VFS_NAME,
     .probe   = probe,
     .mount   = fat_vfs_mount_image,
     .attach  = fat_mount_block,
     .sync    = fat_block_sync,
+    .statfs  = statfs,
     .unmount = unmount,
 };
 
