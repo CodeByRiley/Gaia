@@ -1,0 +1,2 @@
+drive_add 0 if=none,id=hotdisk,file=build/hotplug.img,format=raw
+device_add usb-storage,id=hotdisk,drive=hotdisk,bus=ehci.0

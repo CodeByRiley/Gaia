@@ -61,6 +61,31 @@ int blockdev_set_flags(const char *name, uint32_t flags) {
   return result;
 }
 
+int blockdev_set_online(const char *name, int online)
+{
+    if (!name)
+        return -EINVAL;
+
+    int result = -ENOENT;
+
+    spin_lock(&lock);
+
+    struct blockdev_entry *entry = find(name);
+
+    if (entry) {
+        if (online)
+            entry->flags &= ~BLOCKDEV_OFFLINE;
+        else
+            entry->flags |= BLOCKDEV_OFFLINE;
+
+        result = 0;
+    }
+
+    spin_unlock(&lock);
+
+    return result;
+}
+
 size_t blockdev_count(void) {
   spin_lock(&lock);
   size_t count = entry_count;
@@ -88,17 +113,27 @@ int blockdev_describe(size_t index, struct blockdev_info *out) {
   return result;
 }
 
-int blockdev_lookup(const char *name, struct block_device *out) {
-  if (!name || !out)
-    return -EINVAL;
+int blockdev_lookup(const char *name, struct block_device *out)
+{
+    if (!name || !out)
+        return -EINVAL;
 
-  int result = -ENOENT;
-  spin_lock(&lock);
-  const struct blockdev_entry *entry = find(name);
-  if (entry) {
-    *out   = entry->device;
-    result = 0;
-  }
-  spin_unlock(&lock);
-  return result;
+    int result = -ENOENT;
+
+    spin_lock(&lock);
+
+    const struct blockdev_entry *entry = find(name);
+
+    if (entry) {
+        if (entry->flags & BLOCKDEV_OFFLINE) {
+            result = -ENODEV;
+        } else {
+            *out = entry->device;
+            result = 0;
+        }
+    }
+
+    spin_unlock(&lock);
+
+    return result;
 }

@@ -27,6 +27,8 @@
 /* 32 AHCI ports and 8 USB slots, plus room for the partitions they carry. */
 #define BLOCKDEV_MAX 64
 
+#define BLOCKDEV_OFFLINE 0x20u
+
 /* `start_lba` is where this volume begins inside its parent disk, and is 0 for
  * a whole disk. `flags` carries the BLOCKDEV_* bits the caller knows about;
  * BLOCKDEV_WRITABLE is derived from the device itself and need not be passed.
@@ -35,9 +37,13 @@
 int blockdev_register(const char *name, const struct block_device *device, uint64_t start_lba,
                       uint32_t flags);
 
+int blockdev_unregister(const char *name);
+
 /* OR extra bits into an already-published volume. A disk is only known to be
  * partitioned once its table has been read, which happens after it is named. */
 int blockdev_set_flags(const char *name, uint32_t flags);
+
+int blockdev_set_online(const char *name, int online);
 
 size_t blockdev_count(void);
 
