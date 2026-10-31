@@ -192,6 +192,9 @@ long blockdev_read(const char *source, uint64_t lba, uint32_t sectors, void *out
 long blockdev_write(const char *source, uint64_t lba, uint32_t sectors, const void *in);
 long blockdev_flush(const char *source);
 long fs_sync(void);
+/* Live mounts: target path, filesystem, the volume behind each (empty for
+ * the boot image) and its capacity. Returns how many were written, or -1. */
+long mount_list(struct mount_info *out, long max);
 #ifndef GAIA_USE_MUSL
 int mount(const char *source, const char *target, const char *filesystemtype,
           unsigned long mountflags, const void *data);

@@ -302,6 +302,27 @@ int vfs_device_mounted(const void *context) {
   return 0;
 }
 
+int vfs_mount_describe(size_t slot, struct vfs_mount_info *out) {
+  VFS_GUARD();
+  if (!out || slot >= VFS_MAX_MOUNTS)
+    return -EINVAL;
+  const struct vfs_mount *mount = &mounts[slot];
+  if (!mount->super.filesystem)
+    return -ENOENT;
+  memset(out, 0, sizeof(*out));
+  strcpy(out->path, mount->path);
+  out->filesystem     = mount->super.filesystem->name;
+  out->device_context = mount->super.device_context;
+  /* statfs takes the superblock non-const, but only reads it. */
+  if (mount->super.filesystem->statfs &&
+      mount->super.filesystem->statfs(
+          (struct vfs_superblock *)&mount->super, &out->total_bytes, &out->free_bytes)) {
+    out->total_bytes = 0;
+    out->free_bytes  = 0;
+  }
+  return 0;
+}
+
 int vfs_file_sync(struct vfs_file *file) {
   VFS_GUARD();
   if (!file || !file->node)

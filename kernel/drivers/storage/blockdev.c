@@ -113,6 +113,23 @@ int blockdev_describe(size_t index, struct blockdev_info *out) {
   return result;
 }
 
+int blockdev_name_of(const void *context, char out[BLOCKDEV_NAME_MAX]) {
+  if (!context || !out)
+    return -EINVAL;
+
+  int result = -ENOENT;
+  spin_lock(&lock);
+  for (size_t i = 0; i < entry_count; i++) {
+    if (entries[i].device.context == context) {
+      strcpy(out, entries[i].name);
+      result = 0;
+      break;
+    }
+  }
+  spin_unlock(&lock);
+  return result;
+}
+
 int blockdev_lookup(const char *name, struct block_device *out)
 {
     if (!name || !out)

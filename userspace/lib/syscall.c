@@ -205,6 +205,9 @@ long blockdev_flush(const char *source) {
   return syscall1(SYS_BLKDEV_FLUSH, (sysarg_t)(uintptr_t)source);
 }
 long fs_sync(void) { return syscall0(SYS_FS_SYNC); }
+long mount_list(struct mount_info *out, long max) {
+  return syscall2(SYS_MOUNT_LIST, (sysarg_t)(uintptr_t)out, (sysarg_t)max);
+}
 
 long net_stats(struct net_stats *out) { return syscall1(SYS_NET_STATS, (sysarg_t)(uintptr_t)out); }
 

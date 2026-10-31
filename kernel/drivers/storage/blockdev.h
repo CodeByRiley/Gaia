@@ -56,4 +56,9 @@ int blockdev_describe(size_t index, struct blockdev_info *out);
  * volume goes by that name, or -EINVAL for invalid arguments. */
 int blockdev_lookup(const char *name, struct block_device *out);
 
+/* The reverse: which published name carries transport `context`. Each
+ * volume, partition slices included, has its own context, so the answer is
+ * unique. 0 on success, -ENOENT when nothing published uses it. */
+int blockdev_name_of(const void *context, char out[BLOCKDEV_NAME_MAX]);
+
 #endif

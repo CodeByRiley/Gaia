@@ -69,6 +69,9 @@ struct vfs_filesystem {
   int (*attach)(struct vfs_superblock *super, void *context);
   void (*unmount)(struct vfs_superblock *super);
   int (*sync)(struct vfs_superblock *super);
+  /* Capacity and free space in bytes, from the backend's in-memory state so
+   * it reflects writes not yet synced. Optional: NULL reports 0/0. */
+  int (*statfs)(struct vfs_superblock *super, uint64_t *total_bytes, uint64_t *free_bytes);
 };
 /* Mount supplies private_data and an owned root reference. unmount frees
  * backend state, never the caller-owned image; it also handles failed mounts. */
@@ -123,6 +126,17 @@ int vfs_attach_auto(const char *mountpoint, void *context, const char **mounted_
 int vfs_unmount(const char *mountpoint);
 int vfs_sync_all(void);
 int vfs_device_mounted(const void *context);
+/* Snapshot of one mount-table slot. `device_context` is the transport the
+ * mount was attached from, NULL for a memory image. */
+struct vfs_mount_info {
+  char path[VFS_PATH_MAX];
+  const char *filesystem;
+  const void *device_context;
+  uint64_t total_bytes, free_bytes;
+};
+/* 0 for a live slot, -ENOENT for an empty one, -EINVAL past the table, so a
+ * walk visits slots 0..VFS_MAX_MOUNTS-1 and skips the holes. */
+int vfs_mount_describe(size_t slot, struct vfs_mount_info *out);
 int vfs_file_sync(struct vfs_file *file);
 int vfs_open(const char *path, struct vfs_file *file);
 int vfs_create(const char *path, struct vfs_file *file);

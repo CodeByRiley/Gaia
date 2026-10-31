@@ -74,6 +74,22 @@ struct blockdev_info {
   char name[BLOCKDEV_NAME_MAX];
 };
 
+/* One live mount, as reported by SYS_MOUNT_LIST. `source` is the published
+ * volume name behind it, or empty for a filesystem mounted from a memory
+ * image (the boot ramdisk) that no block device answers to. Sizes are bytes
+ * and both zero when the backend cannot report them. A mount whose path does
+ * not fit MOUNT_PATH_MAX is truncated rather than skipped. */
+#define MOUNT_PATH_MAX 128
+#define MOUNT_TYPE_MAX 16
+
+struct mount_info {
+  uint64_t total_bytes;
+  uint64_t free_bytes;
+  char source[BLOCKDEV_NAME_MAX];
+  char fstype[MOUNT_TYPE_MAX];
+  char target[MOUNT_PATH_MAX];
+};
+
 #define NET_FRAME_BYTES 128
 #define NET_CAPTURE_BATCH 16
 #define NET_DIR_RX 0
@@ -177,6 +193,8 @@ _Static_assert(offsetof(struct proc_info, name) == 20, "proc_info.name ABI");
 _Static_assert(sizeof(struct mem_stats) == 24, "mem_stats ABI");
 _Static_assert(sizeof(struct blockdev_info) == 40, "blockdev_info ABI");
 _Static_assert(offsetof(struct blockdev_info, name) == 24, "blockdev_info.name ABI");
+_Static_assert(sizeof(struct mount_info) == 176, "mount_info ABI");
+_Static_assert(offsetof(struct mount_info, target) == 48, "mount_info.target ABI");
 _Static_assert(sizeof(struct net_frame) == 160, "net_frame ABI");
 _Static_assert(offsetof(struct net_frame, data) == 32, "net_frame.data ABI");
 _Static_assert(sizeof(struct net_stats) == 80, "net_stats ABI");
