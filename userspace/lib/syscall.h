@@ -330,6 +330,7 @@ long net_capture(uint64_t *cursor, struct net_frame *out, long max);
  * -1 on timeout or a rejected argument, -2 when there is no route or too
  * many pings are already in flight. Blocks for up to req->timeout_ms. */
 long net_ping(struct net_ping *req);
+long net_config(struct net_config *out);
 
 /* Threading */
 long thread_create(void *(*entry)(void *), void *stack, void *arg);

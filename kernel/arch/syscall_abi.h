@@ -95,6 +95,28 @@ struct mount_info {
 #define NET_DIR_RX 0
 #define NET_DIR_TX 1
 
+#define NET_CONFIG_MAX_DNS 4
+
+#define NET_CONFIG_PRESENT   0x01u
+#define NET_CONFIG_DHCP_BOUND 0x02u
+
+struct net_config {
+  uint32_t flags;
+
+  uint8_t mac[6];
+  uint8_t address[4];
+  uint8_t netmask[4];
+  uint8_t gateway[4];
+  uint8_t server[4];
+
+  uint8_t dns[NET_CONFIG_MAX_DNS][4];
+  uint8_t dns_count;
+  uint8_t reserved;
+};
+
+_Static_assert(sizeof(struct net_config) == 44,
+               "net_config ABI");
+
 struct net_frame {
   uint64_t seq;
   uint64_t ticks;

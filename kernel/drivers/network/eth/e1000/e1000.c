@@ -10,6 +10,7 @@
 #include <memory/vmm.h>
 #include <net/arp.h>
 #include <net/eth.h>
+#include <net/dhcp.h>
 #include <net/netif.h>
 #include <net/netmon.h>
 #include <pci/pci.h>
@@ -25,9 +26,9 @@
 
 /* QEMU's slirp gateway is 10.0.2.2 and it serves a /24. Static addressing
  * until DHCP lands, at which point netif_set_ipv4 replaces all three. */
-static const u8 e1000_ipv4_addr[IPV4_ALEN]    = {10, 0, 2, 30}; // 10.0.2.30 default we probe later
-static const u8 e1000_ipv4_mask[IPV4_ALEN]    = {255, 255, 255, 0};
-static const u8 e1000_ipv4_gateway[IPV4_ALEN] = {10, 0, 2, 2};
+static const u8 e1000_ipv4_addr[IPV4_ALEN]    = { };
+static const u8 e1000_ipv4_mask[IPV4_ALEN]    = { };
+static const u8 e1000_ipv4_gateway[IPV4_ALEN] = { };
 static u64 next_mmio_virt                     = MMIO_VIRT_BASE;
 
 /* Causes that mean "the poll pass has something to do". */
@@ -296,8 +297,9 @@ static int e1000_init_hardware(struct e1000_dev *nic) {
 
   /* Announce the binding now that transmit is live, and resolve the
    * gateway while nothing is waiting on it. */
-  arp_announce();
-  arp_prime_gateway();
+  dhcp_start();
+  // arp_announce();
+  // arp_prime_gateway();
 
   log_write("e1000: RX/TX ready at 10.0.2.30", KERNEL, LOG_INFO);
 
@@ -374,7 +376,7 @@ static int e1000_poll_rx(struct device *dev) {
   /* ARP timeouts ride the poll task instead of earning a timer of their
    * own; the cache is empty and this returns immediately on most passes. */
   arp_tick();
-
+  dhcp_tick();
   return handled;
 }
 

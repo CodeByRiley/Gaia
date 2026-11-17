@@ -55,6 +55,7 @@ payloads=(
     "rootfs/system/wallpaper.bmp::system/wallpaper.bmp"
     "rootfs/system/testcpp.elf::system/testcpp.elf"
     "rootfs/test.cpp::test.cpp"
+    "rootfs/etc/resolv.conf::etc/resolv.conf"
 )
 
 # Dynamically package the native development toolchain.

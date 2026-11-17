@@ -79,6 +79,7 @@ int ipv4_output(const u8 dst[IPV4_ALEN], u8 protocol, const void *payload, u16 p
 }
 
 void ipv4_input(const struct eth_hdr *eth, const u8 *packet, u16 len) {
+
   struct netif *nif = netif_get();
   if (!nif || !packet || len < IPV4_HDR_LEN)
     return;
@@ -122,7 +123,10 @@ void ipv4_input(const struct eth_hdr *eth, const u8 *packet, u16 len) {
 
   const u8 *payload = packet + ihl;
   u16 payload_len   = (u16)(total_len - ihl);
-
+  log_write_fmt(KERNEL, LOG_INFO,
+                "ipv4: protocol=%u payload_len=%u",
+                ip->protocol,
+                payload_len);
   switch (ip->protocol) {
   case IPPROTO_ICMP:
     icmp_input(ip, payload, payload_len);

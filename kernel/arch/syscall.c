@@ -30,8 +30,8 @@
  * do per-page copy-in/copy-out into kernel buffers.
  */
 #include <arch/gdt.h>
-#include <arch/percpu.h>
 #include <arch/linux_syscall_names.h>
+#include <arch/percpu.h>
 #include <arch/syscall.h>
 #include <devices/io.h>
 #include <devices/pit.h>
@@ -53,9 +53,13 @@
 #include <memory/vmm.h>
 #include <msg/msg.h>
 #include <msg/pipe.h>
+#include <net/dhcp.h>
 #include <net/icmp.h>
+#include <net/ipv4.h>
 #include <net/ksocket.h>
+#include <net/netif.h>
 #include <net/netmon.h>
+#include <net/udp.h>
 #include <sched/sched.h>
 #include <sched/signal.h>
 #include <stddef.h>
@@ -180,6 +184,11 @@ _Static_assert(SYSRET_STAR_BASE + 16 == (GDT_USER_CODE | GDT_RPL_USER),
 #define TASK_FD_NONBLOCK 0x1
 
 #define MSG_DONTWAIT 0x40
+#define MSG_TRUNC 0x20
+#define MSG_NOSIGNAL 0x4000
+
+#define MSG_IOV_MAX 1024
+#define UDP_DATA_MAX (IPV4_PAYLOAD_MAX - UDP_HEADER_SIZE)
 
 #define TIOCGWINSZ 0x5413
 #define TCGETS 0x5401
@@ -277,6 +286,21 @@ struct linux_utsname {
   char machine[65];
   char domainname[65];
 };
+
+struct linux_msghdr {
+  void *msg_name;
+  u32 msg_namelen;
+
+  struct linux_iovec *msg_iov;
+  usize msg_iovlen;
+
+  void *msg_control;
+  usize msg_controllen;
+
+  int msg_flags;
+};
+
+_Static_assert(sizeof(struct linux_msghdr) == 56, "Invalid msghdr ABI");
 
 _Static_assert(sizeof(struct linux_utsname) == 390, "Linux x86_64 utsname ABI size");
 
@@ -2960,6 +2984,7 @@ static long sys_sendto(int fd, const void *buf, usize len, int flags,
 
 static long sys_recvfrom(int fd, void *buf, usize len, int flags, struct sockaddr_in *src,
                          u32 *addrlen) {
+
   struct task *t      = task_current();
   struct socket *sock = sock_from_fd(t, fd);
   if (!sock)
@@ -2980,6 +3005,277 @@ static long sys_recvfrom(int fd, void *buf, usize len, int flags, struct sockadd
   return n;
 }
 
+static long msg_import_iov(const struct linux_msghdr *msg, struct linux_iovec **out, usize *total,
+                           int writable) {
+  *out   = NULL;
+  *total = 0;
+
+  if (msg->msg_iovlen > MSG_IOV_MAX)
+    return -EMSGSIZE;
+
+  if (msg->msg_iovlen == 0)
+    return 0;
+
+  usize bytes = msg->msg_iovlen * sizeof(struct linux_iovec);
+
+  if (!user_buffer_ok(msg->msg_iov, bytes, 0))
+    return -EFAULT;
+
+  struct linux_iovec *iov = kmalloc(bytes);
+
+  if (!iov)
+    return -ENOMEM;
+
+  memcpy(iov, msg->msg_iov, bytes);
+
+  for (usize i = 0; i < msg->msg_iovlen; i++) {
+    if (iov[i].len == 0)
+      continue;
+
+    if (iov[i].len > (u64)INT64_MAX - *total) {
+      kfree(iov);
+      return -EINVAL;
+    }
+
+    if (!user_buffer_ok(iov[i].base, iov[i].len, writable)) {
+      kfree(iov);
+      return -EFAULT;
+    }
+
+    *total += iov[i].len;
+  }
+
+  *out = iov;
+  return 0;
+}
+
+static long sys_recvmsg(int fd, struct linux_msghdr *msg, int flags) {
+  log_write_fmt(KERNEL, LOG_DEBUG, "recvmsg: fd=%d flags=%x", fd, flags);
+  struct task *t      = task_current();
+  struct socket *sock = sock_from_fd(t, fd);
+
+  if (!sock)
+    return -ENOTSOCK;
+
+  if (sock->type != SOCK_DGRAM)
+    return -EPROTONOSUPPORT;
+
+  if (!msg || !user_buffer_ok(msg, sizeof(*msg), 1))
+    return -EFAULT;
+
+  if (flags & ~(MSG_DONTWAIT | MSG_TRUNC))
+    return -EINVAL;
+
+  struct linux_msghdr local;
+  memcpy(&local, msg, sizeof(local));
+
+  usize name_len = local.msg_namelen;
+
+  if (name_len > sizeof(struct sockaddr_in))
+    name_len = sizeof(struct sockaddr_in);
+
+  if (local.msg_name && name_len && !user_buffer_ok(local.msg_name, name_len, 1))
+    return -EFAULT;
+
+  struct linux_iovec *iov;
+  usize capacity;
+
+  long rc = msg_import_iov(&local, &iov, &capacity, 1);
+
+  if (rc < 0)
+    return rc;
+
+  u8 *buffer = kmalloc(UDP_DATA_MAX);
+
+  if (!buffer) {
+    if (iov)
+      kfree(iov);
+
+    return -ENOMEM;
+  }
+
+  struct sockaddr_in src = {0};
+
+  int nonblock = (flags & MSG_DONTWAIT) || fd_nonblocking(t, fd);
+
+  long received =
+      socket_recvfrom(sock, buffer, UDP_DATA_MAX, &src, nonblock ? SOCKET_RECV_NONBLOCK : 0);
+  log_write_fmt(KERNEL, LOG_DEBUG, "recvmsg: received=%ld", received);
+
+  if (received < 0) {
+    kfree(buffer);
+
+    if (iov)
+      kfree(iov);
+
+    return received;
+  }
+
+  if (received >= 12) {
+    log_write_fmt(KERNEL,
+                  LOG_DEBUG,
+                  "dns: ID=%04x flags=%04x rcode=%u answers=%u",
+                  (buffer[0] << 8) | buffer[1],
+                  (buffer[2] << 8) | buffer[3],
+                  buffer[3] & 0x0f,
+                  (buffer[6] << 8) | buffer[7]);
+  }
+
+  usize datagram_len = (usize)received;
+
+  usize copied    = 0;
+  usize remaining = datagram_len;
+
+  for (usize i = 0; i < local.msg_iovlen && remaining; i++) {
+
+    usize count = iov[i].len;
+
+    if (count > remaining)
+      count = remaining;
+
+    if (!count)
+      continue;
+
+    memcpy(iov[i].base, buffer + copied, count);
+
+    copied += count;
+    remaining -= count;
+  }
+
+  local.msg_flags = 0;
+
+  if (datagram_len > capacity)
+    local.msg_flags |= MSG_TRUNC;
+
+  if (local.msg_name) {
+    if (name_len)
+      memcpy(local.msg_name, &src, name_len);
+
+    local.msg_namelen = sizeof(src);
+  } else {
+    local.msg_namelen = 0;
+  }
+
+  // Ancillary data is not implemented.
+  local.msg_controllen = 0;
+
+  memcpy(msg, &local, sizeof(local));
+
+  kfree(buffer);
+
+  if (iov)
+    kfree(iov);
+
+  if (flags & MSG_TRUNC)
+    return (long)datagram_len;
+
+  return (long)copied;
+}
+
+static long sys_sendmsg(int fd, const struct linux_msghdr *msg, int flags) {
+  struct task *t      = task_current();
+  struct socket *sock = sock_from_fd(t, fd);
+
+  if (!sock)
+    return -ENOTSOCK;
+
+  if (sock->type != SOCK_DGRAM)
+    return -EPROTONOSUPPORT;
+
+  if (!msg || !user_buffer_ok(msg, sizeof(*msg), 0))
+    return -EFAULT;
+
+  if (flags & ~(MSG_DONTWAIT | MSG_NOSIGNAL))
+    return -EINVAL;
+
+  struct linux_msghdr local;
+  memcpy(&local, msg, sizeof(local));
+
+  if (local.msg_controllen)
+    return -EINVAL;
+
+  if (!local.msg_name)
+    return -EDESTADDRREQ;
+
+  if (local.msg_namelen < sizeof(struct sockaddr_in))
+    return -EINVAL;
+
+  if (!user_buffer_ok(local.msg_name, sizeof(struct sockaddr_in), 0))
+    return -EFAULT;
+
+  struct sockaddr_in remote;
+  memcpy(&remote, local.msg_name, sizeof(remote));
+
+  if (remote.family != AF_INET)
+    return -EAFNOSUPPORT;
+
+  struct linux_iovec *iov;
+  usize total;
+
+  long rc = msg_import_iov(&local, &iov, &total, 0);
+
+  if (rc < 0)
+    return rc;
+
+  if (total > UDP_DATA_MAX) {
+    if (iov)
+      kfree(iov);
+
+    return -EMSGSIZE;
+  }
+
+  u8 *buffer = kmalloc(total ? total : 1);
+
+  if (!buffer) {
+    if (iov)
+      kfree(iov);
+
+    return -ENOMEM;
+  }
+
+  usize offset = 0;
+
+  for (usize i = 0; i < local.msg_iovlen; i++) {
+    if (!iov[i].len)
+      continue;
+
+    memcpy(buffer + offset, iov[i].base, iov[i].len);
+
+    offset += iov[i].len;
+  }
+
+  // Automatically allocate an ephemeral source port.
+  if (sock->local.port == 0) {
+    struct sockaddr_in addr = {0};
+
+    addr.family = AF_INET;
+    addr.port   = socket_alloc_ephemeral_port();
+
+    if (!addr.port || socket_bind(sock, &addr) != 0) {
+
+      kfree(buffer);
+
+      if (iov)
+        kfree(iov);
+
+      return -EADDRINUSE;
+    }
+  }
+
+  rc = socket_sendto(sock, buffer, total, &remote);
+
+  kfree(buffer);
+
+  if (iov)
+    kfree(iov);
+
+  // Existing socket_sendto returns a generic -1.
+  if (rc == -1)
+    return -EIO;
+
+  return rc;
+}
+
 static long sys_net_ping(struct net_ping *req) {
   if (!user_buffer_ok(req, sizeof(*req), 1))
     return -EFAULT;
@@ -2995,6 +3291,46 @@ static long sys_net_ping(struct net_ping *req) {
   if (rc == 0)
     req->rtt_ms = rtt_ms;
   return rc;
+}
+
+static long sys_net_config(struct net_config *out) {
+  if (!out || !user_buffer_ok(out, sizeof(*out), 1))
+    return -EFAULT;
+
+  struct net_config config = {0};
+
+  struct netif *nif = netif_get();
+
+  if (nif) {
+    config.flags |= NET_CONFIG_PRESENT;
+
+    memcpy(config.mac, nif->mac,
+           sizeof(config.mac));
+
+    memcpy(config.address, nif->ipv4, 4);
+    memcpy(config.netmask, nif->netmask, 4);
+    memcpy(config.gateway, nif->gateway, 4);
+
+    const struct dhcp_lease *lease = dhcp_get_lease();
+
+    if (lease) {
+      config.flags |= NET_CONFIG_DHCP_BOUND;
+
+      memcpy(config.server, lease->server, 4);
+
+      config.dns_count = lease->dns_count;
+
+      if (config.dns_count > NET_CONFIG_MAX_DNS)
+        config.dns_count = NET_CONFIG_MAX_DNS;
+
+      memcpy(config.dns, lease->dns,
+             config.dns_count * sizeof(config.dns[0]));
+    }
+  }
+
+  memcpy(out, &config, sizeof(config));
+
+  return 0;
 }
 
 static long sys_arch_prctl(long code, u64 addr) {
@@ -3343,8 +3679,8 @@ static long copy_user_vector(char *const *user, char **out, char *blob, usize *u
  * 0x37F, all exceptions masked, round to nearest. */
 static void fx_reset(u8 *fx) {
   memset(fx, 0, 512);
-  fx[0] = 0x7f;
-  fx[1] = 0x03;
+  fx[0]     = 0x7f;
+  fx[1]     = 0x03;
   u32 mxcsr = 0x1f80;
   memcpy(fx + 24, &mxcsr, sizeof(mxcsr));
 }
@@ -4017,6 +4353,11 @@ long syscall_dispatch(struct syscall_frame *f) {
   case SYS_NET_PING:
     ret = sys_net_ping((struct net_ping *)(uintptr_t)a1);
     break;
+  case SYS_NET_CONFIG:
+    ret = sys_net_config(
+        (struct net_config *)(uintptr_t)a1
+    );
+    break;
   case SYS_SOCKET:
     ret = sys_socket((int)a1, (int)a2, (int)a3);
     break;
@@ -4038,6 +4379,13 @@ long syscall_dispatch(struct syscall_frame *f) {
                        (int)a4,
                        (struct sockaddr_in *)(uintptr_t)a5,
                        (u32 *)(uintptr_t)a6);
+    break;
+  case SYS_RECVMSG:
+    ret = sys_recvmsg((int)a1, (struct linux_msghdr *)(uintptr_t)a2, (int)a3);
+    break;
+
+  case SYS_SENDMSG:
+    ret = sys_sendmsg((int)a1, (const struct linux_msghdr *)(uintptr_t)a2, (int)a3);
     break;
   default:
     report_syscall(num, "unimplemented");

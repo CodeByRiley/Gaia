@@ -46,9 +46,7 @@ long readdir_path(const char *path, unsigned *index, char *buf, size_t n) {
 }
 
 /* 0777 less the umask, as mkdir(1) asks; the kernel reads the mode register. */
-long mkdir_path(const char *path) {
-  return syscall2(SYS_MKDIR, (sysarg_t)(uintptr_t)path, 0777);
-}
+long mkdir_path(const char *path) { return syscall2(SYS_MKDIR, (sysarg_t)(uintptr_t)path, 0777); }
 
 long rmdir_path(const char *path) { return syscall1(SYS_RMDIR, (sysarg_t)(uintptr_t)path); }
 
@@ -217,6 +215,7 @@ long net_capture(uint64_t *cursor, struct net_frame *out, long max) {
 }
 
 long net_ping(struct net_ping *req) { return syscall1(SYS_NET_PING, (sysarg_t)(uintptr_t)req); }
+long net_config(struct net_config *out) { return syscall1(SYS_NET_CONFIG, SYSPTR(out)); }
 
 /* Threading */
 long thread_create(void *(*entry)(void *), void *stack, void *arg) {

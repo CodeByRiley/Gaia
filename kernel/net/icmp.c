@@ -1,4 +1,5 @@
 /* kernel/net/icmp.c - see icmp.h. */
+#include "utilities/log.h"
 #include <devices/pit.h>
 #include <net/icmp.h>
 #include <net/ipv4.h>
@@ -78,6 +79,9 @@ static void icmp_echo_request_input(const struct ipv4_hdr *ip, const u8 *payload
 }
 
 void icmp_input(const struct ipv4_hdr *ip, const u8 *payload, u16 len) {
+  if (len >= 8) {
+    log_write_fmt(KERNEL, LOG_INFO, "icmp: type=%u code=%u len=%u", payload[0], payload[1], len);
+  }
   if (!ip || !payload || len < ICMP_HDR_LEN || len > IPV4_PAYLOAD_MAX)
     return;
 

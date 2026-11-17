@@ -1,6 +1,7 @@
 /* kernel/net/udp.c */
 #include "net/udp.h"
 
+#include "net/dhcp.h"
 #include "net/ipv4.h"
 #include "net/ksocket.h"
 #include "net/netif.h"
@@ -36,30 +37,50 @@ u16 udp_checksum(const u8 src_ip[4], const u8 dst_ip[4], const struct udp_header
 }
 
 void udp_input(const struct ipv4_hdr *ip, const u8 *segment, u16 seg_len) {
-  if (seg_len < UDP_HEADER_SIZE)
+  log_write_fmt(KERNEL, LOG_INFO, "udp: input seg_len=%u", seg_len);
+
+  if (seg_len < UDP_HEADER_SIZE) {
+    log_write("udp: segment too short", KERNEL, LOG_INFO);
     return;
+  }
 
   const struct udp_header *hdr = (const struct udp_header *)segment;
   u16 udp_len                  = from_be16(hdr->length);
 
-  /* The UDP length field is the real datagram boundary: Ethernet pads
-   * short frames, and a length beyond the IP payload means truncation.
-   * The IP-derived length delimits neither case correctly. */
-  if (udp_len < UDP_HEADER_SIZE || udp_len > seg_len)
-    return;
+  log_write_fmt(KERNEL,
+                LOG_INFO,
+                "udp: src=%u dst=%u len=%u checksum=%04x",
+                from_be16(hdr->src_port),
+                from_be16(hdr->dst_port),
+                udp_len,
+                from_be16(hdr->checksum));
 
-  /* Zero means the sender skipped the checksum — legal under IPv4
-   * (IPv6 removed the option). Accept unverified. */
-  if (hdr->checksum != 0 && udp_checksum(ip->src, ip->dst, hdr, udp_len) != 0) {
-    log_write("udp: dropping datagram with bad checksum", KERNEL, LOG_DEBUG);
+  if (udp_len < UDP_HEADER_SIZE || udp_len > seg_len) {
+    log_write("udp: invalid length", KERNEL, LOG_INFO);
     return;
   }
 
+  u16 checksum = udp_checksum(ip->src, ip->dst, hdr, udp_len);
+
+  if (hdr->checksum != 0 && checksum != 0) {
+    log_write_fmt(KERNEL, LOG_INFO, "udp: bad checksum, residual=%04x", checksum);
+    return;
+  }
+
+  log_write("udp: validation passed", KERNEL, LOG_INFO);
   const u8 *payload = segment + UDP_HEADER_SIZE;
   u16 payload_len   = (u16)(udp_len - UDP_HEADER_SIZE);
 
   struct ipv4_addr src = *(struct ipv4_addr *)ip->src;
   struct ipv4_addr dst = *(struct ipv4_addr *)ip->dst;
+
+  if (from_be16(hdr->src_port) == DHCP_SERVER_PORT &&
+      from_be16(hdr->dst_port) == DHCP_CLIENT_PORT) {
+
+    dhcp_input(payload, payload_len);
+    return;
+  }
+
   socket_handle_incoming(
       src, hdr->src_port, dst, hdr->dst_port, IPPROTO_UDP, (void *)payload, payload_len);
 }
@@ -87,8 +108,7 @@ int udp_output(const u8 dst_ip[IPV4_ALEN], u16 src_port, u16 dst_port, const voi
   udp->dst_port          = to_be16(dst_port);
   udp->length            = to_be16(seg_len);
   udp->checksum          = 0;
-  udp->checksum          = udp_checksum(nif->ipv4, dst_ip, udp, seg_len);
-
+  udp->checksum          = to_be16(udp_checksum(nif->ipv4, dst_ip, udp, seg_len));
   /* A computed checksum of zero goes out as 0xFFFF: zero on the wire
    * means "unchecked", which is not what we computed (RFC 768). */
   if (udp->checksum == 0)

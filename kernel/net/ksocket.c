@@ -258,8 +258,19 @@ void socket_handle_incoming(struct ipv4_addr src_ip, port_t src_port, struct ipv
   // Unlock the global list immediately!
   spin_unlock_irqrestore(&socket_list_lock, list_rflags);
 
-  if (!target)
-    return;
+  if (!target) {
+      log_write_fmt(KERNEL,
+                    LOG_DEBUG,
+                    "socket: no match for port %u",
+                    from_be16(dest_port));
+      return;
+  }
+
+  log_write_fmt(KERNEL,
+                LOG_DEBUG,
+                "socket: matched socket %u, port %u",
+                target->id,
+                from_be16(dest_port));
 
   // Allocate memory BEFORE taking the target lock
   struct packet_node *node = kmalloc(sizeof(struct packet_node));

@@ -17,6 +17,8 @@
  */
 #include <lib/syscall.h>
 
+#include <netdb.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -27,42 +29,29 @@
  * hardcoding that here would break silently the day it changes. */
 #define PING_INTERVAL_MS 1000
 
-/* Strict dotted quad. strtol would accept "1.2.3.4xyz" and octal-looking
- * components, both of which silently ping the wrong host. */
-static int parse_ipv4(const char *text, unsigned char out[4]) {
-  unsigned int part = 0;
-  int digits        = 0;
-  int index         = 0;
+static int resolve_hostname(const char *hostname, uint8_t dst[4]) {
+  struct addrinfo hints   = {0};
+  struct addrinfo *result = NULL;
 
-  for (const char *p = text;; p++) {
-    if (*p >= '0' && *p <= '9') {
-      part = part * 10u + (unsigned int)(*p - '0');
-      if (++digits > 3 || part > 255u)
-        return -1;
-      continue;
-    }
+  hints.ai_family = AF_INET;
 
-    if (*p == '.' || *p == '\0') {
-      if (digits == 0 || index > 3)
-        return -1;
-      out[index++] = (unsigned char)part;
-      part         = 0;
-      digits       = 0;
-      if (*p == '\0')
-        break;
-      continue;
-    }
+  int rc = getaddrinfo(hostname, NULL, &hints, &result);
 
+  if (rc != 0) {
+    fprintf(stderr, "ping: %s: %s\n", hostname, gai_strerror(rc));
     return -1;
   }
 
-  return index == 4 ? 0 : -1;
+  struct sockaddr_in *addr = (struct sockaddr_in *)result->ai_addr;
+
+  memcpy(dst, &addr->sin_addr, 4);
+
+  freeaddrinfo(result);
+  return 0;
 }
 
 static void usage(void) {
-  printf("usage: ping <dotted-quad> [count]\n");
-  printf("  no DNS yet, so a name will not work.\n");
-  printf("  10.0.2.2 is the gateway under QEMU user networking.\n");
+  printf("Usage: ping <hostname|ipv4> [count]\n");
 }
 
 int main(int argc, char **argv) {
@@ -72,11 +61,8 @@ int main(int argc, char **argv) {
   }
 
   unsigned char dst[4];
-  if (parse_ipv4(argv[1], dst) != 0) {
-    printf("ping: %s is not a dotted-quad address\n", argv[1]);
-    usage();
+  if (resolve_hostname(argv[1], dst) != 0)
     return 1;
-  }
 
   int count = PING_DEFAULT_COUNT;
   if (argc == 3) {
@@ -103,7 +89,8 @@ int main(int argc, char **argv) {
    * is the cheapest thing that differs between runs. */
   unsigned short ident = (unsigned short)(get_ticks() & 0xFFFF);
 
-  printf("PING %d.%d.%d.%d: %d data bytes\n", dst[0], dst[1], dst[2], dst[3], 32);
+  printf("PING %s (%u.%u.%u.%u): 32 data bytes\n",
+         argv[1], dst[0], dst[1], dst[2], dst[3]);
 
   int sent               = 0;
   int received           = 0;
@@ -149,7 +136,7 @@ int main(int argc, char **argv) {
       usleep(PING_INTERVAL_MS * 1000);
   }
 
-  printf("\n--- %d.%d.%d.%d ping statistics ---\n", dst[0], dst[1], dst[2], dst[3]);
+  printf("\n--- %s ping statistics ---\n", argv[1]);
   int lost = sent - received;
   printf("%d transmitted, %d received, %d%% packet loss\n",
          sent,
