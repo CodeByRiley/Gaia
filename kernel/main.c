@@ -195,6 +195,16 @@ static void late_init(void) {
  * nothing at all, and every shell in the system , including that fallback ,
  * can exit without consequence. */
 static void init_task_entry(void) {
+ char *netd_argv[] = {(char *)"netd", NULL};
+
+  long netd_pid = process_spawn_async(
+      "/system/bin/netd.elf", netd_argv);
+
+  if (netd_pid < 0)
+    log_write("netd: launch failed", USER, LOG_ERROR);
+  else
+    log_write_hex("netd: launched pid: ",
+                  (u64)netd_pid, USER, LOG_INFO);
   char *heimdall_argv[] = {(char *)"heimdall", NULL};
   long heimdall_pid     = process_spawn_async("/system/bin/heimdall.elf", heimdall_argv);
   if (heimdall_pid < 0)
